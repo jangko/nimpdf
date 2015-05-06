@@ -4,7 +4,7 @@ nimPDF is a free PDF writer library, written mostly in nim programming language
 
 nimPDF was heavily inspired by PHP-[FPDF](http://www.fpdf.org) but also influenced by  [jagPDF](http://www.jagpdf.org), [libHaru](http://www.libharu.org)(especially for the demo), [PyFPDF](https://code.google.com/p/pyfpdf), [pdfkit](http://devongovett.github.io/pdfkit)
 
-nimPDF implements the following features(see demo.pdf):
+nimPDF implements the following features(see [demo.pdf](https://github.com/jangko/nimpdf/blob/master/demo.pdf)):
 
 * **images**
   - PNG -- use [LodePNG](lodev.org/lodepng), still in C
