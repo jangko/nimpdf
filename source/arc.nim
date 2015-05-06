@@ -46,7 +46,7 @@ proc bezier_arc_centre(x, y, rx, ry, start, sweep : float64, approx: var arc_app
     if sweep_angle >=  2.0 * math.PI: sweep_angle =  2.0 * math.PI
     if sweep_angle <= -2.0 * math.PI: sweep_angle = -2.0 * math.PI
 
-    if math.fabs(sweep_angle) < 1e-10:
+    if abs(sweep_angle) < 1e-10:
         approx.num_vertices = 4
         approx.cmd = LINE_TO
         approx.vertices[0] = x + rx * math.cos(start_angle)
