@@ -1,3 +1,13 @@
+# Copyright (c) 2015 Andri Lim
+#
+# Distributed under the MIT license 
+# (See accompanying file LICENSE.txt)
+#
+#-----------------------------------------
+# another port from C++ http://sourceforge.net/projects/utfcpp/
+# then I realize actually nim also have unicode module
+# anyway, I keep it here 
+
 import unicode, strutils, streams, unsigned
 
 const

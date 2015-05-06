@@ -5,7 +5,9 @@ set currentDir=%cd%
 set sourceDir=%currentDir%\source
 set subsetterDir=%currentDir%\subsetter
 
-nim c -d:release --path:%sourceDir% ^
+nim c -d:release --opt:size --path:%sourceDir% ^
 --path:%subsetterDir% ^
 --cincludes:%sourceDir% ^
 demo.nim
+
+strip -s demo.exe

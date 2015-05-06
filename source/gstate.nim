@@ -1,3 +1,11 @@
+# Copyright (c) 2015 Andri Lim
+#
+# Distributed under the MIT license 
+# (See accompanying file LICENSE.txt)
+#
+#-----------------------------------------
+# graphic state
+
 import math, basic2d, fontmanager, image
 
 const
@@ -183,7 +191,7 @@ proc fromIN*(inch: float64) : float64 =  PGU_K_IN * inch
 proc fromUser*(this: PageUnit, val: float64) : float64 =  this.k * val
 proc toUser*(this: PageUnit, val: float64) : float64 = val / this.k
 
-proc newGState*(font: Font): GState =
+proc newGState*(): GState =
     let black = makeRGB(0,0,0)
     let cmyk_black = makeCMYK(0,0,0,0)
     new(result)
@@ -217,7 +225,7 @@ proc newGState*(font: Font): GState =
     result.gradient_fill  = nil
     result.image_fill     = nil
 
-    result.font           = font
+    result.font           = nil
     result.font_size      = fromMM(10)
     result.writing_mode   = WMODE_HORIZONTAL
     result.prev           = nil

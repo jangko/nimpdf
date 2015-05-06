@@ -1,11 +1,13 @@
-import streams, math, basic2d, nimpdf, spline
+# Copyright (c) 2015 Andri Lim
+#
+# Distributed under the MIT license 
+# (See accompanying file LICENSE.txt)
+#
+#-----------------------------------------
+# demo for various features implemented in nimPDF
+# also act as how to use, while the proper documentation being generated
 
-when defined(Windows):
-    const
-        dir_sep = "\\"
-else:
-    const
-        dir_sep = "/"
+import streams, math, basic2d, nimpdf, spline
 
 type
     Canvas = ref object
@@ -303,7 +305,7 @@ proc draw_demo_5(doc: Document) =
     
     doc.setFont("Times", {FS_REGULAR}, 3)
      
-    var image = loadImage("pngsuite" & dir_sep & "basn3p02.png")
+    var image = doc.loadImage("basn3p02.png")
     var x = 40.0
     var y = 40.0
     doc.drawImage(x, y, image)
@@ -338,7 +340,7 @@ proc draw_demo_5(doc: Document) =
     doc.restoreState()
     show_desc(doc, x, y, "Skewing Image")
     
-    var toucan = loadImage("resources"&dir_sep&"toucan.png")
+    var toucan = doc.loadImage("toucan.png")
     x += 60.0
     doc.setRGBStroke(makeRGB("red"))
     doc.drawCircle(x,y,20.0)
@@ -351,17 +353,17 @@ proc draw_demo_5(doc: Document) =
     
     x = 40.0
     y += 50.0
-    var one = loadImage("resources"&dir_sep&"1bit.bmp")
+    var one = doc.loadImage("1bit.bmp")
     doc.drawImage(x, y, one)
     show_desc(doc, x, y, "bmp 1 bit")
     
     x += 60.0
-    var two = loadImage("resources"&dir_sep&"4bit.bmp")
+    var two = doc.loadImage("4bit.bmp")
     doc.drawImage(x, y, two)
     show_desc(doc, x, y, "bmp 4 bit")
 
     x += 60.0
-    var tri = loadImage("resources"&dir_sep&"8bit.bmp")
+    var tri = doc.loadImage("8bit.bmp")
     doc.saveState()
     doc.stretch(0.5, 0.5, x, y)
     doc.drawImage(x, y, tri)
@@ -370,12 +372,12 @@ proc draw_demo_5(doc: Document) =
     
     x = 40.0
     y += 50.0
-    var four = loadImage("resources"&dir_sep&"16bit.bmp")
+    var four = doc.loadImage("16bit.bmp")
     doc.drawImage(x, y, four)
     show_desc(doc, x, y, "bmp 16 bit")
     
     x += 60.0
-    var fiv = loadImage("resources"&dir_sep&"24bit.bmp")
+    var fiv = doc.loadImage("24bit.bmp")
     doc.saveState()
     doc.stretch(0.5, 0.5, x, y)
     doc.drawImage(x, y, fiv)
@@ -383,12 +385,12 @@ proc draw_demo_5(doc: Document) =
     show_desc(doc, x, y, "bmp 24 bit")
 
     x += 60.0
-    var six = loadImage("resources"&dir_sep&"32bit.bmp")
+    var six = doc.loadImage("32bit.bmp")
     doc.drawImage(x, y, six)
     show_desc(doc, x, y, "bmp 32 bit")
     
     doc.saveState()
-    image = loadImage("resources" & dir_sep & "missing.jpg")
+    image = doc.loadImage("missing.jpg")
     x = 40.0
     y += 50
     doc.drawImage(x, y, image)
@@ -799,7 +801,7 @@ proc draw_demo_8(doc: Document) =
 
     doc.endText()
     
-    var img = loadImage("resources" & dir_sep & "monkey.png")
+    var img = doc.loadImage("monkey.png")
     doc.saveState()
     let ccx = cx - doc.toUser(float(img.width))/4
     let ccy = doc.toUser(height) - (cy - doc.toUser(float(img.width))/2) - 10
@@ -1060,10 +1062,10 @@ proc draw_demo_12(doc: Document) =
     doc.setFont("KaiTi", {FS_REGULAR}, 10)
     doc.drawText(15, 70, "你好世界")
     
-    doc.setFont("Purisa", {FS_REGULAR}, 10)
-    doc.drawText(15, 30, "Hello World Purisa")
+    doc.setFont("Calligrapher", {FS_REGULAR}, 10)
+    doc.drawText(15, 30, "Hello World!")
     
-    doc.setFont("Purisa", {FS_REGULAR}, 4)
+    doc.setFont("Calligrapher", {FS_REGULAR}, 4)
     doc.drawText(15, 90, SAMP_TEXT)    
     
 proc createPDF(doc: Document) = 
@@ -1090,7 +1092,13 @@ proc main(): bool {.discardable.} =
     var file = newFileStream(fileName, fmWrite)
     
     if file != nil:
-        var doc = initPDF()        
+        var opts = makeDocOpt()
+        opts.addFontsPath("fonts")
+        opts.addImagesPath("resources")
+        opts.addImagesPath("pngsuite")
+        opts.addResourcesPath("resources")
+    
+        var doc = initPDF(opts)
         doc.createPDF()
         doc.writePDF(file)
         file.close()

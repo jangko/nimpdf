@@ -1,3 +1,15 @@
+# Copyright (c) 2015 Andri Lim
+#
+# Distributed under the MIT license 
+# (See accompanying file LICENSE.txt)
+#
+#-----------------------------------------
+# this module contains implementation for path construction buffer
+# for example, rect, line, circle, arc, etc are first buffered
+# then it will be converted to PDF instruction when doc.stroke or doc.fill called
+# this module also contains implementation of cubic and quadratic curve bounding box
+# calculation used in gradient
+
 import basic2d, math
 
 const

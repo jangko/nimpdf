@@ -1,3 +1,16 @@
+# Copyright (c) 2015 Andri Lim
+#
+# Distributed under the MIT license 
+# (See accompanying file LICENSE.txt)
+#
+#-----------------------------------------
+# although it was a port of Google sfntly
+# i realize, i dont need all the feature sfntly had
+# so i stripped it down, modify it here and there
+# basically, this module and other files in this folder
+# take a TTF/TTC file and make a subset of it based on 
+# how much glyphs used in PDF document
+
 import FontData, FontIOStreams, tables, algorithm, sequtils, math
 
 import LOCATable, GLYPHTable, HEADTable, HDMXTable, NAMETable

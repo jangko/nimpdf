@@ -1,3 +1,9 @@
+# Copyright (c) 2015 Andri Lim
+#
+# Distributed under the MIT license 
+# (See accompanying file LICENSE.txt)
+#
+#-----------------------------------------
 import FontIOStreams, FontData, tables
 
 const

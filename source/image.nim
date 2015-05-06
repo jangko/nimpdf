@@ -1,3 +1,15 @@
+# Copyright (c) 2015 Andri Lim
+#
+# Distributed under the MIT license 
+# (See accompanying file LICENSE.txt)
+#
+#-----------------------------------------
+#
+# this module act as an incomplete wrapper for LodePNG and uJPEG
+# also provide zcompress to compress nimPDF streams
+# currently, identify file format only by it's file name extension
+# eg: .png, .jpg, .jpeg, .bmp
+
 import bmp, os, strutils
 
 #{.deadCodeElim: on.}

@@ -1,3 +1,11 @@
+# Copyright (c) 2015 Andri Lim
+#
+# Distributed under the MIT license 
+# (See accompanying file LICENSE.txt)
+#
+#-------------------------------------
+# this module contains characters width of standard base 14 fonts
+
 import tables
 
 const

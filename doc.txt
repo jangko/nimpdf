@@ -1,0 +1,33 @@
+
+#Quick Start
+
+this is an axample of "Hello World" using nimPDF
+
+    import streams, nimpdf
+    proc main(): bool {.discardable.} = 
+       var fileName = "hello.pdf"
+       var file = newFileStream(fileName, fmWrite)
+       
+       if file != nil:
+          var doc = initPDF()
+          let size = getSizeFromName("A4")
+          doc.addPage(size, PGO_PORTRAIT)
+          doc.setFont("Helvetica", {FS_BOLD}, 5)           
+          doc.drawText(15, 15, "Hello World!")
+          doc.writePDF(file)
+          file.close()
+          return true
+    
+       echo "cannot open: ", fileName
+       result = false
+    
+    main()
+
+#How To Compile
+
+This is example for windows. make sure your PATH already  set
+>set path=c:\mingw\bin;c:\nim\bin
+
+then
+>nim c --path:c:\nimPDF\source --path:c:\nimPDF\subsetter --cincludes:c:\nimPDF\source hello.nim
+

@@ -1,4 +1,12 @@
-﻿import strutils, streams, sequtils, times, unsigned, math, basic2d, algorithm, tables
+﻿# Copyright (c) 2015 Andri Lim
+#
+# Distributed under the MIT license 
+# (See accompanying file LICENSE.txt)
+#
+#-----------------------------------------
+# the main module for nimPDF, import this one from your project
+
+import strutils, streams, sequtils, times, unsigned, math, basic2d, algorithm, tables
 import image, utf8, font, arc, gstate, path, fontmanager
 
 export fontmanager.Font, fontmanager.FontStyle, fontmanager.FontStyles
@@ -10,7 +18,18 @@ export gstate.makeCoord
 export image.PImage, image.loadImage, arc.drawArc, arc.arcTo, arc.degree_to_radian
 export path.Path, path.calculateBounds, path.bound
 
+when defined(Windows):
+    const
+        dir_sep = "\\"
+else:
+    const
+        dir_sep = "/"
+        
 const
+    nimPDFVersion = "0.1.0"
+    
+    defaultFont = "Times"
+    
     PageNames = [
         #my paper size
         ("Faktur",210.0,148.0), ("F4",215.0,330.0)
@@ -56,7 +75,12 @@ type
     Page = object
         content: string
         size: PageSize
-  
+        
+    DocOpt* = ref object
+        resourcesPath: seq[string]
+        fontsPath: seq[string]
+        imagesPath: seq[string]
+    
     Document* = ref object of RootObj
         state: DocStateType
         content: string
@@ -73,6 +97,7 @@ type
         record_shape: bool
         shapes: seq[Path]
         info: Table[int, string]
+        opts: DocOpt
         
     NamedPageSize = tuple[name: string, width: float64, height: float64]
     
@@ -409,9 +434,6 @@ proc i2s10(val: int) : string =
     result = repeatChar(blank, '0')
     result.add(s)
 
-proc setInfo*(doc: Document, field: DocInfo, info: string) =
-    doc.info[int(field)] = info
-
 proc writeInfo(doc: Document, field: DocInfo, fieldName: string) =
     if doc.info.hasKey(int(field)):
         doc.put(fieldName, "(", doc.info[int(field)], ")")
@@ -474,7 +496,10 @@ proc putCatalog(doc: Document) : int =
     doc.state = PGS_DOC_CLOSED
     result = 0
 
-proc initPDF*(): Document =
+proc setInfo*(doc: Document, field: DocInfo, info: string) =
+    doc.info[int(field)] = info
+    
+proc initPDF*(opts: DocOpt): Document =
     new(result)
     result.state = PGS_INITIALIZED
     result.offsets = @[]
@@ -484,8 +509,8 @@ proc initPDF*(): Document =
     result.gradients = @[]
     result.docUnit.setUnit(PGU_MM)
     result.content = ""
-    result.fontMan.init()
-    result.gstate = newGState(result.fontMan.makeFont())
+    result.fontMan.init(opts.fontsPath)
+    result.gstate = newGState()
     result.path_start_x = 0
     result.path_start_y = 0
     result.path_end_x = 0
@@ -493,14 +518,60 @@ proc initPDF*(): Document =
     result.record_shape = false
     result.shapes = nil
     result.info = initTable[int, string]()
+    result.opts = opts
     result.put("%PDF-1.5")
     result.setInfo(DI_PRODUCER, "nimPDF")
+
+proc makeDocOpt*(): DocOpt =
+    new(result)
+    result.resourcesPath = @[]
+    result.fontsPath = @[]
+    result.imagesPath = @[]
+
+proc addResourcesPath*(opt: DocOpt, path: string) =
+    opt.resourcesPath.add(path)
+
+proc addImagesPath*(opt: DocOpt, path: string) =
+    opt.imagesPath.add(path)
+
+proc addFontsPath*(opt: DocOpt, path: string) =
+    opt.fontsPath.add(path)
+    
+proc initPDF*(): Document =
+    var opts = makeDocOpt()
+    opts.addFontsPath("fonts")
+    opts.addImagesPath("resources")
+    opts.addResourcesPath("resources")
+    result = initPDF(opts)
+
+proc loadImage*(doc: Document, fileName: string): PImage =
+    for p in doc.opts.imagesPath:
+        let image = loadImage(p & dir_sep & fileName)
+        if image != nil: return image
+    result = nil
+    
+proc getVersion(): string =
+    result = nimPDFVersion
+    
+proc getVersion*(doc: Document): string = 
+    result = nimPDFVersion
+
+proc setUnit*(doc: Document, unit: PageUnitType) =
+    doc.docUnit.setUnit(unit)
 
 proc getSize*(doc: Document): PageSize = 
     result.width = doc.docUnit.toUser(doc.size.width)
     result.height = doc.docUnit.toUser(doc.size.height)
 
-proc addPage*(doc: Document, s: PageSize, o: PageOrientationType): bool {.discardable.} =
+proc setFont*(doc: Document, family:string, style: FontStyles, size: float64) =
+    var font = doc.fontMan.makeFont(family, style)
+    let fontNumber = font.ID
+    let fontSize = doc.docUnit.fromUser(size)
+    doc.put("BT /F",$fontNumber," ",$fontSize," Tf ET")
+    doc.gstate.font = font
+    doc.gstate.font_size = fontSize
+    
+proc addPage*(doc: Document, s: PageSize, o: PageOrientationType) =
     var p : Page
     p.size.width = fromMM(s.width)
     p.size.height = fromMM(s.height)
@@ -510,6 +581,7 @@ proc addPage*(doc: Document, s: PageSize, o: PageOrientationType): bool {.discar
     doc.pages.add(p)
     doc.state = PGS_PAGE_OPENED
     doc.size = p.size
+
     
 proc writePDF*(doc: Document, s: Stream): bool {.discardable.} =
     discard doc.putCatalog() 
@@ -519,7 +591,10 @@ proc writePDF*(doc: Document, s: Stream): bool {.discardable.} =
 proc drawText*(doc: Document; x,y: float64; text: string) : int {.discardable.} =
     let xx = doc.docUnit.fromUser(x)
     let yy = doc.size.height - doc.docUnit.fromUser(y)
-    
+
+    if doc.gstate.font == nil:
+        doc.setFont(defaultFont, {FS_REGULAR}, 5)
+        
     var font = doc.gstate.font
     
     if font.subType == FT_TRUETYPE:
@@ -533,9 +608,15 @@ proc drawText*(doc: Document; x,y: float64; text: string) : int {.discardable.} 
     result = 0
 
 proc beginText*(doc: Document) =
+    if doc.gstate.font == nil:
+        doc.setFont(defaultFont, {FS_REGULAR}, 5)
+        
     doc.put("BT")
     
 proc beginText*(doc: Document; x,y: float64) =
+    if doc.gstate.font == nil:
+        doc.setFont(defaultFont, {FS_REGULAR}, 5)
+        
     let xx = doc.docUnit.fromUser(x)
     let yy = doc.size.height - doc.docUnit.fromUser(y)
     doc.put("BT ", f2s(xx)," ",f2s(yy)," Td")
@@ -812,14 +893,6 @@ proc drawEllipse*(doc: Document; x, y, r1, r2 : float64) =
 
 proc drawCircle*(doc: Document; x, y, radius : float64) =
     doc.drawEllipse(x,y,radius,radius)
- 
-proc setFont*(doc: Document, family:string, style: FontStyles, size: float64) =
-    var font = doc.fontMan.makeFont(family, style)
-    let fontNumber = font.ID
-    let fontSize = doc.docUnit.fromUser(size)
-    doc.put("BT /F",$fontNumber," ",$fontSize," Tf ET")
-    doc.gstate.font = font
-    doc.gstate.font_size = fontSize
 
 proc setLineWidth*(doc: Document, line_width: float64) =
     let lw = doc.docUnit.fromUser(line_width)

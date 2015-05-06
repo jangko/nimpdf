@@ -1,6 +1,5 @@
 import streams, math, basic2d
-import benalu, image, arc, gstate, fontmanager
-import spline, path
+import nimpdf, spline
 
 proc draw_title(doc: Document, text:string) = 
     let size = getSizeFromName("A4")
@@ -28,10 +27,10 @@ proc createPDF(doc: Document) =
     doc.setFont("KaiTi", {FS_REGULAR}, 10)
     doc.drawText(15, 70, "你好世界")
     
-    doc.setFont("Purisa", {FS_REGULAR}, 10)
-    doc.drawText(15, 30, "Hello World Purisa")
+    doc.setFont("Calligrapher", {FS_REGULAR}, 10)
+    doc.drawText(15, 30, "Hello World!")
     
-    doc.setFont("Purisa", {FS_REGULAR}, 4)
+    doc.setFont("Calligrapher", {FS_REGULAR}, 4)
     doc.drawText(15, 90, SAMP_TEXT)
     
     doc.setInfo(DI_TITLE, "TTF DEMO")

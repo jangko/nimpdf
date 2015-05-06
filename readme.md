@@ -45,6 +45,17 @@ nimPDF implements the following features(see demo.pdf):
   - encryption
   - annotation
   - hyperlinks
-  - other encoding beside UTF-8(nim has encoding module, i will use it someday)
+  - other encoding beside UTF-8(nim has [encoding](http://nim-lang.org/docs/encodings.html) module, i will use it someday)
   - basic text formating(will be implemented as separate layer)
   - radial gradient and multi color gradient
+  - table generator(as in FPDF)(will be implemented as separate layer)
+  - document outline
+  
+#Documentation
+The API documentation is generated using ["reStructuredText"](http://docutils.sourceforge.net/rst.html), so you need to install [Python](https://www.python.org/download/releases/2.7.8/) too if you want generate additional documentation
+
+The API documentation provided may not be complete, please help to improve it
+
+#Installation and build instructions
+
+see documentation

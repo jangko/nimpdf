@@ -1,3 +1,17 @@
+# Copyright (c) 2015 Andri Lim
+#
+# Distributed under the MIT license 
+# (See accompanying file LICENSE.txt)
+#
+#-----------------------------------------
+#
+# this module perform font related task
+# such as when nimPDF as for a font based on family name and style
+# this module will search:
+# - from standard fonts list
+# - from TTF fonts list
+# - from TTC fonts list
+
 import base14, tables, strutils, collect, strtabs, unicode, math
 
 import Font, CMAPTable, HEADTable, HMTXTable, FontData
@@ -181,10 +195,15 @@ proc searchFrom[T](list: seq[T], name: string): Font =
             result = i
             break
             
-proc init*(ff: var FontManager, fontDir: string = "fonts") =
+proc init*(ff: var FontManager, fontDirs: seq[string]) =
     ff.FontList = @[]
-    ff.TTFontList = collectTTF(fontDir)
-    ff.TTCList = collectTTC(fontDir)
+    
+    ff.TTFontList = newStringTable(modeCaseSensitive)
+    ff.TTCList = newStringTable(modeCaseSensitive)
+    
+    for fontDir in fontDirs:
+        collectTTF(fontDir, ff.TTFontList)
+        collectTTC(fontDir, ff.TTCList)
 
     #echo "TTList len ", ff.TTFontList.len
     #echo "TTCList len ", ff.TTCList.len

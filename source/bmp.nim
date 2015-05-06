@@ -1,3 +1,15 @@
+# Copyright (c) 2015 Andri Lim
+#
+# Distributed under the MIT license 
+# (See accompanying file LICENSE.txt)
+#
+# this is a nim version of EasyBMP
+# originally written by Paul Macklin
+# http://easybmp.sourceforge.net
+
+# support reading 1bit, 4bit, 8bit, 16bit, 24bit, and 32bit BMP
+# this is a BMP reader, not a writer
+
 import unsigned, streams, math
 
 const

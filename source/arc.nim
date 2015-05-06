@@ -1,3 +1,13 @@
+# Copyright (c) 2015 Andri Lim
+#
+# Distributed under the MIT license 
+# (See accompanying file LICENSE.txt)
+#
+#-------------------------------------
+# this module try to approximate circle, arc, ellipse
+# using Bezier cubic curve
+# this module export arcTo, drawArc, and degree_to_radian
+
 import math, basic2d
 
 const 
@@ -12,8 +22,6 @@ type
         num_vertices: int
         vertices: array[0..25, float64]
 
-
-    
 proc arc_to_bezier(cx, cy, rx, ry, start_angle, sweep_angle: float64, curve: var openArray[float64]) =
     let x0 = math.cos(sweep_angle / 2.0)
     let y0 = math.sin(sweep_angle / 2.0)

@@ -1,3 +1,14 @@
+# Copyright (c) 2015 Andri Lim
+#
+# Distributed under the MIT license 
+# (See accompanying file LICENSE.txt)
+#
+#-----------------------------------------
+# this is nim version of GraphDisplay(without GUI)
+# http://www.codeproject.com/Articles/58280/GraphDisplay-a-Bezier-based-control-for-graphing-f
+# originally written by Ken Johnson in C#
+# from this module, we learn that nim closure works perfectly
+
 import basic2d, math, path
 
 type

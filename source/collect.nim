@@ -1,3 +1,18 @@
+# Copyright (c) 2015 Andri Lim
+#
+# Distributed under the MIT license 
+# (See accompanying file LICENSE.txt)
+#
+#-----------------------------------------
+#
+# this module responsible to collect TTF/TTC files from 
+# folder/directory specified by user
+# and then read the font(s) internal name and style
+# then build a search map using StringTable
+# 
+# TTF: 'font family' + style -> TTF file name
+# TTC: 'font family' + style -> TTC file name + font index number
+
 import macros, strutils, streams, os, strtabs
 
 macro fourcc(ccx: string): int = 
@@ -175,8 +190,7 @@ proc parseTTC(fileName: string, tables: StringTableRef) =
     finally:
         file.close()
     
-proc collectTTF*(dir:string): StringTableRef =
-    result = newStringTable(modeCaseSensitive)
+proc collectTTF*(dir:string, t: StringTableRef) =
     var key = ""
     
     for fileName in walkDirRec(dir, {pcFile}):
@@ -187,19 +201,18 @@ proc collectTTF*(dir:string): StringTableRef =
         if ext != ".ttf": continue
         
         if parseTTF(fileName, key):
-            result[key] = fileName
+            t[key] = fileName
         else:
             echo "failed ", fileName 
 
-proc collectTTC*(dir:string): StringTableRef =
-    result = newStringTable(modeCaseSensitive)
+proc collectTTC*(dir:string, t: StringTableRef) =
     for fileName in walkDirRec(dir, {pcFile}):
         let path = splitFile(fileName)
         if path.ext.len() == 0: continue
         
         let ext = toLower(path.ext)
         if ext != ".ttc": continue
-        parseTTC(fileName, result)
+        parseTTC(fileName, t)
 
 when isMainModule:
     if paramCount() > 0: 

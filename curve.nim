@@ -1,5 +1,13 @@
+# Copyright (c) 2015 Andri Lim
+#
+# Distributed under the MIT license 
+# (See accompanying file LICENSE.txt)
+#
+#-----------------------------------------
+#
+
 import streams, math, basic2d
-import benalu, image, arc, gstate, font, spline, path
+import nimpdf, spline
 
 type
     Canvas = ref object
