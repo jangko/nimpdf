@@ -239,7 +239,7 @@ proc makeHipotrochoid*(R, P, M: float64; N, D: int) : CyclicCurve =
     result = makeCyclicCurve(fx, fy, 0, math.PI * 2 * qq)
     
 proc makeFarrisWheel*(F1, F2, F3, W1, W2, W3, P1, P2, P3, R, P: float64) : CyclicCurve =
-    let maxRadius   = math.fabs(W1) + math.fabs(W2) + math.fabs(W3)
+    let maxRadius   = abs(W1) + abs(W2) + abs(W3)
     let scaleFactor = R / maxRadius
     let pp1PI = (P + P1) * math.PI
     let pp2PI = (P + P2) * math.PI
