@@ -102,8 +102,8 @@ proc cubicCurveBounds*(x0, y0, x1, y1, x2, y2, x3, y3: float64): bound =
             c = 3 * y1 - 3 * y0
     
 
-        if abs(a) < 1e-12:     #Numerical robustness
-            if abs(b) < 1e-12: continue #Numerical robustness
+        if math.fabs(a) < 1e-12:     #Numerical robustness
+            if math.fabs(b) < 1e-12: continue #Numerical robustness
             t = -c / b
             if 0.0 < t and t < 1.0: tvalues.push(t)
             continue
