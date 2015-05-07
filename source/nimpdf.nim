@@ -26,7 +26,7 @@ else:
         dir_sep = "/"
         
 const
-    nimPDFVersion = "0.1.0"
+    nimPDFVersion = "0.1.1"
     
     defaultFont = "Times"
     
@@ -58,10 +58,15 @@ const
 
     MAX_DASH_PATTERN = 8
     
+    LABEL_STYLE_CH = ["D", "R", "r", "A", "a"]
+   
 type
     DocInfo* = enum
         DI_CREATOR, DI_PRODUCER, DI_TITLE, DI_SUBJECT, DI_AUTHOR, DI_KEYWORDS
     
+    LabelStyle* = enum
+        LS_DECIMAL, LS_UPPER_ROMAN, LS_LOWER_ROMAN, LS_UPPER_LETTER, LS_LOWER_LETTER
+        
     PageOrientationType* = enum
         PGO_PORTRAIT, PGO_LANDSCAPE
     DocStateType* = enum
@@ -72,7 +77,9 @@ type
         strokingAlpha, nonstrokingAlpha: float64
         blendMode: string
         ID, objID: int
-    Page = object
+        
+    Page = ref object
+        objID: int
         content: string
         size: PageSize
         
@@ -80,6 +87,26 @@ type
         resourcesPath: seq[string]
         fontsPath: seq[string]
         imagesPath: seq[string]
+    
+    PageLabel = object
+        pageIndex: int
+        style: LabelStyle
+        prefix: string
+        start: int
+    
+    DestStyle* = enum
+        DS_XYZ, DS_FIT, DS_FITH, DS_FITV, DS_FITR, DS_FITB, DS_FITBH, DS_FITBV
+    
+    Destination = ref object
+        style: DestStyle
+        a,b,c,d: float64
+        page: Page
+        
+    Outline* = ref object
+        objID: int
+        kids: seq[Outline]
+        dest: Destination
+        title: string
     
     Document* = ref object of RootObj
         state: DocStateType
@@ -98,6 +125,9 @@ type
         shapes: seq[Path]
         info: Table[int, string]
         opts: DocOpt
+        labels: seq[PageLabel]
+        setFontCall: int
+        outlines: seq[Outline]
         
     NamedPageSize = tuple[name: string, width: float64, height: float64]
     
@@ -154,6 +184,9 @@ proc putStream(doc: Document, text: string) : bool {.discardable.} =
 template f2s(a: expr): expr =
     formatFloat(a,ffDecimal,4)
 
+proc f2sn(a: float64): string =
+    if a == 0: "null" else: f2s(a)
+    
 proc putPages(doc: Document, resourceID: int) : int =
     let numpages = doc.pages.len()
     let pageRootID = doc.newobj()
@@ -170,8 +203,9 @@ proc putPages(doc: Document, resourceID: int) : int =
     doc.put(">>")
     doc.put("endobj")
     
-    for p in items(doc.pages):
-        let contentID = doc.newobj() + 1
+    for p in doc.pages:
+        p.objID = doc.newobj()
+        let contentID = p.objID + 1
         doc.put("<</Type /Page")
         doc.put("/Parent ", $pageRootID, " 0 R")
         doc.put("/Resources ", $resourceID, " 0 R")
@@ -455,6 +489,97 @@ proc putInfo(doc: Document): int =
     
     result = infoID
     
+proc putLabels(doc: Document): int =
+    if doc.labels.len == 0: return -1
+    
+    let labelsID = doc.newobj()
+    doc.put("<< /Nums [")
+    for label in doc.labels:
+        doc.put($label.pageIndex, " << /S /", LABEL_STYLE_CH[int(label.style)])
+        if label.prefix != nil: 
+            if label.prefix.len > 0: doc.put("/P (", label.prefix, ")")
+        if label.start > 0: doc.put("/St ", $label.start)
+        doc.put(">>")
+        
+    doc.put("] >>")
+    doc.put("endobj")
+    result = labelsID
+
+proc assignID(o: Outline, objID: var int) =
+    for k in o.kids:
+        k.objID = objID
+        inc(objID)
+        assignID(k, objID)
+
+proc putDestination(doc: Document, dest: Destination) =
+    var destStr = "/Dest [" & $dest.page.objID & " 0 R"
+    
+    case dest.style 
+    of DS_XYZ: destStr.add("/XYZ " & f2sn(dest.a) & " " & f2sn(dest.b) & " " & f2sn(dest.c) & "]")
+    of DS_FIT: destStr.add("/Fit]")
+    of DS_FITH: destStr.add("/FitH " & f2sn(dest.a) & "]")
+    of DS_FITV: destStr.add("/FitV " & f2sn(dest.a) & "]")
+    of DS_FITR: destStr.add("/FitR " & f2s(dest.a) & " " & f2s(dest.b) & " " & f2s(dest.c) & " " & f2s(dest.d) & "]")
+    of DS_FITB: destStr.add("/FitB]")
+    of DS_FITBH: destStr.add("/FitBH " & f2sn(dest.a) & "]")
+    of DS_FITBV: destStr.add("/FitBV " & f2sn(dest.a) & "]")
+    
+    doc.put(destStr)
+    
+proc putOutlineItem(doc: Document, outlines: seq[Outline], parentID: int, ot: Outline, i: int) =
+    let objID = doc.newobj()
+    assert objID == ot.objID
+    #echo " ", $objID
+    
+    doc.put("<</Title (",ot.title,")/Parent ", $parentID, " 0 R/Count 0")
+    if outlines.len == 2:
+        if i == 0: doc.put("/Next ", $outlines[1].objID ," 0 R")
+        if i == 1: doc.put("/Prev ", $outlines[0].objID ," 0 R")
+    elif outlines.len > 2:
+        let lastIdx = outlines.len - 1
+        if i == 0: doc.put("/Next ", $outlines[1].objID ," 0 R")
+        if i == lastIdx: doc.put("/Prev ", $outlines[lastIdx-1].objID ," 0 R")
+        if i > 0 and i < lastIdx:
+            doc.put("/Next ", $outlines[i+1].objID ," 0 R")
+            doc.put("/Prev ", $outlines[i-i].objID ," 0 R")
+    
+    doc.putDestination(ot.dest)
+    
+    if ot.kids.len > 0:
+        let firstKid = ot.kids[0].objID
+        let lastKid = ot.kids[ot.kids.len-1].objID
+        doc.put("/First ", $firstKid ," 0 R/Last ", $lastKid ," 0 R>>")
+    else:
+        doc.put(">>")
+    doc.put("endobj")
+    
+    var i = 0
+    for kid in ot.kids:
+        doc.putOutlineItem(ot.kids, ot.objID, kid, i)
+        inc(i)
+        
+proc putOutlines(doc: Document): int =
+    if doc.outlines.len == 0: return -1
+
+    let outlineID = doc.newobj()
+    var objID = outlineID + 1
+    for o in items(doc.outlines):
+        o.objID = objID
+        inc(objID)
+        assignID(o, objID)
+    
+    let firstKid = doc.outlines[0].objID
+    let lastKid = doc.outlines[doc.outlines.len-1].objID
+    doc.put("<</Type/Outlines/First ", $firstKid ," 0 R/Last ", $lastKid ," 0 R>>")
+    doc.put("endobj")
+    
+    var i = 0
+    for ot in items(doc.outlines):
+        doc.putOutlineItem(doc.outlines, outlineID, ot, i)
+        inc(i)
+        
+    result = outlineID
+        
 proc putCatalog(doc: Document) : int =
     doc.state = PGS_DOC_OPENED
     let resourceID = doc.putResources()
@@ -462,11 +587,15 @@ proc putCatalog(doc: Document) : int =
     #let firstPageID = pageRootID + 1
         
     let infoID = doc.putInfo()
+    let pageLabelsID = doc.putLabels()
+    let outlinesID = doc.putOutlines()
     
     let catalogID = doc.newobj()
     doc.put("<<")
     doc.put("/Type /Catalog")
     doc.put("/Pages ", $pageRootID, " 0 R")
+    if doc.labels.len > 0: doc.put("/PageLabels ", $pageLabelsID, " 0 R")
+    if doc.outlines.len > 0: doc.put("/Outlines ", $outlinesID, " 0 R")
     #doc.put("/OpenAction [",$firstPageID," 0 R /FitH null]")
     #doc.put("/PageLayout /OneColumn")
     doc.put(">>")
@@ -519,6 +648,8 @@ proc initPDF*(opts: DocOpt): Document =
     result.shapes = nil
     result.info = initTable[int, string]()
     result.opts = opts
+    result.labels = @[]
+    result.outlines = @[]
     result.put("%PDF-1.5")
     result.setInfo(DI_PRODUCER, "nimPDF")
 
@@ -544,6 +675,29 @@ proc initPDF*(): Document =
     opts.addResourcesPath("resources")
     result = initPDF(opts)
 
+proc setLabel*(doc: Document, style: LabelStyle, prefix: string, start: int) =
+    var label: PageLabel
+    label.pageIndex = doc.pages.len
+    label.style = style
+    label.prefix = prefix
+    label.start = start
+    doc.labels.add(label)
+
+proc setLabel*(doc: Document, style: LabelStyle) =
+    var label: PageLabel
+    label.pageIndex = doc.pages.len
+    label.style = style
+    label.start = -1
+    doc.labels.add(label)
+
+proc setLabel*(doc: Document, style: LabelStyle, prefix: string) =
+    var label: PageLabel
+    label.pageIndex = doc.pages.len
+    label.style = style
+    label.prefix = prefix
+    label.start = -1
+    doc.labels.add(label)
+    
 proc loadImage*(doc: Document, fileName: string): PImage =
     for p in doc.opts.imagesPath:
         let image = loadImage(p & dir_sep & fileName)
@@ -570,9 +724,11 @@ proc setFont*(doc: Document, family:string, style: FontStyles, size: float64) =
     doc.put("BT /F",$fontNumber," ",$fontSize," Tf ET")
     doc.gstate.font = font
     doc.gstate.font_size = fontSize
+    inc(doc.setFontCall)
     
-proc addPage*(doc: Document, s: PageSize, o: PageOrientationType) =
+proc addPage*(doc: Document, s: PageSize, o: PageOrientationType): Page {.discardable.} =
     var p : Page
+    new(p)
     p.size.width = fromMM(s.width)
     p.size.height = fromMM(s.height)
     p.content = ""
@@ -581,8 +737,9 @@ proc addPage*(doc: Document, s: PageSize, o: PageOrientationType) =
     doc.pages.add(p)
     doc.state = PGS_PAGE_OPENED
     doc.size = p.size
+    doc.setFontCall = 0
+    result = p
 
-    
 proc writePDF*(doc: Document, s: Stream): bool {.discardable.} =
     discard doc.putCatalog() 
     s.write(doc.content)
@@ -592,9 +749,9 @@ proc drawText*(doc: Document; x,y: float64; text: string) : int {.discardable.} 
     let xx = doc.docUnit.fromUser(x)
     let yy = doc.size.height - doc.docUnit.fromUser(y)
 
-    if doc.gstate.font == nil:
+    if doc.gstate.font == nil or doc.setFontCall == 0:
         doc.setFont(defaultFont, {FS_REGULAR}, 5)
-        
+
     var font = doc.gstate.font
     
     if font.subType == FT_TRUETYPE:
@@ -608,7 +765,7 @@ proc drawText*(doc: Document; x,y: float64; text: string) : int {.discardable.} 
     result = 0
 
 proc beginText*(doc: Document) =
-    if doc.gstate.font == nil:
+    if doc.gstate.font == nil or doc.setFontCall == 0:
         doc.setFont(defaultFont, {FS_REGULAR}, 5)
         
     doc.put("BT")
@@ -1129,3 +1286,69 @@ proc setGradientFill*(doc: Document, grad: Gradient) =
     doc.record_shape = true
     doc.gstate.cs_fill = CS_GRADIENT
     doc.gstate.gradient_fill = grad
+
+proc makeXYZDest*(doc: Document, page: Page, x,y,z: float64): Destination =
+    new(result)
+    result.style = DS_XYZ
+    result.page  = page
+    result.a = doc.docUnit.fromUser(x)
+    result.b = doc.size.height - doc.docUnit.fromUser(y)
+    result.c = z
+
+proc makeFitDest*(doc: Document, page: Page): Destination =       
+    new(result)
+    result.style = DS_FIT
+    result.page  = page
+    
+proc makeFitHDest*(doc: Document, page: Page, top: float64): Destination =
+    new(result)
+    result.style = DS_FITH
+    result.page  = page
+    result.a = doc.size.height - doc.docUnit.fromUser(top)
+    
+proc makeFitVDest*(doc: Document, page: Page, left: float64): Destination =
+    new(result)
+    result.style = DS_FITV
+    result.page  = page
+    result.a = doc.docUnit.fromUser(left)
+    
+proc makeFitRDest*(doc: Document, page: Page, left,bottom,right,top: float64): Destination =
+    new(result)
+    result.style = DS_FITR
+    result.page  = page
+    result.a = doc.docUnit.fromUser(left)
+    result.b = doc.size.height - doc.docUnit.fromUser(bottom)
+    result.c = doc.docUnit.fromUser(right)
+    result.d = doc.size.height - doc.docUnit.fromUser(top)
+    
+proc makeFitBDest*(doc: Document, page: Page): Destination =
+    new(result)
+    result.style = DS_FITB
+    result.page  = page
+
+proc makeFitBHDest*(doc: Document, page: Page, top: float64): Destination =
+    new(result)
+    result.style = DS_FITBH
+    result.page  = page
+    result.a = doc.size.height - doc.docUnit.fromUser(top)
+
+proc makeFitBVDest*(doc: Document, page: Page, left: float64): Destination =
+    new(result)
+    result.style = DS_FITBV
+    result.page  = page
+    result.a = left
+        
+proc makeOutline*(doc: Document, title: string, dest: Destination): Outline =
+    new(result)
+    result.kids = @[]
+    result.dest = dest
+    result.title = title
+    doc.outlines.add(result)
+
+proc makeOutline*(ot: Outline, title: string, dest: Destination): Outline =
+    new(result)
+    result.kids = @[]
+    result.dest = dest
+    result.title = title
+    ot.kids.add(result)
+    

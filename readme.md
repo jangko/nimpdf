@@ -11,6 +11,7 @@ nimPDF implements the following features(see [demo.pdf](https://github.com/jangk
   - JPEG -- use [uJPEG (MicroJPEG) -- KeyJ's Small Baseline JPEG Decoder](http://keyj.emphy.de/nanojpeg), still in C
   - BMP -- use [EasyBMP](http://easybmp.sourceforge.net), already ported to nim,      support 1bit, 4bit, 8bit, 16bit, 24bit, and 32bit images
   - beside transparency from original image(such as from PNG), you can adjust individual image transparency as easy as other elements in your document
+
 * **text and fonts** 
   - support TTF/TTC font subsetting -- use [Google sfntly](code.google.com/p/sfntly), ported(partially) to nim and modified 
   - you can easily tell the library to look for fonts in certain folder(s)
@@ -31,6 +32,10 @@ nimPDF implements the following features(see [demo.pdf](https://github.com/jangk
   - alpha channel for text, path, and images too!
   - linear gradient to fill any shape
 
+* **Interactive Features**(see demo folder)
+  - Page Labels
+  - Document Outline
+  
 * **others**
   - top-down mode
   - unit measured in point, inch, and mm
@@ -49,12 +54,13 @@ nimPDF implements the following features(see [demo.pdf](https://github.com/jangk
   - basic text formating(will be implemented as separate layer)
   - radial gradient and multi color gradient
   - table generator(as in FPDF)(will be implemented as separate layer)
-  - document outline
+  - ~~document outline~~
+  - permission
   
 #Documentation
-The API documentation is generated using ["reStructuredText"](http://docutils.sourceforge.net/rst.html), so you need to install [Python](https://www.python.org/download/releases/2.7.8/) too if you want generate additional documentation
+The documentation is generated using ["reStructuredText"](http://docutils.sourceforge.net/rst.html), so you need to install [Python](https://www.python.org/download/releases/2.7.8/) too if you want generate additional documentation
 
-The API documentation provided may not be complete, please help to improve it
+The documentation provided may not be complete, please help to improve it
 
 #Installation and build instructions
 
