@@ -35,6 +35,7 @@ nimPDF implements the following features(see [demo.pdf](https://github.com/jangk
 * **Interactive Features**(see demo folder)
   - Page Labels
   - Document Outline
+  - Hyperlinks
   
 * **others**
   - top-down mode
@@ -49,7 +50,7 @@ nimPDF implements the following features(see [demo.pdf](https://github.com/jangk
   - patterns(this can be achieved using PDF primitives and path clipping)
   - encryption
   - annotation
-  - hyperlinks
+  - ~~hyperlinks~~
   - other encoding beside UTF-8(nim has [encoding](http://nim-lang.org/docs/encodings.html) module, i will use it someday)
   - basic text formating(will be implemented as separate layer)
   - radial gradient and multi color gradient
@@ -58,7 +59,7 @@ nimPDF implements the following features(see [demo.pdf](https://github.com/jangk
   - permission
   
 #Documentation
-The documentation is generated using ["reStructuredText"](http://docutils.sourceforge.net/rst.html), so you need to install [Python](https://www.python.org/download/releases/2.7.8/) too if you want generate additional documentation
+The documentation is generated using docutils
 
 The documentation provided may not be complete, please help to improve it
 

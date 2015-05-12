@@ -77,11 +77,20 @@ type
         strokingAlpha, nonstrokingAlpha: float64
         blendMode: string
         ID, objID: int
+    
+    Rectangle= object
+        x,y,w,h: float64
+        
+    LinkAnnot = ref object
+        objID: int
+        dest: Destination
+        rect: Rectangle
         
     Page = ref object
         objID: int
         content: string
         size: PageSize
+        annots: seq[LinkAnnot]
         
     DocOpt* = ref object
         resourcesPath: seq[string]
@@ -186,9 +195,25 @@ template f2s(a: expr): expr =
 
 proc f2sn(a: float64): string =
     if a == 0: "null" else: f2s(a)
+
+proc putDestination(doc: Document, dest: Destination) =
+    var destStr = "/Dest [" & $dest.page.objID & " 0 R"
+    
+    case dest.style 
+    of DS_XYZ: destStr.add("/XYZ " & f2sn(dest.a) & " " & f2sn(dest.b) & " " & f2sn(dest.c) & "]")
+    of DS_FIT: destStr.add("/Fit]")
+    of DS_FITH: destStr.add("/FitH " & f2sn(dest.a) & "]")
+    of DS_FITV: destStr.add("/FitV " & f2sn(dest.a) & "]")
+    of DS_FITR: destStr.add("/FitR " & f2s(dest.a) & " " & f2s(dest.b) & " " & f2s(dest.c) & " " & f2s(dest.d) & "]")
+    of DS_FITB: destStr.add("/FitB]")
+    of DS_FITBH: destStr.add("/FitBH " & f2sn(dest.a) & "]")
+    of DS_FITBV: destStr.add("/FitBV " & f2sn(dest.a) & "]")
+    
+    doc.put(destStr)
     
 proc putPages(doc: Document, resourceID: int) : int =
     let numpages = doc.pages.len()
+        
     let pageRootID = doc.newobj()
     var kids = ""
         
@@ -203,6 +228,8 @@ proc putPages(doc: Document, resourceID: int) : int =
     doc.put(">>")
     doc.put("endobj")
     
+    var annotID = pageRootID + 2 * numpages + 1
+    
     for p in doc.pages:
         p.objID = doc.newobj()
         let contentID = p.objID + 1
@@ -211,6 +238,14 @@ proc putPages(doc: Document, resourceID: int) : int =
         doc.put("/Resources ", $resourceID, " 0 R")
         #Output the page size.
         doc.put("/MediaBox [0 0 ",f2s(p.size.width)," ",f2s(p.size.height),"]")
+        if p.annots.len > 0:
+            var annot = "/Annots ["
+            for a in p.annots:
+                annot.add($annotID)
+                annot.add(" 0 R ")
+                inc(annotID)
+            annot.add("]")
+            doc.put(annot)
         doc.put("/Contents ", $contentID, " 0 R>>")
         doc.put("endobj")
 
@@ -225,6 +260,19 @@ proc putPages(doc: Document, resourceID: int) : int =
             doc.put("<< /Length ", $len, " >>")
             doc.putStream(p.content)
         doc.put("endobj")
+       
+    for p in doc.pages:
+        for a in p.annots:
+            a.objID = doc.newobj()
+            doc.put("<</Type /Annot")
+            doc.put("/Subtype /Link")
+            doc.putDestination(a.dest)
+            doc.put("/Rect [",f2s(a.rect.x)," ",f2s(a.rect.y)," ",f2s(a.rect.w)," ",f2s(a.rect.h),"]")
+            #doc.put("/Border [16 16 1]")
+            doc.put("/BS <</W 0>>")
+            doc.put(">>")
+            doc.put("endobj")
+            
     result = pageRootID
 
 proc putBase14Fonts(doc: Document, font: Font) =
@@ -244,7 +292,7 @@ proc putTrueTypeFonts(doc: Document, font: Font, seed: int) =
     let subsetTag  = makeSubsetTag(seed)
    
     let widths     = fon.GenerateWidths() #don't change this order
-    let ranges     = fon.GenerateRanges()
+    let ranges     = fon.GenerateRanges() #coz they sort CH2GID differently
     let desc       = fon.GetDescriptor()
     let buf        = fon.GetSubsetBuffer(subsetTag)
    
@@ -442,22 +490,25 @@ proc putResources(doc: Document) : int =
         doc.put("/F",$fon.ID," ",$fon.objID," 0 R")
     doc.put(">>")
     
-    doc.put("/ExtGState <<")
-    for gs in items(doc.extGStates):
-        doc.put("/GS",$gs.ID," ",$gs.objID," 0 R")
-    doc.put(">>")
+    if doc.extGStates.len > 0:
+        doc.put("/ExtGState <<")
+        for gs in items(doc.extGStates):
+            doc.put("/GS",$gs.ID," ",$gs.objID," 0 R")
+        doc.put(">>")
     
-    doc.put("/XObject <<")
-    for img in items(doc.images):
-        if img.haveMask():
-            doc.put("/Im",$img.ID," ",$img.maskID," 0 R")
-        doc.put("/I",$img.ID," ",$img.objID," 0 R")
-    doc.put(">>")
-        
-    doc.put("/Shading <<")
-    for gd in items(doc.gradients):
-        doc.put("/Sh",$gd.ID," ",$gd.objID," 0 R")
-    doc.put(">>")
+    if doc.images.len > 0:
+        doc.put("/XObject <<")
+        for img in items(doc.images):
+            if img.haveMask():
+                doc.put("/Im",$img.ID," ",$img.maskID," 0 R")
+            doc.put("/I",$img.ID," ",$img.objID," 0 R")
+        doc.put(">>")
+    
+    if doc.gradients.len > 0:    
+        doc.put("/Shading <<")
+        for gd in items(doc.gradients):
+            doc.put("/Sh",$gd.ID," ",$gd.objID," 0 R")
+        doc.put(">>")
     
     doc.put(">>")
     doc.put("endobj")
@@ -510,21 +561,6 @@ proc assignID(o: Outline, objID: var int) =
         k.objID = objID
         inc(objID)
         assignID(k, objID)
-
-proc putDestination(doc: Document, dest: Destination) =
-    var destStr = "/Dest [" & $dest.page.objID & " 0 R"
-    
-    case dest.style 
-    of DS_XYZ: destStr.add("/XYZ " & f2sn(dest.a) & " " & f2sn(dest.b) & " " & f2sn(dest.c) & "]")
-    of DS_FIT: destStr.add("/Fit]")
-    of DS_FITH: destStr.add("/FitH " & f2sn(dest.a) & "]")
-    of DS_FITV: destStr.add("/FitV " & f2sn(dest.a) & "]")
-    of DS_FITR: destStr.add("/FitR " & f2s(dest.a) & " " & f2s(dest.b) & " " & f2s(dest.c) & " " & f2s(dest.d) & "]")
-    of DS_FITB: destStr.add("/FitB]")
-    of DS_FITBH: destStr.add("/FitBH " & f2sn(dest.a) & "]")
-    of DS_FITBV: destStr.add("/FitBV " & f2sn(dest.a) & "]")
-    
-    doc.put(destStr)
     
 proc putOutlineItem(doc: Document, outlines: seq[Outline], parentID: int, ot: Outline, i: int) =
     let objID = doc.newobj()
@@ -732,12 +768,13 @@ proc addPage*(doc: Document, s: PageSize, o: PageOrientationType): Page {.discar
     p.size.width = fromMM(s.width)
     p.size.height = fromMM(s.height)
     p.content = ""
+    p.annots = @[]
     if o == PGO_LANDSCAPE:
         p.size.swap()
     doc.pages.add(p)
     doc.state = PGS_PAGE_OPENED
     doc.size = p.size
-    doc.setFontCall = 0
+    doc.setFontCall = 0    
     result = p
 
 proc writePDF*(doc: Document, s: Stream): bool {.discardable.} =
@@ -1351,4 +1388,19 @@ proc makeOutline*(ot: Outline, title: string, dest: Destination): Outline =
     result.dest = dest
     result.title = title
     ot.kids.add(result)
+
+proc initRect*(x,y,w,h: float64): Rectangle =
+    result.x = x
+    result.y = y
+    result.w = w
+    result.h = h
     
+proc makeLink*(doc: Document, rect: Rectangle, src: Page, dest: Destination): LinkAnnot =
+    new(result)
+    let xx = doc.docUnit.fromUser(rect.x)
+    let yy = doc.size.height - doc.docUnit.fromUser(rect.y)
+    let ww = doc.docUnit.fromUser(rect.x + rect.w)
+    let hh = doc.size.height - doc.docUnit.fromUser(rect.y + rect.h)
+    result.rect = initRect(xx,yy,ww,hh)
+    result.dest = dest
+    src.annots.add(result)
