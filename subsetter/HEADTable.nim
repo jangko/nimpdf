@@ -7,31 +7,31 @@
 import FontIOStreams, FontData
 
 const
-    kTableVersion = 0
-    kFontRevision = 4
-    kCheckSumAdjustment = 8
-    kMagicNumber = 12
-    kFlags = 16
-    kUnitsPerEm = 18
-    kCreated = 20
-    kModified = 28
-    kXMin = 36
-    kYMin = 38
-    kXMax = 40
-    kYMax = 42
-    kMacStyle = 44
-    kLowestRecPPEM = 46
-    kFontDirectionHint = 48
-    kIndexToLocFormat = 50
-    kGlyphDataFormat = 52    
+  kTableVersion = 0
+  kFontRevision = 4
+  kCheckSumAdjustment = 8
+  kMagicNumber = 12
+  kFlags = 16
+  kUnitsPerEm = 18
+  kCreated = 20
+  kModified = 28
+  kXMin = 36
+  kYMin = 38
+  kXMax = 40
+  kYMax = 42
+  kMacStyle = 44
+  kLowestRecPPEM = 46
+  kFontDirectionHint = 48
+  kIndexToLocFormat = 50
+  kGlyphDataFormat = 52  
 
 type
-    HEADTable* = ref object of FontTable
-    
+  HEADTable* = ref object of FontTable
+  
 proc makeHEADTable*(header: Header, data: FontData): HEADTable =
-    new(result)
-    initFontTable(result, header, data)
-    
+  new(result)
+  initFontTable(result, header, data)
+  
 proc TableVersion*(t: HEADTable): int = t.data.ReadFixed(kTableVersion)
 proc FontRevision*(t: HEADTable): int = t.data.ReadFixed(kFontRevision)
 proc ChecksumAdjustment*(t: HEADTable): int64 = t.data.ReadULong(kCheckSumAdjustment)
@@ -47,7 +47,7 @@ proc YMax*(t: HEADTable): int = t.data.ReadFWord(kYMax)
 proc MacStyleAsInt*(t: HEADTable): int = t.data.ReadUShort(kMacStyle)
 proc LowestRecPPEM*(t: HEADTable): int = t.data.ReadUShort(kLowestRecPPEM)
 proc FontDirectionHint*(t: HEADTable): int =  t.data.ReadShort(kFontDirectionHint)
-proc GetIndexToLocFormat*(t: HEADTable): int = t.data.ReadShort(kIndexToLocFormat)    
+proc GetIndexToLocFormat*(t: HEADTable): int = t.data.ReadShort(kIndexToLocFormat)  
 proc GlyphDataFormat*(t: HEADTable): int = t.data.ReadShort(kGlyphDataFormat)
 
    

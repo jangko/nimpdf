@@ -7,26 +7,26 @@
 import FontIOStreams, FontData
 
 const
-    kVersion = 0
-    kNumGlyphs = 4
+  kVersion = 0
+  kNumGlyphs = 4
 
-    #version 1.0
-    kMaxPoints = 6
-    kMaxContours = 8
-    kMaxCompositePoints = 10
-    kMaxCompositeContours = 12
-    kMaxZones = 14
-    kMaxTwilightPoints = 16
-    kMaxStorage = 18
-    kMaxFunctionDefs = 20
-    kMaxInstructionDefs = 22
-    kMaxStackElements = 24
-    kMaxSizeOfInstructions = 26
-    kMaxComponentElements = 28
-    kMaxComponentDepth = 30
+  #version 1.0
+  kMaxPoints = 6
+  kMaxContours = 8
+  kMaxCompositePoints = 10
+  kMaxCompositeContours = 12
+  kMaxZones = 14
+  kMaxTwilightPoints = 16
+  kMaxStorage = 18
+  kMaxFunctionDefs = 20
+  kMaxInstructionDefs = 22
+  kMaxStackElements = 24
+  kMaxSizeOfInstructions = 26
+  kMaxComponentElements = 28
+  kMaxComponentDepth = 30
 
 type
-    MAXPTable* = ref object of FontTable
+  MAXPTable* = ref object of FontTable
 
 proc TableVersion*(t: MAXPTable): int = t.data.ReadFixed(kVersion)
 proc NumGlyphs*(t: MAXPTable): int = t.data.ReadUShort(kNumGlyphs)
@@ -44,8 +44,8 @@ proc MaxComponentElements*(t: MAXPTable): int = t.data.ReadUShort(kMaxComponentE
 proc MaxComponentDepth*(t: MAXPTable): int = t.data.ReadUShort(kMaxComponentDepth)
 
 proc makeMAXPTable*(header: Header, data: FontData): MAXPTable =
-    new(result)
-    initFontTable(result, header, data)
+  new(result)
+  initFontTable(result, header, data)
 #---------------------------------------
 proc SetTableVersion*(t: MAXPTable, version: int) = discard t.data.WriteUShort(kVersion, version)
 proc SetNumGlyphs*(t: MAXPTable, num_glyphs: int) = discard t.data.WriteUShort(kNumGlyphs, num_glyphs)

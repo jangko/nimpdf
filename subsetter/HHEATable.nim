@@ -7,26 +7,26 @@
 import FontIOStreams, FontData
 
 const
-    kVersion = 0
-    kAscender = 4
-    kDescender = 6
-    kLineGap = 8
-    kAdvanceWidthMax = 10
-    kMinLeftSideBearing = 12
-    kMinRightSideBearing = 14
-    kXMaxExtent = 16
-    kCaretSlopeRise = 18
-    kCaretSlopeRun = 20
-    kCaretOffset = 22
-    kMetricDataFormat = 32
-    kNumberOfHMetrics = 34
+  kVersion = 0
+  kAscender = 4
+  kDescender = 6
+  kLineGap = 8
+  kAdvanceWidthMax = 10
+  kMinLeftSideBearing = 12
+  kMinRightSideBearing = 14
+  kXMaxExtent = 16
+  kCaretSlopeRise = 18
+  kCaretSlopeRun = 20
+  kCaretOffset = 22
+  kMetricDataFormat = 32
+  kNumberOfHMetrics = 34
 
 type
-    HHEATable* = ref object of FontTable
-    
+  HHEATable* = ref object of FontTable
+  
 proc makeHHEATable*(header: Header, data: FontData): HHEATable =
-    new(result)
-    initFontTable(result, header, data)
+  new(result)
+  initFontTable(result, header, data)
 
 proc TableVersion*(t: HHEATable): int = t.data.ReadFixed(kVersion)
 proc Ascender*(t: HHEATable): int = t.data.ReadFWord(kAscender)
