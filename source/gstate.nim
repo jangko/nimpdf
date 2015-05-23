@@ -84,6 +84,9 @@ type
     
   Coord* = object
     x1*, y1*, x2*, y2*: float64
+  
+  CoordRadial* = object
+    x1*, y1*, r1*, x2*, y2*, r2*: float64
     
   CMYKColor* = object
     c*, m*, y*, k* : float64
@@ -101,11 +104,11 @@ type
   Gradient* = ref object
     ID*, objID*: int
     a*, b*: RGBColor
-    case gradType: GradientType
+    case gradType*: GradientType
     of GDT_LINEAR:
       axis* : Coord
     of GDT_RADIAL:
-      radius*: float64
+      radCoord*: CoordRadial
  
   GState* = ref object
     trans_matrix*: TMatrix2d
@@ -158,6 +161,13 @@ proc makeLinearGradient*(a, b: RGBColor, axis: Coord): Gradient =
   result.a = a
   result.b = b
   result.axis = axis
+
+proc makeRadialGradient*(a, b: RGBColor, coord: CoordRadial): Gradient =
+  new(result)
+  result.gradType = GDT_RADIAL
+  result.a = a
+  result.b = b
+  result.radCoord = coord
   
 proc init*(cc: var CMYKColor; c,m,y,k: float64) =
   cc.c = c
@@ -170,6 +180,14 @@ proc makeCoord*(x1,y1,x2,y2: float64): Coord =
   result.y1 = y1
   result.x2 = x2
   result.y2 = y2
+
+proc makeCoord*(x1,y1,r1,x2,y2,r2: float64): CoordRadial =
+  result.x1 = x1
+  result.y1 = y1
+  result.r1 = r1
+  result.x2 = x2
+  result.y2 = y2
+  result.r2 = r2
 
 proc init*(c: var DashMode) =
   for i in 0..high(c.ptn): c.ptn[i] = 0

@@ -337,6 +337,7 @@ proc SymbolGetWidth(cp: int): int = GetWidth(cp, CHAR_DATA_SYMBOL)
 proc ZapfDingbatsGetWidth(cp: int): int = GetWidth(cp, CHAR_DATA_ZAPF_DINGBATS)
 
 const
+  #BaseFont, SearchName, get_width, is_font_specific, ascent, descent, x_height, cap_height, bbox
   BUILTIN_FONTS* = [
     ("Courier", "Courier00", CourierGetwidth, false, 629, -157, 426, 562, (-23, -250, 715, 805) ), 
     ("Courier-Bold", "Courier10", CourierGetwidth, false, 629, -157, 439, 562, (-113, -250, 749, 801) ),

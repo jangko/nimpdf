@@ -30,12 +30,14 @@ nimPDF implements the following features(see [demo.pdf](https://github.com/jangk
 * **Color spaces**
   - Gray, RGB, CMYK
   - alpha channel for text, path, and images too!
-  - linear gradient to fill any shape
+  - linear gradient to fill any closed shape
+  - radial gradient to fill any closed shape
 
 * **Interactive Features**(see demo folder)
   - Page Labels
   - Document Outline
   - Hyperlinks
+  - Text annotation
   
 * **others**
   - top-down mode
@@ -49,11 +51,11 @@ nimPDF implements the following features(see [demo.pdf](https://github.com/jangk
   - CIE based color space
   - patterns(this can be achieved using PDF primitives and path clipping)
   - encryption
-  - annotation
+  - ~~annotation~~
   - ~~hyperlinks~~
   - other encoding beside UTF-8(nim has [encoding](http://nim-lang.org/docs/encodings.html) module, i will use it someday)
   - basic text formating(will be implemented as separate layer)
-  - radial gradient and multi color gradient
+  - ~~radial gradient~~ and multi color gradient
   - table generator(as in FPDF)(will be implemented as separate layer)
   - ~~document outline~~
   - permission

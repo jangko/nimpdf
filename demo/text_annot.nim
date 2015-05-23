@@ -8,16 +8,12 @@ proc createPDF(doc: Document) =
     let w = doc.getTextWidth(text)
     #doc.drawRect(15, 25, w, 6)
     #doc.stroke()
-        
-    let pg2 = doc.addPage(size, PGO_PORTRAIT)
-    doc.drawText(15, 30, "Page 2")
-    
-    let dest = doc.makeXYZDest(pg2, 0, 0, 0)
-    let r = initRect(15,25,w,6)
-    discard doc.linkAnnot(r, pg1, dest)
+ 
+    let r = initRect(15, 19, 10, 6)
+    discard doc.textAnnot(r, pg1, "Hello There")
     
 proc main(): bool {.discardable.} = 
-    var fileName = "link_annot.pdf"
+    var fileName = "text_annot.pdf"
     var file = newFileStream(fileName, fmWrite)
     
     if file != nil:

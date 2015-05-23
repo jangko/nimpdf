@@ -51,6 +51,7 @@ type
     is_font_specific : bool
     ascent, descent, x_height, cap_height : int
     bbox : BBox
+    missing_width: int
 
   TextWidth* = object
     numchars*, width*, numspace*, numwords*: int
@@ -154,7 +155,10 @@ method GetTextWidth*(f: Base14, text: string): TextWidth =
   for i in 0..text.len-1:
     b = text[i]
     inc(result.numchars)
-    result.width += f.get_width(ord(b))
+    var ww = f.get_width(ord(b))
+    if ord(b) == 0x89: echo "w: ", $ww
+    #if ww == 0: ww = f.missing_width
+    result.width += ww
     if b in Whitespace:
       inc(result.numspace)
       inc(result.numwords)
@@ -215,8 +219,9 @@ proc init*(ff: var FontManager, fontDirs: seq[string]) =
     ff.BaseFont[i].baseFont   = BUILTIN_FONTS[i][0]
     ff.BaseFont[i].searchName = BUILTIN_FONTS[i][1]
     ff.BaseFont[i].get_width  = BUILTIN_FONTS[i][2]
-    ff.BaseFont[i].subType  = FT_BASE14
-  
+    ff.BaseFont[i].subType    = FT_BASE14
+    ff.BaseFont[i].missing_width = ff.BaseFont[i].get_width(0x20)
+    
   #put default font
   var res = searchFrom(ff.BaseFont, defaultFont)
   res.ID = ff.FontList.len + 1

@@ -14,7 +14,7 @@ export gstate.PageUnitType, gstate.LineCap, gstate.LineJoin, gstate.DashMode
 export gstate.TextRenderingMode, gstate.RGBColor, gstate.CMYKColor, gstate.BlendMode
 export gstate.makeRGB, gstate.makeCMYK, gstate.makeLinearGradient, gstate.setUnit
 export gstate.fromMM, gstate.fromCM, gstate.fromIN, gstate.fromUser, gstate.toUser
-export gstate.makeCoord
+export gstate.makeCoord,gstate.makeRadialGradient
 export image.PImage, image.loadImage, arc.drawArc, arc.arcTo, arc.degree_to_radian
 export path.Path, path.calculateBounds, path.bound
 
@@ -80,17 +80,24 @@ type
   
   Rectangle= object
     x,y,w,h: float64
+  
+  AnnotType = enum
+    ANNOT_LINK, ANNOT_TEXT
     
-  LinkAnnot = ref object
+  Annot = ref object
     objID: int
-    dest: Destination
     rect: Rectangle
+    case annotType: AnnotType
+    of ANNOT_LINK: 
+      dest: Destination
+    of ANNOT_TEXT: 
+      content: string
     
   Page = ref object
     objID: int
     content: string
     size: PageSize
-    annots: seq[LinkAnnot]
+    annots: seq[Annot]
     
   DocOpt* = ref object
     resourcesPath: seq[string]
@@ -166,10 +173,16 @@ proc escapeString(text: string): string =
   result = ""
   for c in items(text):
     case c
-    of '\\': add(result, "\\\\")
-    of ')': add(result, "\\)")
-    of '(': add(result, "\\(")
-    else: add(result, c)
+    of chr(0x0A): add(result, "\\n")
+    of chr(0x0D): add(result, "\\r")
+    of chr(0x09): add(result, "\\t")
+    of chr(0x08): add(result, "\\b")
+    of chr(0x20)..chr(0x7e): 
+      if c == '\\': add(result, "\\\\")
+      elif c == ')': add(result, "\\)")
+      elif c == '(': add(result, "\\(")
+      else: add(result, c)
+    else: add(result, "\\" & toOctal(c))
 
 proc put(p: var Page, text: varargs[string]) =
   for s in items(text):
@@ -271,8 +284,12 @@ proc putPages(doc: Document, resourceID: int) : int =
     for a in p.annots:
       a.objID = doc.newobj()
       doc.put("<</Type /Annot")
-      doc.put("/Subtype /Link")
-      doc.putDestination(a.dest)
+      if a.annotType == ANNOT_LINK:
+        doc.put("/Subtype /Link")
+        doc.putDestination(a.dest)
+      else:
+        doc.put("/Subtype /Text")
+        doc.put("/Contents (", escapeString(a.content), ")")
       doc.put("/Rect [",f2s(a.rect.x)," ",f2s(a.rect.y)," ",f2s(a.rect.w)," ",f2s(a.rect.h),"]")
       #doc.put("/Border [16 16 1]")
       doc.put("/BS <</W 0>>")
@@ -416,13 +433,18 @@ proc putGradients(doc: Document) : int =
     doc.put("/N 1")
     doc.put(">>")
     doc.put("endobj")
-
-    let cr = gd.axis
+    
     let objID = doc.newobj()
     doc.put("<<")
-    doc.put("/ShadingType 2")
-    doc.put("/ColorSpace /DeviceRGB")
-    doc.put("/Coords [",f2s(cr.x1)," ",f2s(cr.y1)," ",f2s(cr.x2)," ",f2s(cr.y2),"]");
+    if gd.gradType == GDT_LINEAR:
+      let cr = gd.axis
+      doc.put("/ShadingType 2")
+      doc.put("/Coords [",f2s(cr.x1)," ",f2s(cr.y1)," ",f2s(cr.x2)," ",f2s(cr.y2),"]")
+    elif gd.gradType == GDT_RADIAL:
+      let cr = gd.radCoord
+      doc.put("/ShadingType 3")
+      doc.put("/Coords [",f2s(cr.x1)," ",f2s(cr.y1)," ",f2s(cr.r1)," ",f2s(cr.x2)," ",f2s(cr.y2)," ",f2s(cr.r2),"]")
+    doc.put("/ColorSpace /DeviceRGB")    
     doc.put("/Function ",$funcID," 0 R")
     doc.put("/Extend [true true] ")
     doc.put(">>")
@@ -622,7 +644,7 @@ proc putOutlines(doc: Document): int =
     
   result = outlineID
     
-proc putCatalog(doc: Document) : int =
+proc putCatalog(doc: Document) =
   doc.state = PGS_DOC_OPENED
   let resourceID = doc.putResources()
   let pageRootID = doc.putPages(resourceID)
@@ -665,7 +687,6 @@ proc putCatalog(doc: Document) : int =
   doc.put("%%EOF")
   
   doc.state = PGS_DOC_CLOSED
-  result = 0
 
 proc setInfo*(doc: Document, field: DocInfo, info: string) =
   doc.info[int(field)] = info
@@ -783,12 +804,11 @@ proc addPage*(doc: Document, s: PageSize, o: PageOrientationType): Page {.discar
   doc.setFontCall = 0  
   result = p
 
-proc writePDF*(doc: Document, s: Stream): bool {.discardable.} =
-  discard doc.putCatalog() 
+proc writePDF*(doc: Document, s: Stream) =
+  doc.putCatalog()
   s.write(doc.content)
-  result = true
    
-proc drawText*(doc: Document; x,y: float64; text: string) : int {.discardable.} =
+proc drawText*(doc: Document; x,y: float64; text: string) =
   let xx = doc.docUnit.fromUser(x)
   let yy = doc.size.height - doc.docUnit.fromUser(y)
 
@@ -802,8 +822,6 @@ proc drawText*(doc: Document; x,y: float64; text: string) : int {.discardable.} 
     doc.put("BT ",f2s(xx)," ",f2s(yy)," Td <",font.EscapeString(utf8),"> Tj ET")
   else:
     doc.put("BT ",f2s(xx)," ",f2s(yy)," Td (",escapeString(text),") Tj ET")
-    
-  result = 0
 
 proc beginText*(doc: Document) =
   if doc.gstate.font == nil or doc.setFontCall == 0:
@@ -1397,12 +1415,24 @@ proc initRect*(x,y,w,h: float64): Rectangle =
   result.w = w
   result.h = h
   
-proc makeLink*(doc: Document, rect: Rectangle, src: Page, dest: Destination): LinkAnnot =
+proc linkAnnot*(doc: Document, rect: Rectangle, src: Page, dest: Destination): Annot =
   new(result)
   let xx = doc.docUnit.fromUser(rect.x)
   let yy = doc.size.height - doc.docUnit.fromUser(rect.y)
   let ww = doc.docUnit.fromUser(rect.x + rect.w)
   let hh = doc.size.height - doc.docUnit.fromUser(rect.y + rect.h)
+  result.annotType = ANNOT_LINK
   result.rect = initRect(xx,yy,ww,hh)
   result.dest = dest
+  src.annots.add(result)
+
+proc textAnnot*(doc: Document, rect: Rectangle, src: Page, content: string): Annot =
+  new(result)
+  let xx = doc.docUnit.fromUser(rect.x)
+  let yy = doc.size.height - doc.docUnit.fromUser(rect.y)
+  let ww = doc.docUnit.fromUser(rect.x + rect.w)
+  let hh = doc.size.height - doc.docUnit.fromUser(rect.y + rect.h)
+  result.annotType = ANNOT_TEXT
+  result.rect = initRect(xx,yy,ww,hh)
+  result.content = content
   src.annots.add(result)

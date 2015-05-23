@@ -1,0 +1,76 @@
+%PDF-1.5
+1 0 obj
+<</Type /Font
+/BaseFont /Times-Roman
+/Subtype /Type1
+/Encoding /WinAnsiEncoding
+>>
+endobj
+2 0 obj
+<</Font <<
+/F1 1 0 R
+>>
+>>
+endobj
+3 0 obj
+<</Type /Pages
+/Kids [4 0 R ]
+/Count 1
+>>
+endobj
+4 0 obj
+<</Type /Page
+/Parent 3 0 R
+/Resources 2 0 R
+/MediaBox [0 0 595.2756 841.8898]
+/Annots [6 0 R ]
+/Contents 5 0 R>>
+endobj
+5 0 obj
+<< /Length 73 >>
+stream
+BT /F1 14.17322834645669 Tf ET
+BT 42.5197 756.8504 Td (Click Here) Tj ET
+
+endstream
+endobj
+6 0 obj
+<</Type /Annot
+/Subtype /Text
+/Contents (Hello There)
+/Rect [42.5197 788.0315 70.8661 771.0236]
+/BS <</W 0>>
+>>
+endobj
+7 0 obj
+<<
+/Producer(nimPDF)
+/CreationDate (D:20150523132144)
+>>
+endobj
+8 0 obj
+<<
+/Type /Catalog
+/Pages 3 0 R
+>>
+endobj
+xref
+0 9
+0000000000 65535 f 
+0000000009 00000 n 
+0000000107 00000 n 
+0000000149 00000 n 
+0000000206 00000 n 
+0000000335 00000 n 
+0000000458 00000 n 
+0000000585 00000 n 
+0000000657 00000 n 
+trailer
+<<
+/Size 9
+/Root 8 0 R
+/Info 7 0 R
+>>
+startxref
+706
+%%EOF
