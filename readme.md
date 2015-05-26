@@ -17,7 +17,7 @@ nimPDF implements the following features(see [demo.pdf](https://github.com/jangk
   - you can easily tell the library to look for fonts in certain folder(s)
   - you only need to ask for font family name and it's style, the library will try to find the right one for you(if avilable)
   - text encoded in UTF-8 if you use TTF/TTC
-  - 14 base font in PDF use plain ASCII encoding
+  - 14 base font in PDF use Standard,MacRoman,WinAnsi encoding
  
 * **Path construction**
   - straight segments, Bezier curves, elliptical arcs, roundrect
@@ -53,7 +53,7 @@ nimPDF implements the following features(see [demo.pdf](https://github.com/jangk
   - encryption
   - ~~annotation~~
   - ~~hyperlinks~~
-  - other encoding beside UTF-8(nim has [encoding](http://nim-lang.org/docs/encodings.html) module, i will use it someday)
+  - ~~other encoding beside UTF-8~~(nim has [encoding](http://nim-lang.org/docs/encodings.html) module, i will use it someday)
   - basic text formating(will be implemented as separate layer)
   - ~~radial gradient~~ and multi color gradient
   - table generator(as in FPDF)(will be implemented as separate layer)

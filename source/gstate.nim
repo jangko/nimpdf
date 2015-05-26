@@ -78,7 +78,7 @@ type
     CS_CAL_RGB, CS_LAB, CS_ICC_BASED, CS_SEPARATION, CS_DEVICE_N,
     CS_INDEXED, CS_PATTERN,
     CS_GRADIENT, CS_IMAGE #fill type
-  
+    
   RGBColor* = object
     r*, g*, b* : float64
     

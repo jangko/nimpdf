@@ -14,7 +14,7 @@
 
 import base14, tables, strutils, collect, strtabs, unicode, math
 
-import Font, CMAPTable, HEADTable, HMTXTable, FontData
+import encode, Font, CMAPTable, HEADTable, HMTXTable, FontData
 
 const
   defaultFont = "Times00"
@@ -27,6 +27,9 @@ type
 
   FontType* = enum
     FT_BASE14, FT_TRUETYPE
+  
+  EncodingType* = enum
+    ENC_STANDARD, ENC_MACROMAN, ENC_WINANSI, ENC_UTF8
     
   BBox = object 
     x1,y1,x2,y2 : int
@@ -52,7 +55,9 @@ type
     ascent, descent, x_height, cap_height : int
     bbox : BBox
     missing_width: int
-
+    encoding*: EncodingType
+    encode: proc(val: int): int
+    
   TextWidth* = object
     numchars*, width*, numspace*, numwords*: int
   
@@ -150,20 +155,19 @@ method GetTextWidth*(f: Base14, text: string): TextWidth =
   result.width = 0
   result.numspace = 0
   result.numwords = 0
-  var b:char
-  
+  var b:int
+ 
   for i in 0..text.len-1:
-    b = text[i]
+    b = ord(text[i])
     inc(result.numchars)
-    var ww = f.get_width(ord(b))
-    if ord(b) == 0x89: echo "w: ", $ww
-    #if ww == 0: ww = f.missing_width
+    var ww = f.get_width(f.encode(b))
+    if ww == 0: ww = f.missing_width
     result.width += ww
-    if b in Whitespace:
+    if chr(b) in Whitespace:
       inc(result.numspace)
       inc(result.numwords)
  
-  if b notin Whitespace:
+  if chr(b) notin Whitespace:
     inc(result.numwords)
   
 proc reverse(s: string): string =
@@ -202,8 +206,8 @@ proc searchFrom[T](list: seq[T], name: string): Font =
 proc init*(ff: var FontManager, fontDirs: seq[string]) =
   ff.FontList = @[]
   
-  ff.TTFontList = newStringTable(modeCaseSensitive)
-  ff.TTCList = newStringTable(modeCaseSensitive)
+  ff.TTFontList = newStringTable(modeCaseInsensitive)
+  ff.TTCList = newStringTable(modeCaseInsensitive)
   
   for fontDir in fontDirs:
     collectTTF(fontDir, ff.TTFontList)
@@ -223,9 +227,9 @@ proc init*(ff: var FontManager, fontDirs: seq[string]) =
     ff.BaseFont[i].missing_width = ff.BaseFont[i].get_width(0x20)
     
   #put default font
-  var res = searchFrom(ff.BaseFont, defaultFont)
-  res.ID = ff.FontList.len + 1
-  ff.FontList.add(res)
+  #var res = searchFrom(ff.BaseFont, defaultFont)
+  #res.ID = ff.FontList.len + 1
+  #ff.FontList.add(res)
 
 proc makeTTFont(font: FontDef, searchName: string): TTFont = 
   var cmap = CMAPTable(font.GetTable(TAG.cmap))
@@ -274,24 +278,58 @@ proc makeSubsetTag*(number: int): string =
   result.add(val)
   result.add('+')
 
-proc makeFont*(ff: var FontManager, family:string = "Times", style:FontStyles = {FS_REGULAR}): Font =
+proc enc_std_map(val: int): int = STDMAP[val]
+proc enc_mac_map(val: int): int = MACMAP[val]
+proc enc_win_map(val: int): int = WINMAP[val]
+
+proc clone(src: Base14): Base14 =
+  new(result)
+  result.ID = src.ID
+  result.objID = src.objID
+  result.subType = src.subType
+  result.searchName = src.searchName
+  result.baseFont = src.baseFont
+  result.get_width = src.get_width
+  result.is_font_specific = src.is_font_specific
+  result.ascent = src.ascent
+  result.descent = src.descent
+  result.x_height = src.x_height
+  result.cap_height = src.cap_height
+  result.bbox = src.bbox
+  result.missing_width = src.missing_width
+  result.encoding = src.encoding
+  result.encode = src.encode
+    
+proc makeFont*(ff: var FontManager, family:string = "Times", style:FontStyles = {FS_REGULAR}, enc: EncodingType): Font =
   var searchStyle = "00"
   if FS_BOLD in style: searchStyle[0] = '1'
   if FS_ITALIC in style: searchStyle[1] = '1'
   
   var searchName = family 
   searchName.add(searchStyle)
-  
-  var res = searchFrom(ff.FontList, searchName)
-  if res != nil: return res
-  
-  res = searchFrom(ff.BaseFont, searchName)
+    
+  var res = searchFrom(ff.BaseFont, searchName)
   if res != nil:
-    #echo "Base 14 Font ", searchName
-    res.ID = ff.FontList.len + 1
-    ff.FontList.add(res)
-    return res
+    var encoding = ENC_STANDARD
+    if enc in {ENC_STANDARD, ENC_MACROMAN, ENC_WINANSI}: encoding = enc
+    var fon = searchFrom(ff.FontList, searchName & $int(enc))
+    if fon != nil: return fon
+    
+    var fon14 = clone(Base14(res))
+    fon14.searchName = fon14.searchName & $int(enc)
+    fon14.encoding = encoding
+    
+    if encoding == ENC_STANDARD: fon14.encode = enc_std_map
+    elif encoding == ENC_MACROMAN: fon14.encode = enc_mac_map
+    elif encoding == ENC_WINANSI: fon14.encode = enc_win_map
+    
+    fon14.ID = ff.FontList.len + 1
+    ff.FontList.add(fon14)
+    return  fon14
   
+  res = searchFrom(ff.FontList, searchName)
+  if res != nil: return res
+      
   res = searchFromTTList(ff, searchName)
   if res != nil:
     #echo "TT Font ", searchName
@@ -300,7 +338,7 @@ proc makeFont*(ff: var FontManager, family:string = "Times", style:FontStyles = 
     return res
 
   res = searchFromTTCList(ff, searchName)
-  if res != nil: 
+  if res != nil:
     #echo "TTC Font ", searchName
     res.ID = ff.FontList.len + 1
     ff.FontList.add(res)

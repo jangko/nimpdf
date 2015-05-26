@@ -10,6 +10,7 @@ import strutils, streams, sequtils, times, unsigned, math, basic2d, algorithm, t
 import image, utf8, font, arc, gstate, path, fontmanager
 
 export fontmanager.Font, fontmanager.FontStyle, fontmanager.FontStyles
+export fontmanager.EncodingType
 export gstate.PageUnitType, gstate.LineCap, gstate.LineJoin, gstate.DashMode
 export gstate.TextRenderingMode, gstate.RGBColor, gstate.CMYKColor, gstate.BlendMode
 export gstate.makeRGB, gstate.makeCMYK, gstate.makeLinearGradient, gstate.setUnit
@@ -77,7 +78,7 @@ type
     strokingAlpha, nonstrokingAlpha: float64
     blendMode: string
     ID, objID: int
-  
+    
   Rectangle= object
     x,y,w,h: float64
   
@@ -306,7 +307,12 @@ proc putBase14Fonts(doc: Document, font: Font) =
   doc.put("/BaseFont /", fon.baseFont)
   doc.put("/Subtype /Type1")
   if (fon.baseFont != "Symbol") and (fon.baseFont != "ZapfDingbats"):
-    doc.put("/Encoding /WinAnsiEncoding")
+    if fon.encoding == ENC_STANDARD:
+      doc.put("/Encoding /StandardEncoding")
+    elif fon.encoding == ENC_MACROMAN:
+      doc.put("/Encoding /MacRomanEncoding")
+    elif fon.encoding == ENC_WINANSI:
+      doc.put("/Encoding /WinAnsiEncoding")
   doc.put(">>")
   doc.put("endobj")
 
@@ -780,8 +786,8 @@ proc getSize*(doc: Document): PageSize =
   result.width = doc.docUnit.toUser(doc.size.width)
   result.height = doc.docUnit.toUser(doc.size.height)
 
-proc setFont*(doc: Document, family:string, style: FontStyles, size: float64) =
-  var font = doc.fontMan.makeFont(family, style)
+proc setFont*(doc: Document, family:string, style: FontStyles, size: float64, enc: EncodingType = ENC_STANDARD) =
+  var font = doc.fontMan.makeFont(family, style, enc)
   let fontNumber = font.ID
   let fontSize = doc.docUnit.fromUser(size)
   doc.put("BT /F",$fontNumber," ",$fontSize," Tf ET")
