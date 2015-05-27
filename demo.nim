@@ -1062,6 +1062,11 @@ proc draw_demo_12(doc: Document) =
   doc.setFont("KaiTi", {FS_REGULAR}, 10)
   doc.drawText(15, 70, "你好世界")
   
+  doc.drawVText(100, 70, "你好世界")
+  doc.drawVText(120, 70, "天下大勢")
+  doc.drawVText(130, 70, "分久必合")
+  doc.drawVText(140, 70, "合久必分")
+  
   doc.setFont("Calligrapher", {FS_REGULAR}, 10)
   doc.drawText(15, 30, "Hello World!")
   

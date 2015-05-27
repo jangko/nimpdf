@@ -7,7 +7,7 @@
 # the main module for nimPDF, import this one from your project
 
 import strutils, streams, sequtils, times, unsigned, math, basic2d, algorithm, tables
-import image, utf8, font, arc, gstate, path, fontmanager
+import image, utf8, font, arc, gstate, path, fontmanager, unicode
 
 export fontmanager.Font, fontmanager.FontStyle, fontmanager.FontStyles
 export fontmanager.EncodingType
@@ -27,7 +27,7 @@ else:
     dir_sep = "/"
     
 const
-  nimPDFVersion = "0.1.3"
+  nimPDFVersion = "0.1.4"
   
   defaultFont = "Times"
   
@@ -829,6 +829,32 @@ proc drawText*(doc: Document; x,y: float64; text: string) =
   else:
     doc.put("BT ",f2s(xx)," ",f2s(yy)," Td (",escapeString(text),") Tj ET")
 
+proc drawVText*(doc: Document; x,y: float64; text: string) =
+  if doc.gstate.font == nil or doc.setFontCall == 0:
+    doc.setFont(defaultFont, {FS_REGULAR}, 5)
+
+  var font = doc.gstate.font
+
+  if not font.CanWriteVertical():
+    #echo "cannot write vertical"
+    doc.drawText(x, y, text)
+    return
+    
+  var xx = doc.docUnit.fromUser(x)
+  var yy = doc.size.height - doc.docUnit.fromUser(y)
+  let utf8 = replace_invalid(text)
+  let cid = font.EscapeString(utf8)
+  
+  doc.put("BT")
+  var i = 0
+  for b in runes(utf8):
+    doc.put(f2s(xx)," ",f2s(yy)," Td <", substr(cid, i, i + 3),"> Tj")
+    yy = -float(TTFont(font).GetCharHeight(int(b))) * doc.gstate.font_size / 1000
+    xx = 0
+    inc(i, 4)
+  doc.put("ET")
+    
+
 proc beginText*(doc: Document) =
   if doc.gstate.font == nil or doc.setFontCall == 0:
     doc.setFont(defaultFont, {FS_REGULAR}, 5)
@@ -1211,6 +1237,16 @@ proc restoreState*(doc: Document) =
 proc getTextWidth*(doc: Document, text:string): float64 =
   var res = 0.0
   let tw = doc.gstate.font.GetTextWidth(text)
+  
+  res += doc.gstate.word_space * float64(tw.numspace)
+  res += float64(tw.width) * doc.gstate.font_size / 1000
+  res += doc.gstate.char_space * float64(tw.numchars)
+
+  result = doc.docUnit.toUser(res)
+
+proc getTextHeight*(doc: Document, text:string): float64 =
+  var res = 0.0
+  let tw = doc.gstate.font.GetTextHeight(text)
   
   res += doc.gstate.word_space * float64(tw.numspace)
   res += float64(tw.width) * doc.gstate.font_size / 1000

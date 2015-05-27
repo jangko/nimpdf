@@ -18,6 +18,7 @@ nimPDF implements the following features(see [demo.pdf](https://github.com/jangk
   - you only need to ask for font family name and it's style, the library will try to find the right one for you(if avilable)
   - text encoded in UTF-8 if you use TTF/TTC
   - 14 base font in PDF use Standard,MacRoman,WinAnsi encoding
+  - TTF/TTC fonts can be written vertically if they have vertical metrics
  
 * **Path construction**
   - straight segments, Bezier curves, elliptical arcs, roundrect

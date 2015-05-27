@@ -14,7 +14,7 @@
 
 import base14, tables, strutils, collect, strtabs, unicode, math
 
-import encode, Font, CMAPTable, HEADTable, HMTXTable, FontData
+import encode, Font, CMAPTable, HEADTable, HMTXTable, FontData, VMTXTable
 
 const
   defaultFont = "Times00"
@@ -44,6 +44,7 @@ type
     font*: FontDef
     cmap: CMAP
     hmtx: HMTXTable
+    vmtx: VMTXTable
     scaleFactor: float64
     CH2GID*: CH2GIDMAP
     newGID: int
@@ -67,8 +68,11 @@ type
     TTFontList: StringTableRef
     TTCList: StringTableRef
 
-proc GetCharWidth(f: TTFont, gid: int): int =
+proc GetCharWidth*(f: TTFont, gid: int): int =
   result = math.round(float(f.hmtx.AdvanceWidth(gid)) * f.scaleFactor)
+
+proc GetCharHeight*(f: TTFont, gid: int): int =
+  result = math.round(float(f.vmtx.AdvanceHeight(gid)) * f.scaleFactor)
   
 proc GenerateWidths*(f: TTFont): string =
   f.CH2GID.sort(proc(x,y: tuple[key: int, val: TONGID]):int = cmp(x.val.newGID, y.val.newGID) )
@@ -106,6 +110,11 @@ proc GetSubsetBuffer*(f: TTFont, subsetTag: string): string =
    let fd   = f.font.Subset(f.CH2GID, subsetTag)
    result = fd.GetInternalBuffer()
 
+method CanWriteVertical*(f: Font): bool = false
+method CanWriteVertical*(f: Base14): bool = false
+method CanWriteVertical*(f: TTFont): bool =
+  result = f.vmtx != nil
+  
 method EscapeString*(f: Font, text: string): string =
   discard
 
@@ -142,6 +151,29 @@ method GetTextWidth*(f: TTFont, text: string): TextWidth =
   for b in runes(text):
     inc(result.numchars)
     result.width += f.GetCharWidth(int(b))
+    if isWhiteSpace(b):
+      inc(result.numspace)
+      inc(result.numwords)
+  
+  let lastChar = runeLen(text) - 1
+  if not isWhiteSpace(runeAt(text, lastChar)):
+    inc(result.numwords)
+
+method GetTextHeight*(f: Font, text: string): TextWidth =
+  discard
+
+method GetTextHeight*(f: Base14, text: string): TextWidth =
+  result = GetTextWidth(f, text)
+
+method GetTextHeight*(f: TTFont, text: string): TextWidth =
+  result.width = 0
+  result.numchars = 0
+  result.numwords = 0
+  result.numspace = 0
+  
+  for b in runes(text):
+    inc(result.numchars)
+    result.width += f.GetCharHeight(int(b))
     if isWhiteSpace(b):
       inc(result.numspace)
       inc(result.numwords)
@@ -250,6 +282,7 @@ proc makeTTFont(font: FontDef, searchName: string): TTFont =
   res.font     = font
   res.cmap     = encodingcmap
   res.hmtx     = hmtx
+  res.vmtx     = VMTXTable(font.GetTable(TAG.vmtx))
   res.scaleFactor= 1000 / head.UnitsPerEm()
   res.CH2GID   = initOrderedTable[int, TONGID]()
   res.newGID   = 1

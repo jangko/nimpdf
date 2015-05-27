@@ -15,6 +15,7 @@ import FontData, FontIOStreams, tables, algorithm, sequtils, math
 
 import LOCATable, GLYPHTable, HEADTable, HDMXTable, NAMETable
 import HHEATable, HMTXTable, MAXPTable, OS2Table, CMAPTable, POSTTable
+import VHEATable, VMTXTable
 
 const
   kSfntVersion = 0
@@ -81,6 +82,8 @@ proc GetTable(header: Header, data: FontData): FontTable =
   of TAG.hhea: result = makeHHEATable(header, data)
   of TAG.hmtx: result = makeHMTXTable(header, data)
   of TAG.maxp: result = makeMAXPTable(header, data)
+  of TAG.vhea: result = makeVHEATable(header, data)
+  of TAG.vmtx: result = makeVMTXTable(header, data)
   of TAG.name: result = makeNAMETable(header, data)
   of TAG.OS_2: result = makeOS2Table(header, data)
   of TAG.glyf: result = makeGLYPHTable(header, data)
@@ -179,7 +182,13 @@ proc InterRelateTables(f: FontDef) =
   var hmtx = HMTXTable(f.GetTable(TAG.hmtx))
   var hdmx = HDMXTable(f.GetTable(TAG.hdmx))
   var glyf = GLYPHTable(f.GetTable(TAG.glyf))
+  var vhea = VHEATable(f.GetTable(TAG.vhea))
+  var vmtx = VMTXTable(f.GetTable(TAG.vmtx))
   
+  if vmtx != nil:
+    if maxp != nil: vmtx.SetNumGlyphs(maxp.NumGlyphs())
+    if vhea != nil: vmtx.SetNumberOfVMetrics(vhea.NumberOfVMetrics())
+
   if hmtx != nil:
     if maxp != nil: hmtx.SetNumGlyphs(maxp.NumGlyphs())
     if hhea != nil: hmtx.SetNumberOfHMetrics(hhea.NumberOfHMetrics())
@@ -359,7 +368,9 @@ proc Subset*(font: FontDef, CH2GID: CH2GIDMAP, newTag: string): FontData =
   var fpgm = font.GetTable(TAG.fpgm)
   var prep = font.GetTable(TAG.prep)
   var gasp = font.GetTable(TAG.gasp)
- 
+  var vhea = VHEATable(font.GetTable(TAG.vhea))
+  var vmtx = VMTXTable(font.GetTable(TAG.vmtx))
+  
   var isSymbol = false
   if os2 != nil:
     isSymbol = os2.IsSymbolCharSet() and
@@ -387,6 +398,12 @@ proc Subset*(font: FontDef, CH2GID: CH2GIDMAP, newTag: string): FontData =
   #echo "numGlyphs: ", $GID2GID.len
   #cmap, glyf, head, hhea, hmtx, loca, maxp, name, post, os/2
   var tables = @[newcmap, newglyf, head, hhea, newhmtx, newloca, maxp, newname, os2, newpost, prep, cvt, fpgm, gasp]
+  if vhea != nil and vmtx != nil:
+    vhea.SetNumberOfVMetrics(GID2GID.len)
+    var newvmtx = EncodeVMTXTable(vmtx, GID2GID)
+    tables.add(vhea)
+    tables.add(newvmtx)
+    
   result = SerializeFont(tables)
 
 proc makeDescriptor*(font: FontDef, CH2GID: CH2GIDMAP): FontDescriptor =
