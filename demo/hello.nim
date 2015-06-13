@@ -1,19 +1,7 @@
-import streams, nimpdf
+import nimpdf
 
-proc main(): bool {.discardable.} = 
-  var fileName = "hello.pdf"
-  var file = newFileStream(fileName, fmWrite)
-
-  if file != nil:
-    var doc = initPDF()
-    let size = getSizeFromName("A4")
-    doc.addPage(size, PGO_PORTRAIT)
-    doc.drawText(15, 15, "Hello World!")
-    doc.writePDF(file)
-    file.close()
-    return true
-
-  echo "cannot open: ", fileName
-  result = false
-
-main()
+var doc = initPDF()
+doc.addPage(getSizeFromName("A4"), PGO_PORTRAIT)
+doc.drawText(15, 15, "Hello World!")
+if not doc.writePDF("hello.pdf"):
+  echo "cannot open: hello.pdf"

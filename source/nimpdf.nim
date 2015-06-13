@@ -1,6 +1,6 @@
 ﻿# Copyright (c) 2015 Andri Lim
 #
-# Distributed under the MIT license 
+# Distributed under the MIT license
 # (See accompanying file LICENSE.txt)
 #
 #-----------------------------------------
@@ -25,12 +25,12 @@ when defined(Windows):
 else:
   const
     dir_sep = "/"
-    
+
 const
   nimPDFVersion = "0.1.4"
-  
+
   defaultFont = "Times"
-  
+
   PageNames = [
     #my paper size
     ("Faktur",210.0,148.0), ("F4",215.0,330.0)
@@ -58,16 +58,16 @@ const
     ,("Broadsheet",457.0,610.0),("Royal",508.0,635.0),("Elephant",584.0,711.0),("REAL Demy",572.0,889.0),("Quad Demy",889.0,1143.0)]
 
   MAX_DASH_PATTERN = 8
-  
+
   LABEL_STYLE_CH = ["D", "R", "r", "A", "a"]
-   
+
 type
   DocInfo* = enum
     DI_CREATOR, DI_PRODUCER, DI_TITLE, DI_SUBJECT, DI_AUTHOR, DI_KEYWORDS
-  
+
   LabelStyle* = enum
     LS_DECIMAL, LS_UPPER_ROMAN, LS_LOWER_ROMAN, LS_UPPER_LETTER, LS_LOWER_LETTER
-    
+
   PageOrientationType* = enum
     PGO_PORTRAIT, PGO_LANDSCAPE
   DocStateType* = enum
@@ -78,53 +78,53 @@ type
     strokingAlpha, nonstrokingAlpha: float64
     blendMode: string
     ID, objID: int
-    
+
   Rectangle= object
     x,y,w,h: float64
-  
+
   AnnotType = enum
     ANNOT_LINK, ANNOT_TEXT
-    
+
   Annot = ref object
     objID: int
     rect: Rectangle
     case annotType: AnnotType
-    of ANNOT_LINK: 
+    of ANNOT_LINK:
       dest: Destination
-    of ANNOT_TEXT: 
+    of ANNOT_TEXT:
       content: string
-    
+
   Page = ref object
     objID: int
     content: string
     size: PageSize
     annots: seq[Annot]
-    
+
   DocOpt* = ref object
     resourcesPath: seq[string]
     fontsPath: seq[string]
     imagesPath: seq[string]
-  
+
   PageLabel = object
     pageIndex: int
     style: LabelStyle
     prefix: string
     start: int
-  
+
   DestStyle* = enum
     DS_XYZ, DS_FIT, DS_FITH, DS_FITV, DS_FITR, DS_FITB, DS_FITBH, DS_FITBV
-  
+
   Destination = ref object
     style: DestStyle
     a,b,c,d: float64
     page: Page
-    
+
   Outline* = ref object
     objID: int
     kids: seq[Outline]
     dest: Destination
     title: string
-  
+
   Document* = ref object of RootObj
     state: DocStateType
     content: string
@@ -145,16 +145,16 @@ type
     labels: seq[PageLabel]
     setFontCall: int
     outlines: seq[Outline]
-    
+
   NamedPageSize = tuple[name: string, width: float64, height: float64]
-  
-proc init(gs: var ExtGState; id: int; sA, nsA: float64, bm: string = "Normal") : int {.discardable.} = 
+
+proc init(gs: var ExtGState; id: int; sA, nsA: float64, bm: string = "Normal") : int {.discardable.} =
   gs.ID = id
   gs.strokingAlpha = sA
   gs.nonstrokingAlpha = nsA
   gs.blendMode = bm
   result = 0
-  
+
 proc swap(this: var PageSize) : int {.discardable.} = swap(this.width, this.height)
 
 proc searchPageSize(x: openArray[NamedPageSize], y: string, z: var PageSize) : bool =
@@ -178,7 +178,7 @@ proc escapeString(text: string): string =
     of chr(0x0D): add(result, "\\r")
     of chr(0x09): add(result, "\\t")
     of chr(0x08): add(result, "\\b")
-    of chr(0x20)..chr(0x7e): 
+    of chr(0x20)..chr(0x7e):
       if c == '\\': add(result, "\\\\")
       elif c == ')': add(result, "\\)")
       elif c == '(': add(result, "\\(")
@@ -189,7 +189,7 @@ proc put(p: var Page, text: varargs[string]) =
   for s in items(text):
     p.content.add(s)
   p.content.add('\x0A')
-  
+
 proc put(doc: Document, text: varargs[string]) =
   if doc.state == PGS_PAGE_OPENED:
     let p = doc.pages.high()
@@ -198,7 +198,7 @@ proc put(doc: Document, text: varargs[string]) =
     for s in items(text):
       doc.content.add(s)
     doc.content.add('\x0A')
-    
+
 proc newobj(doc: Document) : int =
   doc.offsets.add(doc.content.len())
   result = doc.offsets.len()
@@ -218,8 +218,8 @@ proc f2sn(a: float64): string =
 
 proc putDestination(doc: Document, dest: Destination) =
   var destStr = "/Dest [" & $dest.page.objID & " 0 R"
-  
-  case dest.style 
+
+  case dest.style
   of DS_XYZ: destStr.add("/XYZ " & f2sn(dest.a) & " " & f2sn(dest.b) & " " & f2sn(dest.c) & "]")
   of DS_FIT: destStr.add("/Fit]")
   of DS_FITH: destStr.add("/FitH " & f2sn(dest.a) & "]")
@@ -228,15 +228,15 @@ proc putDestination(doc: Document, dest: Destination) =
   of DS_FITB: destStr.add("/FitB]")
   of DS_FITBH: destStr.add("/FitBH " & f2sn(dest.a) & "]")
   of DS_FITBV: destStr.add("/FitBV " & f2sn(dest.a) & "]")
-  
+
   doc.put(destStr)
-  
+
 proc putPages(doc: Document, resourceID: int) : int =
   let numpages = doc.pages.len()
-    
+
   let pageRootID = doc.newobj()
   var kids = ""
-    
+
   doc.put("<</Type /Pages")
   kids.add("/Kids [")
   for i in 0..numpages-1:
@@ -247,9 +247,9 @@ proc putPages(doc: Document, resourceID: int) : int =
   doc.put("/Count ", $numpages)
   doc.put(">>")
   doc.put("endobj")
-  
+
   var annotID = pageRootID + 2 * numpages + 1
-  
+
   for p in doc.pages:
     p.objID = doc.newobj()
     let contentID = p.objID + 1
@@ -280,7 +280,7 @@ proc putPages(doc: Document, resourceID: int) : int =
       doc.put("<< /Length ", $len, " >>")
       doc.putStream(p.content)
     doc.put("endobj")
-     
+
   for p in doc.pages:
     for a in p.annots:
       a.objID = doc.newobj()
@@ -296,12 +296,12 @@ proc putPages(doc: Document, resourceID: int) : int =
       doc.put("/BS <</W 0>>")
       doc.put(">>")
       doc.put("endobj")
-      
+
   result = pageRootID
 
 proc putBase14Fonts(doc: Document, font: Font) =
   let fon = Base14(font)
-  
+
   fon.objID = doc.newobj()
   doc.put("<</Type /Font")
   doc.put("/BaseFont /", fon.baseFont)
@@ -319,22 +319,22 @@ proc putBase14Fonts(doc: Document, font: Font) =
 proc putTrueTypeFonts(doc: Document, font: Font, seed: int) =
   let fon = TTFont(font)
   let subsetTag  = makeSubsetTag(seed)
-   
+
   let widths   = fon.GenerateWidths() #don't change this order
   let ranges   = fon.GenerateRanges() #coz they sort CH2GID differently
   let desc     = fon.GetDescriptor()
   let buf    = fon.GetSubsetBuffer(subsetTag)
-   
+
   let compressed = zcompress(buf)
   let Length   = compressed.len
   let Length1  = buf.len
   let psName   = subsetTag & desc.postscriptName
-   
+
   let fontFileID = doc.newobj()
   doc.put("<</Filter/FlateDecode/Length ", $Length, "/Length1 ", $Length1, ">>")
   doc.putStream(compressed)
   doc.put("endobj")
-   
+
   let descriptorID = doc.newobj()
   doc.put("<</Type /FontDescriptor")
   doc.put("/FontName /", psName)
@@ -350,7 +350,7 @@ proc putTrueTypeFonts(doc: Document, font: Font, seed: int) =
   doc.put("/FontFile2 ", $fontFileID, " 0 R")
   doc.put(">>")
   doc.put("endobj")
-   
+
   # CIDFontType2
   # A CIDFont whose glyph descriptions are based on TrueType font technology
   let descendantID = doc.newobj()
@@ -363,7 +363,7 @@ proc putTrueTypeFonts(doc: Document, font: Font, seed: int) =
   doc.put("/W ", widths)
   doc.put(">>")
   doc.put("endobj")
-   
+
   # ToUnicode
   let toUni1 = """/CIDInit /ProcSet findresource begin
 12 dict begin
@@ -380,13 +380,13 @@ endcodespacerange"""
 CMapName currentdict /CMap defineresource pop
 end
 end"""
-   
+
   let ToUnicodeID = doc.newobj()
   let toUni = toUni1 & ranges & toUni2
   doc.put("<</Length ", $toUni.len , ">>")
   doc.putStream(toUni)
   doc.put("endobj")
-   
+
   fon.objID = doc.newobj()
   doc.put("<</Type /Font")
   doc.put("/BaseFont /", psName)
@@ -399,14 +399,14 @@ end"""
   ##doc.put("/Widths ", $widthsID, " 0 R")
   doc.put(">>")
   doc.put("endobj")
-    
+
 proc putFonts(doc: Document) : int =
   var seed = fromBase26("NIMPDF")
   for fon in items(doc.fontMan.FontList):
     if fon.subType == FT_BASE14: doc.putBase14Fonts(fon)
     if fon.subType == FT_TRUETYPE: doc.putTrueTypeFonts(fon, seed)
     inc(seed)
-    
+
   result = 0
 
 proc putExtGStates(doc: Document) : int =
@@ -416,10 +416,10 @@ proc putExtGStates(doc: Document) : int =
     doc.put("<</Type /ExtGState")
     let nsa = doc.extGStates[i].nonstrokingAlpha
     let sa = doc.extGStates[i].strokingAlpha
-    
+
     if nsa > 0.0: doc.put("/ca ", $nsa)
     if sa > 0.0: doc.put("/CA ", $sa)
-    
+
     doc.put("/BM /", doc.extGStates[i].blendMode)
     doc.put(">>")
     doc.put("endobj")
@@ -439,7 +439,7 @@ proc putGradients(doc: Document) : int =
     doc.put("/N 1")
     doc.put(">>")
     doc.put("endobj")
-    
+
     let objID = doc.newobj()
     doc.put("<<")
     if gd.gradType == GDT_LINEAR:
@@ -450,7 +450,7 @@ proc putGradients(doc: Document) : int =
       let cr = gd.radCoord
       doc.put("/ShadingType 3")
       doc.put("/Coords [",f2s(cr.x1)," ",f2s(cr.y1)," ",f2s(cr.r1)," ",f2s(cr.x2)," ",f2s(cr.y2)," ",f2s(cr.r2),"]")
-    doc.put("/ColorSpace /DeviceRGB")    
+    doc.put("/ColorSpace /DeviceRGB")
     doc.put("/Function ",$funcID," 0 R")
     doc.put("/Extend [true true] ")
     doc.put(">>")
@@ -509,13 +509,13 @@ proc putImages(doc: Document) : int =
       doc.putStream(doc.images[i].data)
     doc.put("endobj")
   result = 0
-  
+
 proc putResources(doc: Document) : int =
   discard doc.putGradients()
   discard doc.putExtGStates()
   discard doc.putImages()
   discard doc.putFonts()
-  
+
   result = doc.newobj()
   #doc.put("<</ProcSet [/PDF /Text /ImageB /ImageC /ImageI]")
 
@@ -523,13 +523,13 @@ proc putResources(doc: Document) : int =
   for fon in items(doc.fontMan.FontList):
     doc.put("/F",$fon.ID," ",$fon.objID," 0 R")
   doc.put(">>")
-  
+
   if doc.extGStates.len > 0:
     doc.put("/ExtGState <<")
     for gs in items(doc.extGStates):
       doc.put("/GS",$gs.ID," ",$gs.objID," 0 R")
     doc.put(">>")
-  
+
   if doc.images.len > 0:
     doc.put("/XObject <<")
     for img in items(doc.images):
@@ -537,17 +537,17 @@ proc putResources(doc: Document) : int =
         doc.put("/Im",$img.ID," ",$img.maskID," 0 R")
       doc.put("/I",$img.ID," ",$img.objID," 0 R")
     doc.put(">>")
-  
-  if doc.gradients.len > 0:  
+
+  if doc.gradients.len > 0:
     doc.put("/Shading <<")
     for gd in items(doc.gradients):
       doc.put("/Sh",$gd.ID," ",$gd.objID," 0 R")
     doc.put(">>")
-  
+
   doc.put(">>")
   doc.put("endobj")
 
-proc i2s10(val: int) : string = 
+proc i2s10(val: int) : string =
   let s = $val
   let blank = 9 - s.len()
   result = repeatChar(blank, '0')
@@ -571,21 +571,21 @@ proc putInfo(doc: Document): int =
   doc.put("/CreationDate (D:", lt.format("yyyyMMddHHmmss"), ")")
   doc.put(">>")
   doc.put("endobj")
-  
+
   result = infoID
-  
+
 proc putLabels(doc: Document): int =
   if doc.labels.len == 0: return -1
-  
+
   let labelsID = doc.newobj()
   doc.put("<< /Nums [")
   for label in doc.labels:
     doc.put($label.pageIndex, " << /S /", LABEL_STYLE_CH[int(label.style)])
-    if label.prefix != nil: 
+    if label.prefix != nil:
       if label.prefix.len > 0: doc.put("/P (", escapeString(label.prefix), ")")
     if label.start > 0: doc.put("/St ", $label.start)
     doc.put(">>")
-    
+
   doc.put("] >>")
   doc.put("endobj")
   result = labelsID
@@ -595,12 +595,12 @@ proc assignID(o: Outline, objID: var int) =
     k.objID = objID
     inc(objID)
     assignID(k, objID)
-  
+
 proc putOutlineItem(doc: Document, outlines: seq[Outline], parentID: int, ot: Outline, i: int) =
   let objID = doc.newobj()
   assert objID == ot.objID
   #echo " ", $objID
-  
+
   doc.put("<</Title (",escapeString(ot.title),")/Parent ", $parentID, " 0 R/Count 0")
   if outlines.len == 2:
     if i == 0: doc.put("/Next ", $outlines[1].objID ," 0 R")
@@ -612,9 +612,9 @@ proc putOutlineItem(doc: Document, outlines: seq[Outline], parentID: int, ot: Ou
     if i > 0 and i < lastIdx:
       doc.put("/Next ", $outlines[i+1].objID ," 0 R")
       doc.put("/Prev ", $outlines[i-i].objID ," 0 R")
-  
+
   doc.putDestination(ot.dest)
-  
+
   if ot.kids.len > 0:
     let firstKid = ot.kids[0].objID
     let lastKid = ot.kids[ot.kids.len-1].objID
@@ -622,12 +622,12 @@ proc putOutlineItem(doc: Document, outlines: seq[Outline], parentID: int, ot: Ou
   else:
     doc.put(">>")
   doc.put("endobj")
-  
+
   var i = 0
   for kid in ot.kids:
     doc.putOutlineItem(ot.kids, ot.objID, kid, i)
     inc(i)
-    
+
 proc putOutlines(doc: Document): int =
   if doc.outlines.len == 0: return -1
 
@@ -637,29 +637,29 @@ proc putOutlines(doc: Document): int =
     o.objID = objID
     inc(objID)
     assignID(o, objID)
-  
+
   let firstKid = doc.outlines[0].objID
   let lastKid = doc.outlines[doc.outlines.len-1].objID
   doc.put("<</Type/Outlines/First ", $firstKid ," 0 R/Last ", $lastKid ," 0 R>>")
   doc.put("endobj")
-  
+
   var i = 0
   for ot in items(doc.outlines):
     doc.putOutlineItem(doc.outlines, outlineID, ot, i)
     inc(i)
-    
+
   result = outlineID
-    
+
 proc putCatalog(doc: Document) =
   doc.state = PGS_DOC_OPENED
   let resourceID = doc.putResources()
   let pageRootID = doc.putPages(resourceID)
   #let firstPageID = pageRootID + 1
-    
+
   let infoID = doc.putInfo()
   let pageLabelsID = doc.putLabels()
   let outlinesID = doc.putOutlines()
-  
+
   let catalogID = doc.newobj()
   doc.put("<<")
   doc.put("/Type /Catalog")
@@ -674,7 +674,7 @@ proc putCatalog(doc: Document) =
   let start_xref = doc.content.len()
   let numoffset = doc.offsets.len()
   let numobject = numoffset + 1
-  
+
   doc.put("xref")
   doc.put("0 ", $numobject)
   doc.put("0000000000 65535 f ")
@@ -691,12 +691,12 @@ proc putCatalog(doc: Document) =
   doc.put("startxref")
   doc.put($start_xref)
   doc.put("%%EOF")
-  
+
   doc.state = PGS_DOC_CLOSED
 
 proc setInfo*(doc: Document, field: DocInfo, info: string) =
   doc.info[int(field)] = info
-  
+
 proc initPDF*(opts: DocOpt): Document =
   new(result)
   result.state = PGS_INITIALIZED
@@ -736,7 +736,7 @@ proc addImagesPath*(opt: DocOpt, path: string) =
 
 proc addFontsPath*(opt: DocOpt, path: string) =
   opt.fontsPath.add(path)
-  
+
 proc initPDF*(): Document =
   var opts = makeDocOpt()
   opts.addFontsPath("fonts")
@@ -766,23 +766,23 @@ proc setLabel*(doc: Document, style: LabelStyle, prefix: string) =
   label.prefix = prefix
   label.start = -1
   doc.labels.add(label)
-  
+
 proc loadImage*(doc: Document, fileName: string): PImage =
   for p in doc.opts.imagesPath:
     let image = loadImage(p & dir_sep & fileName)
     if image != nil: return image
   result = nil
-  
+
 proc getVersion(): string =
   result = nimPDFVersion
-  
-proc getVersion*(doc: Document): string = 
+
+proc getVersion*(doc: Document): string =
   result = nimPDFVersion
 
 proc setUnit*(doc: Document, unit: PageUnitType) =
   doc.docUnit.setUnit(unit)
 
-proc getSize*(doc: Document): PageSize = 
+proc getSize*(doc: Document): PageSize =
   result.width = doc.docUnit.toUser(doc.size.width)
   result.height = doc.docUnit.toUser(doc.size.height)
 
@@ -794,7 +794,7 @@ proc setFont*(doc: Document, family:string, style: FontStyles, size: float64, en
   doc.gstate.font = font
   doc.gstate.font_size = fontSize
   inc(doc.setFontCall)
-  
+
 proc addPage*(doc: Document, s: PageSize, o: PageOrientationType): Page {.discardable.} =
   var p : Page
   new(p)
@@ -807,13 +807,21 @@ proc addPage*(doc: Document, s: PageSize, o: PageOrientationType): Page {.discar
   doc.pages.add(p)
   doc.state = PGS_PAGE_OPENED
   doc.size = p.size
-  doc.setFontCall = 0  
+  doc.setFontCall = 0
   result = p
 
 proc writePDF*(doc: Document, s: Stream) =
   doc.putCatalog()
   s.write(doc.content)
-   
+
+proc writePDF*(doc: Document, fileName: string): bool =
+  result = false
+  var file = newFileStream(fileName, fmWrite)
+  if file != nil:
+    doc.writePDF(file)
+    file.close()
+    result = true
+
 proc drawText*(doc: Document; x,y: float64; text: string) =
   let xx = doc.docUnit.fromUser(x)
   let yy = doc.size.height - doc.docUnit.fromUser(y)
@@ -822,7 +830,7 @@ proc drawText*(doc: Document; x,y: float64; text: string) =
     doc.setFont(defaultFont, {FS_REGULAR}, 5)
 
   var font = doc.gstate.font
-  
+
   if font.subType == FT_TRUETYPE:
     var utf8 = replace_invalid(text)
     doc.put("BT ",f2s(xx)," ",f2s(yy)," Td <",font.EscapeString(utf8),"> Tj ET")
@@ -839,12 +847,12 @@ proc drawVText*(doc: Document; x,y: float64; text: string) =
     #echo "cannot write vertical"
     doc.drawText(x, y, text)
     return
-    
+
   var xx = doc.docUnit.fromUser(x)
   var yy = doc.size.height - doc.docUnit.fromUser(y)
   let utf8 = replace_invalid(text)
   let cid = font.EscapeString(utf8)
-  
+
   doc.put("BT")
   var i = 0
   for b in runes(utf8):
@@ -853,22 +861,22 @@ proc drawVText*(doc: Document; x,y: float64; text: string) =
     xx = 0
     inc(i, 4)
   doc.put("ET")
-    
+
 
 proc beginText*(doc: Document) =
   if doc.gstate.font == nil or doc.setFontCall == 0:
     doc.setFont(defaultFont, {FS_REGULAR}, 5)
-    
+
   doc.put("BT")
-  
+
 proc beginText*(doc: Document; x,y: float64) =
   if doc.gstate.font == nil:
     doc.setFont(defaultFont, {FS_REGULAR}, 5)
-    
+
   let xx = doc.docUnit.fromUser(x)
   let yy = doc.size.height - doc.docUnit.fromUser(y)
   doc.put("BT ", f2s(xx)," ",f2s(yy)," Td")
-   
+
 proc moveTextPos*(doc: Document; x,y: float64) =
   let xx = doc.docUnit.fromUser(x)
   let yy = doc.docUnit.fromUser(-y)
@@ -878,13 +886,13 @@ proc setTextRenderingMode*(doc: Document, rm: TextRenderingMode) =
   let trm = cast[int](rm)
   if doc.gstate.rendering_mode != rm: doc.put($trm, " Tr")
   doc.gstate.rendering_mode = rm
-  
+
 proc setTextMatrix*(doc: Document, m: TMatrix2d) =
   doc.put(f2s(m.ax)," ", f2s(m.ay), " ", f2s(m.bx), " ", f2s(m.by), " ", f2s(m.tx)," ",f2s(m.ty)," Tm")
-  
+
 proc showText*(doc: Document, text:string) =
   var font = doc.gstate.font
-  
+
   if font.subType == FT_TRUETYPE:
     var utf8 = replace_invalid(text)
     doc.put("<",font.EscapeString(utf8),"> Tj")
@@ -897,7 +905,7 @@ proc setTextLeading*(doc: Document, val: float64) =
 
 proc moveToNextLine*(doc: Document) =
   doc.put("T*")
-  
+
 proc endText*(doc: Document) =
   doc.put("ET")
 
@@ -908,42 +916,42 @@ proc setCharSpace*(doc: Document; val: float64) =
 proc setWordSpace*(doc: Document; val: float64) =
   doc.put(f2s(val)," Tw")
   doc.gstate.word_space = val
-  
+
 proc setTransform*(doc: Document, m: TMatrix2d) =
   doc.put(f2s(m.ax)," ", f2s(m.ay), " ", f2s(m.bx), " ", f2s(m.by), " ", f2s(m.tx)," ",f2s(m.ty)," cm")
   doc.gstate.trans_matrix = doc.gstate.trans_matrix & m
 
 proc rotate*(doc: Document, angle:float64) =
   doc.setTransform(rotate(degree_to_radian(angle)))
-  
+
 proc rotate*(doc: Document, angle, x,y:float64) =
   let xx = doc.docUnit.fromUser(x)
   let yy = doc.size.height - doc.docUnit.fromUser(y)
   doc.setTransform(rotate(degree_to_radian(angle), point2d(xx, yy)))
-  
+
 proc move*(doc: Document, x,y:float64) =
   let xx = doc.docUnit.fromUser(x)
   let yy = -doc.docUnit.fromUser(y)
   doc.setTransform(move(xx,yy))
-  
+
 proc scale*(doc: Document, s:float64) =
   doc.setTransform(scale(s))
-  
+
 proc scale*(doc: Document, s, x,y:float64) =
   let xx = doc.docUnit.fromUser(x)
   let yy = doc.size.height - doc.docUnit.fromUser(y)
   doc.setTransform(scale(s, point2d(xx, yy)))
-  
+
 proc stretch*(doc: Document, sx,sy:float64) =
   doc.setTransform(stretch(sx,sy))
-  
+
 proc stretch*(doc: Document, sx,sy,x,y:float64) =
   let xx = doc.docUnit.fromUser(x)
   let yy = doc.size.height - doc.docUnit.fromUser(y)
   doc.setTransform(stretch(sx, sy, point2d(xx, yy)))
 
 proc shear(sx,sy,x,y:float64): TMatrix2d =
-  let 
+  let
     m = move(-x,-y)
     s = matrix2d(1,sx,sy,1,0,0)
   result = m & s & move(x,y)
@@ -965,38 +973,38 @@ proc toUser*(doc: Document, val:float64): float64 =
 
 proc fromUser*(doc: Document, val:float64): float64 =
   result = doc.docUnit.fromUser(val)
-  
+
 proc drawImage*(doc: Document, x:float64, y:float64, source: PImage) =
   let size = doc.images.len()
   var found = false
   var img = source
 
   if img == nil: return
-  
+
   for image in items(doc.images):
     if image == img:
       found = true
       break
-      
+
   if doc.gstate.alpha_fill > 0.0 and doc.gstate.alpha_fill < 1.0:
     img = img.clone()
     img.adjustTransparency(doc.gstate.alpha_fill)
     found = false
-    
+
   if not found:
     img.ID = size + 1
     doc.images.add(img)
-  
+
   let hh = float(img.height)
   let ww = float(img.width)
-    
+
   if img.haveMask():
     doc.put("q")
-  
+
     #embed hidden, outside canvas
     var xx = doc.docUnit.fromUser(doc.size.width + 10)
     var yy = doc.docUnit.fromUser(doc.size.height + 10)
-  
+
     doc.put(f2s(ww)," 0 0 ",f2s(hh)," ",f2s(xx)," ",f2s(yy)," cm")
     doc.put("/Im",$img.ID," Do")
     doc.put("Q")
@@ -1004,9 +1012,9 @@ proc drawImage*(doc: Document, x:float64, y:float64, source: PImage) =
   doc.put("q")
   var xx = doc.docUnit.fromUser(x)
   var yy = doc.size.height - doc.docUnit.fromUser(y)
-  
+
   doc.put(f2s(ww)," 0 0 ",f2s(hh)," ",f2s(xx)," ",f2s(yy)," cm")
-    
+
   doc.put("/I",$img.ID," Do")
   doc.put("Q")
 
@@ -1031,7 +1039,7 @@ proc moveTo*(doc: Document, x: float64, y: float64) =
   doc.path_end_y = y
 
 proc moveTo*(doc: Document, p: TPoint2d) {.inline.} = doc.moveTo(p.x, p.y)
-     
+
 proc lineTo*(doc: Document, x: float64, y: float64) =
   if doc.record_shape:
     doc.shapes[doc.shapes.len - 1].addLine(doc.path_start_x, doc.path_start_y, x, y)
@@ -1045,7 +1053,7 @@ proc lineTo*(doc: Document, x: float64, y: float64) =
   doc.path_end_y = y
 
 proc lineTo*(doc: Document, p: TPoint2d) {.inline.} = doc.lineTo(p.x, p.y)
-  
+
 proc bezierCurveTo*(doc: Document; cp1x, cp1y, cp2x, cp2y, x, y: float64) =
   if doc.record_shape:
     doc.shapes[doc.shapes.len - 1].addCubicCurve(doc.path_end_x, doc.path_end_y, cp1x,cp1y, cp2x,cp2y, x, y)
@@ -1055,7 +1063,7 @@ proc bezierCurveTo*(doc: Document; cp1x, cp1y, cp2x, cp2y, x, y: float64) =
     let cp1xx = doc.docUnit.fromUser(cp1x)
     let cp2xx = doc.docUnit.fromUser(cp2x)
     let xx = doc.docUnit.fromUser(x)
-  
+
     let cp1yy = doc.size.height - doc.docUnit.fromUser(cp1y)
     let cp2yy = doc.size.height - doc.docUnit.fromUser(cp2y)
     let yy = doc.size.height - doc.docUnit.fromUser(y)
@@ -1064,7 +1072,7 @@ proc bezierCurveTo*(doc: Document; cp1x, cp1y, cp2x, cp2y, x, y: float64) =
   doc.path_end_y = y
 
 proc bezierCurveTo*(doc: Document; cp1, cp2, p: TPoint2d) {.inline.}= doc.bezierCurveTo(cp1.x,cp1.y,cp2.x,cp2.y,p.x,p.y)
-  
+
 proc curveTo1*(doc: Document; cpx, cpy, x, y: float64) =
   if doc.record_shape:
     doc.shapes[doc.shapes.len - 1].addQuadraticCurve(doc.path_end_x, doc.path_end_y, cpx,cpy, x, y)
@@ -1096,17 +1104,17 @@ proc curveTo2*(doc: Document; cpx, cpy, x, y: float64) =
   doc.path_end_y = y
 
 proc curveTo2*(doc: Document; cp, p: TPoint2d) {.inline.}= doc.curveTo2(cp.x,cp.y,p.x,p.y)
-  
+
 proc closePath*(doc: Document) =
   if doc.record_shape:
     doc.shapes[doc.shapes.len - 1].addLine(doc.path_end_x, doc.path_end_y, doc.path_start_x, doc.path_start_y)
     doc.shapes.add(makePath())
   else:
     doc.put("h")
-    
+
   doc.path_end_x = doc.path_start_x
   doc.path_end_y = doc.path_start_y
-  
+
 proc roundRect*(doc: Document; x, y, w, h: float64; r:float64 = 0.0) =
   doc.moveTo(x + r, y)
   doc.lineTo(x + w - r, y)
@@ -1117,7 +1125,7 @@ proc roundRect*(doc: Document; x, y, w, h: float64; r:float64 = 0.0) =
   doc.curveTo1(x, y + h, x, y + h - r)
   doc.lineTo(x, y + r)
   doc.curveTo1(x, y, x + r, y)
-  
+
 proc drawEllipse*(doc: Document; x, y, r1, r2 : float64) =
   # based on http://stackoverflow.com/questions/2172798/how-to-draw-an-oval-in-html5-canvas/2173084#2173084
   let KAPPA = 4.0 * ((math.sqrt(2) - 1.0) / 3.0)
@@ -1129,7 +1137,7 @@ proc drawEllipse*(doc: Document; x, y, r1, r2 : float64) =
   let ye = yy + r2 * 2
   let xm = xx + r1
   let ym = yy + r2
-  
+
   doc.moveTo(xx, ym)
   doc.bezierCurveTo(xx, ym - oy, xm - ox, yy, xm, yy)
   doc.bezierCurveTo(xm + ox, yy, xe, ym - oy, xe, ym)
@@ -1168,10 +1176,10 @@ proc setGrayFill*(doc: Document; g:float64) =
   doc.record_shape = false
 
 proc setGrayStroke*(doc: Document; g:float64) =
-  doc.put(f2s(g), " G")    
+  doc.put(f2s(g), " G")
   doc.gstate.gray_stroke = g
   doc.gstate.cs_stroke = CS_DEVICE_GRAY
-  
+
 proc setRGBFill*(doc: Document; r,g,b:float64) =
   doc.put(f2s(r), " ",f2s(g), " ",f2s(b), " rg")
   doc.gstate.rgb_fill = makeRGB(r,g,b)
@@ -1180,13 +1188,13 @@ proc setRGBFill*(doc: Document; r,g,b:float64) =
   doc.record_shape = false
 
 proc setRGBStroke*(doc: Document; r,g,b:float64) =
-  doc.put(f2s(r), " ",f2s(g), " ",f2s(b), " RG")    
+  doc.put(f2s(r), " ",f2s(g), " ",f2s(b), " RG")
   doc.gstate.rgb_stroke = makeRGB(r,g,b)
   doc.gstate.cs_stroke = CS_DEVICE_RGB
 
 proc setRGBFill*(doc: Document; col: RGBColor) =
   doc.setRGBFill(col.r,col.g,col.b)
-  
+
 proc setRGBStroke*(doc: Document; col: RGBColor) =
   doc.setRGBStroke(col.r,col.g,col.b)
 
@@ -1207,7 +1215,7 @@ proc setCMYKFill*(doc: Document; col: CMYKColor) =
 
 proc setCMYKStroke*(doc: Document; col: CMYKColor) =
   doc.setCMYKStroke(col.c,col.m,col.y,col.k)
-  
+
 proc setAlpha*(doc: Document, a: float64) =
   let id = doc.extGStates.len() + 1
   var gs : ExtGState
@@ -1237,7 +1245,7 @@ proc restoreState*(doc: Document) =
 proc getTextWidth*(doc: Document, text:string): float64 =
   var res = 0.0
   let tw = doc.gstate.font.GetTextWidth(text)
-  
+
   res += doc.gstate.word_space * float64(tw.numspace)
   res += float64(tw.width) * doc.gstate.font_size / 1000
   res += doc.gstate.char_space * float64(tw.numchars)
@@ -1247,13 +1255,13 @@ proc getTextWidth*(doc: Document, text:string): float64 =
 proc getTextHeight*(doc: Document, text:string): float64 =
   var res = 0.0
   let tw = doc.gstate.font.GetTextHeight(text)
-  
+
   res += doc.gstate.word_space * float64(tw.numspace)
   res += float64(tw.width) * doc.gstate.font_size / 1000
   res += doc.gstate.char_space * float64(tw.numchars)
 
   result = doc.docUnit.toUser(res)
-  
+
 proc setDash*(doc: Document, dash:openArray[int], phase:int) =
   var ptn = "["
   var num_ptn = 0
@@ -1263,16 +1271,16 @@ proc setDash*(doc: Document, dash:openArray[int], phase:int) =
     ptn.add($dash[i])
     ptn.add(" ")
     inc(num_ptn)
-    
+
   ptn.add("] " & $phase & " d")
   doc.put(ptn)
-  
+
   doc.gstate.dash.num_ptn = num_ptn
   doc.gstate.dash.phase = phase
 
   for i in 0..num_ptn-1:
     doc.gstate.dash.ptn[i] = dash[i]
-    
+
 proc clip*(doc: Document) =
   doc.put("W")
 
@@ -1320,7 +1328,7 @@ proc drawBounds*(doc: Document) =
     for p in doc.shapes:
       if p.len > 0: doc.drawBounds(p)
     doc.record_shape = true
-    
+
 proc applyGradient(doc: Document) =
   for p in doc.shapes:
     if p.len > 0 and p.isClosed():
@@ -1336,7 +1344,7 @@ proc applyGradient(doc: Document) =
       doc.put(f2s(ww)," 0 0 ", f2s(hh), " ", f2s(xx), " ", f2s(yy), " cm")
       doc.put("/Sh",$doc.gstate.gradient_fill.ID," sh") #paint the gradient
       doc.put("Q")
-  
+
 proc fill*(doc: Document) =
   if doc.record_shape:
     doc.record_shape = false
@@ -1357,7 +1365,7 @@ proc stroke*(doc: Document) =
     doc.record_shape = true
   else:
     doc.put("S")
-  
+
 proc fillAndStroke*(doc: Document) =
   if doc.record_shape:
     doc.record_shape = false
@@ -1366,12 +1374,12 @@ proc fillAndStroke*(doc: Document) =
     doc.stroke()
   else:
     doc.put("B")
-  
+
 proc setGradientFill*(doc: Document, grad: Gradient) =
   let size = doc.gradients.len()
   var found = false
   if grad == nil: return
-  
+
   for gradient in items(doc.gradients):
     if gradient == grad:
       found = true
@@ -1379,7 +1387,7 @@ proc setGradientFill*(doc: Document, grad: Gradient) =
   if not found:
     grad.ID = size + 1
     doc.gradients.add(grad)
-    
+
   doc.shapes = @[]
   doc.shapes.add(makePath())
   doc.record_shape = true
@@ -1394,23 +1402,23 @@ proc makeXYZDest*(doc: Document, page: Page, x,y,z: float64): Destination =
   result.b = doc.size.height - doc.docUnit.fromUser(y)
   result.c = z
 
-proc makeFitDest*(doc: Document, page: Page): Destination =     
+proc makeFitDest*(doc: Document, page: Page): Destination =
   new(result)
   result.style = DS_FIT
   result.page  = page
-  
+
 proc makeFitHDest*(doc: Document, page: Page, top: float64): Destination =
   new(result)
   result.style = DS_FITH
   result.page  = page
   result.a = doc.size.height - doc.docUnit.fromUser(top)
-  
+
 proc makeFitVDest*(doc: Document, page: Page, left: float64): Destination =
   new(result)
   result.style = DS_FITV
   result.page  = page
   result.a = doc.docUnit.fromUser(left)
-  
+
 proc makeFitRDest*(doc: Document, page: Page, left,bottom,right,top: float64): Destination =
   new(result)
   result.style = DS_FITR
@@ -1419,7 +1427,7 @@ proc makeFitRDest*(doc: Document, page: Page, left,bottom,right,top: float64): D
   result.b = doc.size.height - doc.docUnit.fromUser(bottom)
   result.c = doc.docUnit.fromUser(right)
   result.d = doc.size.height - doc.docUnit.fromUser(top)
-  
+
 proc makeFitBDest*(doc: Document, page: Page): Destination =
   new(result)
   result.style = DS_FITB
@@ -1436,7 +1444,7 @@ proc makeFitBVDest*(doc: Document, page: Page, left: float64): Destination =
   result.style = DS_FITBV
   result.page  = page
   result.a = left
-    
+
 proc makeOutline*(doc: Document, title: string, dest: Destination): Outline =
   new(result)
   result.kids = @[]
@@ -1456,7 +1464,7 @@ proc initRect*(x,y,w,h: float64): Rectangle =
   result.y = y
   result.w = w
   result.h = h
-  
+
 proc linkAnnot*(doc: Document, rect: Rectangle, src: Page, dest: Destination): Annot =
   new(result)
   let xx = doc.docUnit.fromUser(rect.x)

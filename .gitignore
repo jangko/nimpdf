@@ -17,6 +17,12 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
+# Windows executables
+*.exe
+
+# Nim compiler cache
+nimcache
+
 # =========================
 # Operating System Files
 # =========================
