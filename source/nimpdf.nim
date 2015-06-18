@@ -26,8 +26,16 @@ else:
   const
     dir_sep = "/"
 
+macro getPackageVersion(): string =
+  let lines = splitLines(slurp("nimPDF.nimble"))
+  for line in lines:
+    let words = split(line)
+    if words.len > 0 and words[0] == "version":
+      return substr(words[2], 1, words[2].len-2)
+  assert false, "version in nimPDF not found"
+
 const
-  nimPDFVersion = "0.1.4"
+  nimPDFVersion = getPackageVersion()
 
   defaultFont = "Times"
 
