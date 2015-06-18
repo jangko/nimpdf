@@ -1,6 +1,6 @@
 # Copyright (c) 2015 Andri Lim
 #
-# Distributed under the MIT license 
+# Distributed under the MIT license
 # (See accompanying file LICENSE.txt)
 #
 #-----------------------------------------
@@ -33,15 +33,15 @@ type
     nicematch: int #stop searching if >= this length found. Set to 258 for best compression. Default: 128
     lazymatching: int #use lazy matching: better compression but a bit slower. Default: true
     #use custom zlib encoder instead of built in one (default: null)
-    custom_zlib: TCompressFunc     
+    custom_zlib: TCompressFunc
     #use custom deflate encoder instead of built in one (default: null)
     #if custom_zlib is used, custom_deflate is ignored since only the built in
     #zlib function will call custom_deflate
     custom_deflate: TCompressFunc
     custom_context: ptr cuchar #optional custom settings for custom functions
-  
+
   ujImage = pointer
-  
+
 proc lodepng_decode32_file(data: ptr ptr cuchar, w: ptr int, h: ptr int, filename : cstring) : int {.header: "lodepng.h", importc: "lodepng_decode32_file".}
 proc lodepng_zlib_compress(outdata: ptr ptr cuchar, outsize: ptr int, indata: pointer, insize: int, settings: ptr LodePNGCompressSettings): int {.header: "lodepng.h", importc: "lodepng_zlib_compress".}
 proc lodepng_compress_settings_init(settings: ptr LodePNGCompressSettings) {.header: "lodepng.h", importc: "lodepng_compress_settings_init".}
@@ -56,7 +56,7 @@ proc ujGetImageSize(img: ujImage) : int {.header: "ujpeg.h", importc: "ujGetImag
 proc ujGetImage(img: ujImage, dest: cstring) : cstring {.header: "ujpeg.h", importc: "ujGetImage".}
 proc ujDestroy(img: ujImage) {.header: "ujpeg.h", importc: "ujDestroy".}
 
-proc loadImagePNG(fileName:string) : PImage = 
+proc loadImagePNG(fileName:string) : PImage =
   var data: ptr cuchar = nil
   var width, height : int = 0
   if lodepng_decode32_file(addr data, addr width, addr height, cstring(fileName)) == 0:
@@ -75,10 +75,10 @@ proc loadImagePNG(fileName:string) : PImage =
   else:
     result = nil
 
-proc loadImageJPG(fileName:string) : PImage = 
+proc loadImageJPG(fileName:string) : PImage =
   var jpg = ujCreate()
   if jpg == nil: return nil
-  
+
   if ujDecodeFile(jpg, cstring(fileName)) != nil:
     new(result)
     let size = ujGetImageSize(jpg)
@@ -90,8 +90,8 @@ proc loadImageJPG(fileName:string) : PImage =
     ujDestroy(jpg)
   else:
     result = nil
-    
-proc loadImageBMP(fileName:string) : PImage = 
+
+proc loadImageBMP(fileName:string) : PImage =
   var bmp: BMP
   bmp.init()
   if bmp.ReadFromFile(fileName):
@@ -104,14 +104,15 @@ proc loadImageBMP(fileName:string) : PImage =
     var pos = 0
     for y in 0..bmp.Height-1:
       for x in 0..bmp.Width-1:
-        result.data[pos] = char(bmp.Pixels[x][y].Red)
-        result.data[pos + 1] = char(bmp.Pixels[x][y].Green)
-        result.data[pos + 2] = char(bmp.Pixels[x][y].Blue)
+        let px = y * bmp.Width + x
+        result.data[pos] = char(bmp.Pixels[px].Red)
+        result.data[pos + 1] = char(bmp.Pixels[px].Green)
+        result.data[pos + 2] = char(bmp.Pixels[px].Blue)
         pos += 3
   else:
-    result = nil  
-  
-proc loadImage*(fileName:string) : PImage = 
+    result = nil
+
+proc loadImage*(fileName:string) : PImage =
   let path = splitFile(fileName)
   if path.ext.len() > 0:
     let ext = toLower(path.ext)
@@ -122,7 +123,7 @@ proc loadImage*(fileName:string) : PImage =
     if ext == ".jpg" or ext == ".jpeg":
       return loadImageJPG(fileName)
   result = nil
-  
+
 proc haveMask*(img: PImage): bool =
   result = img.mask.len() > 0
 
@@ -132,7 +133,7 @@ proc clone*(img: PImage): PImage =
   result.height = img.height
   result.data = img.data
   result.mask = img.mask
-  
+
 proc adjustTransparency*(img: PImage, alpha:float) =
   if img.haveMask():
     for i in 0..high(img.mask):
@@ -141,7 +142,7 @@ proc adjustTransparency*(img: PImage, alpha:float) =
     img.mask = newString(img.width*img.height)
     for i in 0..high(img.mask):
       img.mask[i] = char(255.0 * alpha)
-  
+
 proc zcompress*(data:string): string =
   var outdata: ptr cuchar = nil
   var outsize: int = 0
@@ -155,7 +156,7 @@ proc zcompress*(data:string): string =
     c_free(outdata)
   else:
     result = ""
-    
+
 when isMainModule:
   var img = loadImage("pngbar.png")
   var x = loadImage("24bit.bmp")
