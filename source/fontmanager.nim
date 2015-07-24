@@ -1,6 +1,6 @@
 # Copyright (c) 2015 Andri Lim
 #
-# Distributed under the MIT license 
+# Distributed under the MIT license
 # (See accompanying file LICENSE.txt)
 #
 #-----------------------------------------
@@ -12,34 +12,34 @@
 # - from TTF fonts list
 # - from TTC fonts list
 
-import base14, tables, strutils, collect, strtabs, unicode, math
-
-import encode, Font, CMAPTable, HEADTable, HMTXTable, FontData, VMTXTable
+import base14, tables, strutils, collect, strtabs, unicode, math, encode
+import "subsetter/Font", "subsetter/CMAPTable", "subsetter/HEADTable"
+import "subsetter/HMTXTable", "subsetter/FontData", "subsetter/VMTXTable"
 
 const
-  defaultFont = "Times00"
-  
+  defaultFont = "Times"
+
 type
   FontStyle* = enum
     FS_REGULAR, FS_ITALIC, FS_BOLD
-  
+
   FontStyles* = set[FontStyle]
 
   FontType* = enum
     FT_BASE14, FT_TRUETYPE
-  
+
   EncodingType* = enum
     ENC_STANDARD, ENC_MACROMAN, ENC_WINANSI, ENC_UTF8
-    
-  BBox = object 
+
+  BBox = object
     x1,y1,x2,y2 : int
-  
+
   Font* = ref object of RootObj
     ID*: int
     objID*: int
     subType*: FontType
     searchName*: string
-    
+
   TTFont* = ref object of Font
     font*: FontDef
     cmap: CMAP
@@ -58,10 +58,10 @@ type
     missing_width: int
     encoding*: EncodingType
     encode: proc(val: int): int
-    
+
   TextWidth* = object
     numchars*, width*, numspace*, numwords*: int
-  
+
   FontManager* = object
     FontList*: seq[Font]
     BaseFont: seq[Base14]
@@ -73,24 +73,24 @@ proc GetCharWidth*(f: TTFont, gid: int): int =
 
 proc GetCharHeight*(f: TTFont, gid: int): int =
   result = math.round(float(f.vmtx.AdvanceHeight(gid)) * f.scaleFactor)
-  
+
 proc GenerateWidths*(f: TTFont): string =
   f.CH2GID.sort(proc(x,y: tuple[key: int, val: TONGID]):int = cmp(x.val.newGID, y.val.newGID) )
   var widths = "[ 1["
   var x = 0
-  
+
   for gid in values(f.CH2GID):
     widths.add($f.GetCharWidth(gid.oldGID))
     if x < f.CH2GID.len-1: widths.add(' ')
     inc(x)
-    
+
   widths.add("]]")
   result = widths
-  
+
 proc GenerateRanges*(f: TTFont): string =
   var range: seq[string] = @[]
   var mapping = ""
-  
+
   for code, gid in pairs(f.CH2GID):
     if range.len >= 100:
       mapping.add("\x0A" & $range.len & " beginbfchar\x0A" & join(range, "\x0A") & "\x0Aendbfchar")
@@ -99,13 +99,13 @@ proc GenerateRanges*(f: TTFont): string =
 
   if range.len > 0:
     mapping.add("\x0A" & $range.len & " beginbfchar\x0A" & join(range, "\x0A") & "\x0Aendbfchar")
-  
+
   result = mapping
 
 proc GetDescriptor*(f: TTFont): FontDescriptor =
    f.CH2GID.sort(proc(x,y: tuple[key: int, val: TONGID]):int = cmp(x.key, y.key) )
    result = f.font.makeDescriptor(f.CH2GID)
-   
+
 proc GetSubsetBuffer*(f: TTFont, subsetTag: string): string =
    let fd   = f.font.Subset(f.CH2GID, subsetTag)
    result = fd.GetInternalBuffer()
@@ -114,7 +114,7 @@ method CanWriteVertical*(f: Font): bool = false
 method CanWriteVertical*(f: Base14): bool = false
 method CanWriteVertical*(f: TTFont): bool =
   result = f.vmtx != nil
-  
+
 method EscapeString*(f: Font, text: string): string =
   discard
 
@@ -129,7 +129,7 @@ method EscapeString*(f: TTFont, text: string): string =
       if oldGID != 0:
         f.CH2GID[charCode] = (oldGID, f.newGID)
         inc(f.newGID)
-  
+
   result = ""
   for c in runes(text):
     let charCode = int(c)
@@ -147,14 +147,14 @@ method GetTextWidth*(f: TTFont, text: string): TextWidth =
   result.numchars = 0
   result.numwords = 0
   result.numspace = 0
-  
+
   for b in runes(text):
     inc(result.numchars)
     result.width += f.GetCharWidth(int(b))
     if isWhiteSpace(b):
       inc(result.numspace)
       inc(result.numwords)
-  
+
   let lastChar = runeLen(text) - 1
   if not isWhiteSpace(runeAt(text, lastChar)):
     inc(result.numwords)
@@ -170,14 +170,14 @@ method GetTextHeight*(f: TTFont, text: string): TextWidth =
   result.numchars = 0
   result.numwords = 0
   result.numspace = 0
-  
+
   for b in runes(text):
     inc(result.numchars)
     result.width += f.GetCharHeight(int(b))
     if isWhiteSpace(b):
       inc(result.numspace)
       inc(result.numwords)
-  
+
   let lastChar = runeLen(text) - 1
   if not isWhiteSpace(runeAt(text, lastChar)):
     inc(result.numwords)
@@ -188,7 +188,7 @@ method GetTextWidth*(f: Base14, text: string): TextWidth =
   result.numspace = 0
   result.numwords = 0
   var b:int
- 
+
   for i in 0..text.len-1:
     b = ord(text[i])
     inc(result.numchars)
@@ -198,10 +198,10 @@ method GetTextWidth*(f: Base14, text: string): TextWidth =
     if chr(b) in Whitespace:
       inc(result.numspace)
       inc(result.numwords)
- 
+
   if chr(b) notin Whitespace:
     inc(result.numwords)
-  
+
 proc reverse(s: string): string =
   result = newString(s.len)
   for i in 1..s.len:
@@ -210,8 +210,8 @@ proc reverse(s: string): string =
 proc toBase26*(number: int): string =
   var n = number
   if n < 0: n = -n
-  var converted = ""    
-  
+  var converted = ""
+
   #Repeatedly divide the number by 26 and convert the
   #remainder into the appropriate letter.
   while n > 0:
@@ -231,25 +231,22 @@ proc fromBase26*(number: string): int =
 proc searchFrom[T](list: seq[T], name: string): Font =
   result = nil
   for i in items(list):
-    if i.searchName == name: 
+    if i.searchName == name:
       result = i
       break
-      
+
 proc init*(ff: var FontManager, fontDirs: seq[string]) =
   ff.FontList = @[]
-  
+
   ff.TTFontList = newStringTable(modeCaseInsensitive)
   ff.TTCList = newStringTable(modeCaseInsensitive)
-  
+
   for fontDir in fontDirs:
     collectTTF(fontDir, ff.TTFontList)
     collectTTC(fontDir, ff.TTCList)
 
-  #echo "TTList len ", ff.TTFontList.len
-  #echo "TTCList len ", ff.TTCList.len
-  
   newSeq(ff.BaseFont, 14)
-  
+
   for i in 0..high(BUILTIN_FONTS):
     new(ff.BaseFont[i])
     ff.BaseFont[i].baseFont   = BUILTIN_FONTS[i][0]
@@ -257,26 +254,21 @@ proc init*(ff: var FontManager, fontDirs: seq[string]) =
     ff.BaseFont[i].get_width  = BUILTIN_FONTS[i][2]
     ff.BaseFont[i].subType    = FT_BASE14
     ff.BaseFont[i].missing_width = ff.BaseFont[i].get_width(0x20)
-    
-  #put default font
-  #var res = searchFrom(ff.BaseFont, defaultFont)
-  #res.ID = ff.FontList.len + 1
-  #ff.FontList.add(res)
 
-proc makeTTFont(font: FontDef, searchName: string): TTFont = 
+proc makeTTFont(font: FontDef, searchName: string): TTFont =
   var cmap = CMAPTable(font.GetTable(TAG.cmap))
   var head = HEADTable(font.GetTable(TAG.head))
   var hmtx = HMTXTable(font.GetTable(TAG.hmtx))
   if cmap == nil or head == nil or hmtx == nil: return nil
   var encodingcmap = cmap.GetEncodingCMAP()
-  
+
   if encodingcmap == nil:
     echo "no unicode cmap found"
     return nil
-  
+
   var res: TTFont
   new(res)
-  
+
   res.subType  = FT_TRUETYPE
   res.searchName = searchName
   res.font     = font
@@ -287,9 +279,9 @@ proc makeTTFont(font: FontDef, searchName: string): TTFont =
   res.CH2GID   = initOrderedTable[int, TONGID]()
   res.newGID   = 1
   result = res
-  
+
 proc searchFromTTList(ff: FontManager, name:string): Font =
-  if not ff.TTFontList.hasKey(name): return nil  
+  if not ff.TTFontList.hasKey(name): return nil
   let fileName = ff.TTFontList[name]
   let font = LoadTTF(fileName)
   if font != nil: return makeTTFont(font, name)
@@ -303,7 +295,7 @@ proc searchFromTTCList(ff: FontManager, name:string): Font =
   let font = LoadTTC(fileName, fontIndex)
   if font != nil: return makeTTFont(font, name)
   result = nil
-  
+
 proc makeSubsetTag*(number: int): string =
   let val = toBase26(number)
   let blank = 6 - val.len
@@ -332,66 +324,63 @@ proc clone(src: Base14): Base14 =
   result.missing_width = src.missing_width
   result.encoding = src.encoding
   result.encode = src.encode
-    
+
 proc makeFont*(ff: var FontManager, family:string = "Times", style:FontStyles = {FS_REGULAR}, enc: EncodingType): Font =
   var searchStyle = "00"
   if FS_BOLD in style: searchStyle[0] = '1'
   if FS_ITALIC in style: searchStyle[1] = '1'
-  
-  var searchName = family 
+
+  var searchName = family
   searchName.add(searchStyle)
-    
+
   var res = searchFrom(ff.BaseFont, searchName)
   if res != nil:
     var encoding = ENC_STANDARD
     if enc in {ENC_STANDARD, ENC_MACROMAN, ENC_WINANSI}: encoding = enc
     var fon = searchFrom(ff.FontList, searchName & $int(enc))
     if fon != nil: return fon
-    
+
     var fon14 = clone(Base14(res))
     fon14.searchName = fon14.searchName & $int(enc)
     fon14.encoding = encoding
-    
+
     if encoding == ENC_STANDARD: fon14.encode = enc_std_map
     elif encoding == ENC_MACROMAN: fon14.encode = enc_mac_map
     elif encoding == ENC_WINANSI: fon14.encode = enc_win_map
-    
+
     fon14.ID = ff.FontList.len + 1
     ff.FontList.add(fon14)
-    return  fon14
-  
+    return fon14
+
   res = searchFrom(ff.FontList, searchName)
   if res != nil: return res
-      
+
   res = searchFromTTList(ff, searchName)
   if res != nil:
-    #echo "TT Font ", searchName
     res.ID = ff.FontList.len + 1
     ff.FontList.add(res)
     return res
 
   res = searchFromTTCList(ff, searchName)
   if res != nil:
-    #echo "TTC Font ", searchName
     res.ID = ff.FontList.len + 1
     ff.FontList.add(res)
     return res
-  
-  #echo "Fall Back ", searchName
-  result = searchFrom(ff.FontList, defaultFont)
+
+  result = makeFont(ff, defaultFont, style, enc)
 
 when isMainModule:
   var ff: FontManager
   ff.init()
-  
-  for key, val in pairs(ff.TTFontList): 
+
+  for key, val in pairs(ff.TTFontList):
     echo key, ": ", val
-    
+
   var font = ff.makeFont("GoodDog", {FS_REGULAR})
-  if font == nil: 
+  if font == nil:
     echo "NULL"
   else:
     echo font.searchName
-  
+
   var times = ff.makeFont("GoodDogx", {FS_REGULAR})
   echo times.searchName

@@ -1,6 +1,6 @@
 # Copyright (c) 2015 Andri Lim
 #
-# Distributed under the MIT license 
+# Distributed under the MIT license
 # (See accompanying file LICENSE.txt)
 #
 #-----------------------------------------
@@ -12,10 +12,10 @@ const
   PGU_K_MM = 72/25.4
   PGU_K_CM = 72/2.54
   PGU_K_IN = 72
-  
+
   BM_NAMES* = ["Normal", "Multiply", "Screen", "Overlay", "Darken",
     "Lighten", "ColorDodge", "ColorBurn", "HardLight", "SoftLight", "Difference", "Exclusion"]
- 
+
   NAMED_COLORS = [
     ("aliceblue", 240, 248, 255), ("antiquewhite", 250, 235, 215), ("aqua", 0, 255, 255), ("aquamarine", 127, 255, 212),
     ("azure", 240, 255, 255), ("beige", 245, 245, 220), ("bisque", 255, 228, 196), ("black", 0, 0, 0), ("blanchedalmond", 255, 235, 205),
@@ -49,21 +49,21 @@ const
     ("snow", 255, 255, 250),("springgreen", 0, 255, 127),("steelblue", 70, 130, 180),("tan", 210, 180, 140),("teal", 0, 128, 128),
     ("thistle", 216, 191, 216),("tomato", 255, 99, 71),("turquoise", 64, 224, 208),("violet", 238, 130, 238),("wheat", 245, 222, 179),
     ("white", 255, 255, 255),("whitesmoke", 245, 245, 245),("yellow", 255, 255, 0),("yellowgreen", 154, 205, 5)]
-     
+
 type
   PageUnitType* = enum
     PGU_PT, PGU_MM, PGU_CM, PGU_IN
-  
+
   PageUnit* = object
     unitType*: PageUnitType
     k*: float64
-  
+
   LineCap* = enum
     BUTT_END, ROUND_END, SQUARE_END
 
   LineJoin* = enum
     MITER_JOIN, ROUND_JOIN, BEVEL_JOIN
-    
+
   DashMode* = object
     ptn*: array[0..7, int]
     num_ptn*: int
@@ -72,44 +72,49 @@ type
   TextRenderingMode* = enum
     TR_FILL, TR_STROKE, TR_FILL_THEN_STROKE, TR_INVISIBLE, TR_FILL_CLIPPING,
     TR_STROKE_CLIPPING, TR_FILL_STROKE_CLIPPING, TR_CLIPPING
-  
+
   ColorSpace* = enum
     CS_DEVICE_GRAY, CS_DEVICE_RGB, CS_DEVICE_CMYK, CS_CAL_GRAY,
     CS_CAL_RGB, CS_LAB, CS_ICC_BASED, CS_SEPARATION, CS_DEVICE_N,
     CS_INDEXED, CS_PATTERN,
     CS_GRADIENT, CS_IMAGE #fill type
-    
+
   RGBColor* = object
     r*, g*, b* : float64
-    
+
   Coord* = object
     x1*, y1*, x2*, y2*: float64
-  
+
   CoordRadial* = object
     x1*, y1*, r1*, x2*, y2*, r2*: float64
-    
+
   CMYKColor* = object
     c*, m*, y*, k* : float64
-  
+
   WritingMode = enum
     WMODE_HORIZONTAL, WMODE_VERTICAL
-  
+
   BlendMode* = enum
     BM_NORMAL, BM_MULTIPLY, BM_SCREEN, BM_OVERLAY, BM_DARKEN, BM_LIGHTEN
     BM_COLOR_DODGE, BM_COLOR_BURN, BM_HARD_LIGHT, BM_SOFT_LIGHT, BM_DIFFERENCE, BM_EXCLUSION
-  
+
+  ExtGState* = object
+    strokingAlpha*, nonstrokingAlpha*: float64
+    blendMode*: string
+    ID*: int
+
   GradientType* = enum
     GDT_LINEAR, GDT_RADIAL
-  
+
   Gradient* = ref object
-    ID*, objID*: int
+    ID*: int
     a*, b*: RGBColor
     case gradType*: GradientType
     of GDT_LINEAR:
       axis* : Coord
     of GDT_RADIAL:
       radCoord*: CoordRadial
- 
+
   GState* = ref object
     trans_matrix*: TMatrix2d
     line_width*: float64
@@ -119,7 +124,7 @@ type
     dash*: DashMode
     flatness*: float64
     char_space*, word_space*, h_scaling*, text_leading*: float64
-    rendering_mode*: TextRenderingMode  
+    rendering_mode*: TextRenderingMode
     text_rise*: float64
     cs_fill*, cs_stroke*: ColorSpace
     rgb_fill*, rgb_stroke*: RGBColor
@@ -128,12 +133,12 @@ type
     gray_stroke*, gray_fill*:float64
     blend_mode*: BlendMode
     gradient_fill*: Gradient
-    image_fill*: PImage
+    image_fill*: Image
     font*: Font
     font_size*: float64
     writing_mode*: WritingMode
     prev: GState
-    
+
 proc init*(c: var RGBColor; r,g,b: float64) =
   c.r = r
   c.g = g
@@ -148,7 +153,7 @@ proc makeRGB*(name:string): RGBColor =
   for c in NAMED_COLORS:
     if name == c[0]: return makeRGB(c[1]/255, c[2]/255, c[3]/255)
   result = makeRGB(0,0,0)
-  
+
 proc makeCMYK*(c,m,y,k: float64): CMYKColor =
   result.c = c
   result.m = m
@@ -168,13 +173,13 @@ proc makeRadialGradient*(a, b: RGBColor, coord: CoordRadial): Gradient =
   result.a = a
   result.b = b
   result.radCoord = coord
-  
+
 proc init*(cc: var CMYKColor; c,m,y,k: float64) =
   cc.c = c
   cc.m = m
   cc.y = y
   cc.k = k
-   
+
 proc makeCoord*(x1,y1,x2,y2: float64): Coord =
   result.x1 = x1
   result.y1 = y1
@@ -193,7 +198,7 @@ proc init*(c: var DashMode) =
   for i in 0..high(c.ptn): c.ptn[i] = 0
   c.num_ptn = 0
   c.phase = 0
-  
+
 proc setUnit*(this: var PageUnit, v: PageUnitType) : int {.discardable.} =
   this.unitType = v
   case v
@@ -213,7 +218,7 @@ proc newGState*(): GState =
   let black = makeRGB(0,0,0)
   let cmyk_black = makeCMYK(0,0,0,0)
   new(result)
-  
+
   result.trans_matrix   = IDMATRIX
   result.line_width   = fromMM(1.0)
   result.line_cap     = BUTT_END
@@ -247,10 +252,10 @@ proc newGState*(): GState =
   result.font_size    = fromMM(10)
   result.writing_mode   = WMODE_HORIZONTAL
   result.prev       = nil
-  
+
 proc newGState*(gs: GState): GState =
   new(result)
-  
+
   result.trans_matrix   = gs.trans_matrix
   result.line_width   = gs.line_width
   result.line_cap     = gs.line_cap
@@ -284,7 +289,7 @@ proc newGState*(gs: GState): GState =
   result.font_size    = gs.font_size
   result.writing_mode   = gs.writing_mode
   result.prev       = gs
- 
+
 proc freeGState*(gs: GState): GState =
   result = gs
   if gs.prev != nil: result = gs.prev

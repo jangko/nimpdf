@@ -7,7 +7,8 @@
 # the main module for nimPDF, import this one from your project
 
 import strutils, streams, sequtils, times, unsigned, math, basic2d, algorithm, tables
-import image, utf8, font, arc, gstate, path, fontmanager, unicode
+import image, utf8, "subsetter/font", arc, gstate, path, fontmanager, unicode
+import objects, resources, encrypt
 
 export fontmanager.Font, fontmanager.FontStyle, fontmanager.FontStyles
 export fontmanager.EncodingType
@@ -16,7 +17,7 @@ export gstate.TextRenderingMode, gstate.RGBColor, gstate.CMYKColor, gstate.Blend
 export gstate.makeRGB, gstate.makeCMYK, gstate.makeLinearGradient, gstate.setUnit
 export gstate.fromMM, gstate.fromCM, gstate.fromIN, gstate.fromUser, gstate.toUser
 export gstate.makeCoord,gstate.makeRadialGradient
-export image.PImage, image.loadImage, arc.drawArc, arc.arcTo, arc.degree_to_radian
+export image.Image, image.loadImage, arc.drawArc, arc.arcTo, arc.degree_to_radian
 export path.Path, path.calculateBounds, path.bound
 
 when defined(Windows):
@@ -26,19 +27,9 @@ else:
   const
     dir_sep = "/"
 
-macro getPackageVersion(): string =
-  let lines = splitLines(slurp("nimPDF.nimble"))
-  for line in lines:
-    let words = split(line)
-    if words.len > 0 and words[0] == "version":
-      return substr(words[2], 1, words[2].len-2)
-  assert false, "version in nimPDF not found"
-
 const
-  nimPDFVersion = getPackageVersion()
-
+  nimPDFVersion = "0.2.0"
   defaultFont = "Times"
-
   PageNames = [
     #my paper size
     ("Faktur",210.0,148.0), ("F4",215.0,330.0)
@@ -66,8 +57,8 @@ const
     ,("Broadsheet",457.0,610.0),("Royal",508.0,635.0),("Elephant",584.0,711.0),("REAL Demy",572.0,889.0),("Quad Demy",889.0,1143.0)]
 
   MAX_DASH_PATTERN = 8
-
   LABEL_STYLE_CH = ["D", "R", "r", "A", "a"]
+  INFO_FIELD = ["Creator", "Producer", "Title", "Subject", "Author", "Keywords"]
 
 type
   DocInfo* = enum
@@ -82,10 +73,6 @@ type
     PGS_INITIALIZED, PGS_DOC_OPENED, PGS_PAGE_OPENED, PGS_DOC_CLOSED
   PageSize* = object
     width*, height*: float64
-  ExtGState = object
-    strokingAlpha, nonstrokingAlpha: float64
-    blendMode: string
-    ID, objID: int
 
   Rectangle= object
     x,y,w,h: float64
@@ -94,7 +81,6 @@ type
     ANNOT_LINK, ANNOT_TEXT
 
   Annot = ref object
-    objID: int
     rect: Rectangle
     case annotType: AnnotType
     of ANNOT_LINK:
@@ -103,10 +89,10 @@ type
       content: string
 
   Page = ref object
-    objID: int
     content: string
     size: PageSize
     annots: seq[Annot]
+    page: dictObj
 
   DocOpt* = ref object
     resourcesPath: seq[string]
@@ -127,8 +113,7 @@ type
     a,b,c,d: float64
     page: Page
 
-  Outline* = ref object
-    objID: int
+  Outline* = ref object of dictObj
     kids: seq[Outline]
     dest: Destination
     title: string
@@ -141,7 +126,7 @@ type
     docUnit: PageUnit
     size: PageSize
     extGStates: seq[ExtGState]
-    images: seq[PImage]
+    images: seq[Image]
     gradients: seq[Gradient]
     fontMan: FontManager
     gstate: GState
@@ -153,17 +138,17 @@ type
     labels: seq[PageLabel]
     setFontCall: int
     outlines: seq[Outline]
+    xref: pdfXref
 
   NamedPageSize = tuple[name: string, width: float64, height: float64]
 
-proc init(gs: var ExtGState; id: int; sA, nsA: float64, bm: string = "Normal") : int {.discardable.} =
+proc init(gs: var ExtGState; id: int; sA, nsA: float64, bm: string = "Normal") =
   gs.ID = id
   gs.strokingAlpha = sA
   gs.nonstrokingAlpha = nsA
   gs.blendMode = bm
-  result = 0
 
-proc swap(this: var PageSize) : int {.discardable.} = swap(this.width, this.height)
+proc swap(this: var PageSize) = swap(this.width, this.height)
 
 proc searchPageSize(x: openArray[NamedPageSize], y: string, z: var PageSize) : bool =
   for t in items(x):
@@ -224,481 +209,214 @@ template f2s(a: expr): expr =
 proc f2sn(a: float64): string =
   if a == 0: "null" else: f2s(a)
 
-proc putDestination(doc: Document, dest: Destination) =
-  var destStr = "/Dest [" & $dest.page.objID & " 0 R"
+proc putDestination(doc: Document, dict: dictObj, dest: Destination) =
+  var arr = arrayObjNew()
+  dict.addElement("Dest", arr)
+  arr.add(dest.page.page)
 
   case dest.style
-  of DS_XYZ: destStr.add("/XYZ " & f2sn(dest.a) & " " & f2sn(dest.b) & " " & f2sn(dest.c) & "]")
-  of DS_FIT: destStr.add("/Fit]")
-  of DS_FITH: destStr.add("/FitH " & f2sn(dest.a) & "]")
-  of DS_FITV: destStr.add("/FitV " & f2sn(dest.a) & "]")
-  of DS_FITR: destStr.add("/FitR " & f2s(dest.a) & " " & f2s(dest.b) & " " & f2s(dest.c) & " " & f2s(dest.d) & "]")
-  of DS_FITB: destStr.add("/FitB]")
-  of DS_FITBH: destStr.add("/FitBH " & f2sn(dest.a) & "]")
-  of DS_FITBV: destStr.add("/FitBV " & f2sn(dest.a) & "]")
+  of DS_XYZ:
+    arr.addName("XYZ")
+    arr.addPlain(f2sn(dest.a))
+    arr.addPlain(f2sn(dest.b))
+    arr.addPlain(f2sn(dest.c))
+  of DS_FIT: arr.addName("Fit")
+  of DS_FITH:
+    arr.addName("FitH")
+    arr.addPlain(f2sn(dest.a))
+  of DS_FITV:
+    arr.addName("FitV")
+    arr.addPlain(f2sn(dest.a) & "]")
+  of DS_FITR:
+    arr.addName("FitR")
+    arr.addPlain(f2s(dest.a))
+    arr.addPlain(f2s(dest.b))
+    arr.addPlain(f2s(dest.c))
+    arr.addPlain(f2s(dest.d))
+  of DS_FITB: arr.addName("FitB")
+  of DS_FITBH:
+    arr.addName("FitBH")
+    arr.addPlain(f2sn(dest.a))
+  of DS_FITBV:
+    arr.addName("FitBV")
+    arr.addPlain(f2sn(dest.a))
 
-  doc.put(destStr)
-
-proc putPages(doc: Document, resourceID: int) : int =
+proc putPages(doc: Document, resource: dictObj): dictObj =
   let numpages = doc.pages.len()
 
-  let pageRootID = doc.newobj()
-  var kids = ""
-
-  doc.put("<</Type /Pages")
-  kids.add("/Kids [")
-  for i in 0..numpages-1:
-    kids.add($(pageRootID + 2 * i + 1))
-    kids.add(" 0 R ")
-  kids.add("]")
-  doc.put(kids)
-  doc.put("/Count ", $numpages)
-  doc.put(">>")
-  doc.put("endobj")
-
-  var annotID = pageRootID + 2 * numpages + 1
+  var kids = arrayObjNew()
+  var root = dictObjNew()
+  doc.xref.add(root)
+  root.addName("Type", "Pages")
+  root.addNumber("Count", numpages)
+  root.addElement("Kids", kids)
 
   for p in doc.pages:
-    p.objID = doc.newobj()
-    let contentID = p.objID + 1
-    doc.put("<</Type /Page")
-    doc.put("/Parent ", $pageRootID, " 0 R")
-    doc.put("/Resources ", $resourceID, " 0 R")
+    let content = doc.xref.dictStreamNew(p.content)
+    var page = dictObjNew()
+    p.page = page
+    doc.xref.add(page)
+    kids.add(page)
+    page.addName("Type", "Page")
+    page.addElement("Parent", root)
+    page.addElement("Resources", resource)
+    page.addElement("Contents", content)
+
     #Output the page size.
-    doc.put("/MediaBox [0 0 ",f2s(p.size.width)," ",f2s(p.size.height),"]")
-    if p.annots.len > 0:
-      var annot = "/Annots ["
-      for a in p.annots:
-        annot.add($annotID)
-        annot.add(" 0 R ")
-        inc(annotID)
-      annot.add("]")
-      doc.put(annot)
-    doc.put("/Contents ", $contentID, " 0 R>>")
-    doc.put("endobj")
+    var box = arrayNew(0.0,0.0, p.size.width, p.size.height)
+    page.addElement("MediaBox", box)
 
-    discard doc.newobj()
-    let len = p.content.len()
-    let zc = zcompress(p.content)
-    let useFlate = zc.len() < len
-    if useFlate:
-      doc.put("<< /Filter /FlateDecode /Length ", $zc.len(), " >>")
-      doc.putStream(zc)
-    else:
-      doc.put("<< /Length ", $len, " >>")
-      doc.putStream(p.content)
-    doc.put("endobj")
-
+  #the page.page must be initialized first to prevent crash
   for p in doc.pages:
+    if p.annots.len == 0: continue
+    var annots = arrayObjNew()
+    p.page.addElement("Annots", annots)
     for a in p.annots:
-      a.objID = doc.newobj()
-      doc.put("<</Type /Annot")
+      var annot = dictObjNew()
+      doc.xref.add(annot)
+      annots.add(annot)
+      annot.addName("Type", "Annot")
       if a.annotType == ANNOT_LINK:
-        doc.put("/Subtype /Link")
-        doc.putDestination(a.dest)
+        annot.addName("Subtype", "Link")
+        doc.putDestination(annot, a.dest)
       else:
-        doc.put("/Subtype /Text")
-        doc.put("/Contents (", escapeString(a.content), ")")
-      doc.put("/Rect [",f2s(a.rect.x)," ",f2s(a.rect.y)," ",f2s(a.rect.w)," ",f2s(a.rect.h),"]")
-      #doc.put("/Border [16 16 1]")
-      doc.put("/BS <</W 0>>")
-      doc.put(">>")
-      doc.put("endobj")
+        annot.addName("Subtype", "Text")
+        annot.addString("Contents", a.content)
+      annot.addElement("Rect", arrayNew(a.rect.x, a.rect.y, a.rect.w, a.rect.h))
+      annot.addElement("Border", arrayNew(16, 16, 1))
+      annot.addPlain("BS", "<</W 0>>")
+  result = root
 
-  result = pageRootID
+proc putResources(doc: Document): dictObj =
+  let grads = putGradients(doc.xref, doc.gradients)
+  let exts  = putExtGStates(doc.xref, doc.extGStates)
+  let imgs  = putImages(doc.xref, doc.images)
+  let fonts = putFonts(doc.xref, doc.fontMan.FontList)
 
-proc putBase14Fonts(doc: Document, font: Font) =
-  let fon = Base14(font)
+  result = dictObjNew()
+  doc.xref.add(result)
 
-  fon.objID = doc.newobj()
-  doc.put("<</Type /Font")
-  doc.put("/BaseFont /", fon.baseFont)
-  doc.put("/Subtype /Type1")
-  if (fon.baseFont != "Symbol") and (fon.baseFont != "ZapfDingbats"):
-    if fon.encoding == ENC_STANDARD:
-      doc.put("/Encoding /StandardEncoding")
-    elif fon.encoding == ENC_MACROMAN:
-      doc.put("/Encoding /MacRomanEncoding")
-    elif fon.encoding == ENC_WINANSI:
-      doc.put("/Encoding /WinAnsiEncoding")
-  doc.put(">>")
-  doc.put("endobj")
-
-proc putTrueTypeFonts(doc: Document, font: Font, seed: int) =
-  let fon = TTFont(font)
-  let subsetTag  = makeSubsetTag(seed)
-
-  let widths   = fon.GenerateWidths() #don't change this order
-  let ranges   = fon.GenerateRanges() #coz they sort CH2GID differently
-  let desc     = fon.GetDescriptor()
-  let buf    = fon.GetSubsetBuffer(subsetTag)
-
-  let compressed = zcompress(buf)
-  let Length   = compressed.len
-  let Length1  = buf.len
-  let psName   = subsetTag & desc.postscriptName
-
-  let fontFileID = doc.newobj()
-  doc.put("<</Filter/FlateDecode/Length ", $Length, "/Length1 ", $Length1, ">>")
-  doc.putStream(compressed)
-  doc.put("endobj")
-
-  let descriptorID = doc.newobj()
-  doc.put("<</Type /FontDescriptor")
-  doc.put("/FontName /", psName)
-  doc.put("/FontFamily (", desc.fontFamily, ")")
-  doc.put("/Flags ", $desc.Flags)
-  doc.put("/FontBBox [",$desc.BBox[0]," ", $desc.BBox[1]," ", $desc.BBox[2]," ", $desc.BBox[3],"]")
-  doc.put("/ItalicAngle ", $desc.italicAngle)
-  doc.put("/Ascent ", $desc.Ascent)
-  doc.put("/Descent ", $desc.Descent)
-  doc.put("/CapHeight ", $desc.capHeight)
-  doc.put("/StemV ", $desc.StemV)
-  doc.put("/XHeight ", $desc.xHeight)
-  doc.put("/FontFile2 ", $fontFileID, " 0 R")
-  doc.put(">>")
-  doc.put("endobj")
-
-  # CIDFontType2
-  # A CIDFont whose glyph descriptions are based on TrueType font technology
-  let descendantID = doc.newobj()
-  doc.put("<</Type/Font")
-  doc.put("/Subtype/CIDFontType2")
-  doc.put("/BaseFont /", psName)
-  doc.put("/CIDSystemInfo <</Registry(Adobe)/Ordering(Identity)/Supplement 0>>")
-  doc.put("/FontDescriptor ", $descriptorID, " 0 R")
-  doc.put("/DW ", $desc.MissingWidth)
-  doc.put("/W ", widths)
-  doc.put(">>")
-  doc.put("endobj")
-
-  # ToUnicode
-  let toUni1 = """/CIDInit /ProcSet findresource begin
-12 dict begin
-begincmap
-/CIDSystemInfo
-<</Registry(Adobe)/Ordering(Identity)/Supplement 0>> def
-/CMapName /Adobe-Identity-UCS def
-/CMapType 2 def
-1 begincodespacerange
-<0000> <FFFF>
-endcodespacerange"""
-
-  let toUni2 = """\x0Aendcmap
-CMapName currentdict /CMap defineresource pop
-end
-end"""
-
-  let ToUnicodeID = doc.newobj()
-  let toUni = toUni1 & ranges & toUni2
-  doc.put("<</Length ", $toUni.len , ">>")
-  doc.putStream(toUni)
-  doc.put("endobj")
-
-  fon.objID = doc.newobj()
-  doc.put("<</Type /Font")
-  doc.put("/BaseFont /", psName)
-  doc.put("/Subtype /Type0")
-  doc.put("/Encoding /Identity-H")
-  doc.put("/DescendantFonts [", $descendantID ," 0 R]")
-  doc.put("/ToUnicode " , $ToUnicodeID, " 0 R")
-  doc.put("/FirstChar ", $desc.FirstChar)
-  doc.put("/LastChar ", $desc.LastChar)
-  ##doc.put("/Widths ", $widthsID, " 0 R")
-  doc.put(">>")
-  doc.put("endobj")
-
-proc putFonts(doc: Document) : int =
-  var seed = fromBase26("NIMPDF")
-  for fon in items(doc.fontMan.FontList):
-    if fon.subType == FT_BASE14: doc.putBase14Fonts(fon)
-    if fon.subType == FT_TRUETYPE: doc.putTrueTypeFonts(fon, seed)
-    inc(seed)
-
-  result = 0
-
-proc putExtGStates(doc: Document) : int =
-  for i in 0..high(doc.extGStates):
-    let objID = doc.newobj()
-    doc.extGStates[i].objID = objID
-    doc.put("<</Type /ExtGState")
-    let nsa = doc.extGStates[i].nonstrokingAlpha
-    let sa = doc.extGStates[i].strokingAlpha
-
-    if nsa > 0.0: doc.put("/ca ", $nsa)
-    if sa > 0.0: doc.put("/CA ", $sa)
-
-    doc.put("/BM /", doc.extGStates[i].blendMode)
-    doc.put(">>")
-    doc.put("endobj")
-  result = 0
-
-proc putGradients(doc: Document) : int =
-  for i in 0..high(doc.gradients):
-    var gd = doc.gradients[i]
-    let a = gd.a
-    let b = gd.b
-    let funcID = doc.newobj()
-    doc.put("<<")
-    doc.put("/FunctionType 2")
-    doc.put("/Domain [0.0 1.0]")
-    doc.put("/C0 [",f2s(a.r)," ",f2s(a.g)," ",f2s(a.b),"]")
-    doc.put("/C1 [",f2s(b.r)," ",f2s(b.g)," ",f2s(b.b),"]")
-    doc.put("/N 1")
-    doc.put(">>")
-    doc.put("endobj")
-
-    let objID = doc.newobj()
-    doc.put("<<")
-    if gd.gradType == GDT_LINEAR:
-      let cr = gd.axis
-      doc.put("/ShadingType 2")
-      doc.put("/Coords [",f2s(cr.x1)," ",f2s(cr.y1)," ",f2s(cr.x2)," ",f2s(cr.y2),"]")
-    elif gd.gradType == GDT_RADIAL:
-      let cr = gd.radCoord
-      doc.put("/ShadingType 3")
-      doc.put("/Coords [",f2s(cr.x1)," ",f2s(cr.y1)," ",f2s(cr.r1)," ",f2s(cr.x2)," ",f2s(cr.y2)," ",f2s(cr.r2),"]")
-    doc.put("/ColorSpace /DeviceRGB")
-    doc.put("/Function ",$funcID," 0 R")
-    doc.put("/Extend [true true] ")
-    doc.put(">>")
-    doc.put("endobj")
-    doc.gradients[i].objID = objID
-  result = 0
-
-proc putImages(doc: Document) : int =
-  for i in 0..high(doc.images):
-    if doc.images[i].haveMask():
-      doc.images[i].maskID = doc.newobj()
-      let len = doc.images[i].height * doc.images[i].width
-      let zc = zcompress(doc.images[i].mask)
-      let useFlate = zc.len() < doc.images[i].mask.len()
-      doc.put("<</Type /XObject")
-      doc.put("/Subtype /Image")
-      doc.put("/Width ", $doc.images[i].width)
-      doc.put("/Height ", $doc.images[i].height)
-      doc.put("/ColorSpace /DeviceGray")
-      doc.put("/BitsPerComponent 8")
-      #doc.put("/Filter /ASCIIHexDecode")
-      if useflate:
-        doc.put("/Filter /FlateDecode")
-        doc.put("/Length ", $len)
-      else:
-        doc.put("/Length ", $zc.len())
-      doc.put(">>")
-      if useFlate:
-        doc.putStream(zc)
-      else:
-        doc.putStream(doc.images[i].mask)
-      doc.put("endobj")
-
-    doc.images[i].objID = doc.newobj()
-    let len = doc.images[i].height * doc.images[i].width * 3
-    let zc = zcompress(doc.images[i].data)
-    let useFlate = zc.len() < doc.images[i].data.len()
-    doc.put("<</Type /XObject")
-    doc.put("/Subtype /Image")
-    doc.put("/Width ", $doc.images[i].width)
-    doc.put("/Height ", $doc.images[i].height)
-    if doc.images[i].haveMask():
-      doc.put("/SMask ",$doc.images[i].maskID," 0 R")
-    doc.put("/ColorSpace /DeviceRGB")
-    doc.put("/BitsPerComponent 8")
-    #doc.put("/Filter /ASCIIHexDecode")
-    if useFlate:
-      doc.put("/Filter /FlateDecode")
-      doc.put("/Length ", $zc.len())
-    else:
-      doc.put("/Length ", $len)
-    doc.put(">>")
-    if useFlate:
-      doc.putStream(zc)
-    else:
-      doc.putStream(doc.images[i].data)
-    doc.put("endobj")
-  result = 0
-
-proc putResources(doc: Document) : int =
-  discard doc.putGradients()
-  discard doc.putExtGStates()
-  discard doc.putImages()
-  discard doc.putFonts()
-
-  result = doc.newobj()
   #doc.put("<</ProcSet [/PDF /Text /ImageB /ImageC /ImageI]")
+  if fonts != nil: result.addElement("Font", fonts)
+  if exts != nil: result.addElement("ExtGState", exts)
+  if imgs != nil: result.addElement("XObject", imgs)
+  if grads != nil: result.addElement("Shading", grads)
 
-  doc.put("<</Font <<")
-  for fon in items(doc.fontMan.FontList):
-    doc.put("/F",$fon.ID," ",$fon.objID," 0 R")
-  doc.put(">>")
+proc writeInfo(doc: Document, dict: dictObj, field: DocInfo) =
+  var idx = int(field)
+  if doc.info.hasKey(idx):
+    dict.addString(INFO_FIELD[idx], doc.info[idx])
 
-  if doc.extGStates.len > 0:
-    doc.put("/ExtGState <<")
-    for gs in items(doc.extGStates):
-      doc.put("/GS",$gs.ID," ",$gs.objID," 0 R")
-    doc.put(">>")
+proc putInfo(doc: Document): dictObj =
+  var dict = dictObjNew()
+  doc.xref.add(dict)
 
-  if doc.images.len > 0:
-    doc.put("/XObject <<")
-    for img in items(doc.images):
-      if img.haveMask():
-        doc.put("/Im",$img.ID," ",$img.maskID," 0 R")
-      doc.put("/I",$img.ID," ",$img.objID," 0 R")
-    doc.put(">>")
-
-  if doc.gradients.len > 0:
-    doc.put("/Shading <<")
-    for gd in items(doc.gradients):
-      doc.put("/Sh",$gd.ID," ",$gd.objID," 0 R")
-    doc.put(">>")
-
-  doc.put(">>")
-  doc.put("endobj")
-
-proc i2s10(val: int) : string =
-  let s = $val
-  let blank = 9 - s.len()
-  result = repeatChar(blank, '0')
-  result.add(s)
-
-proc writeInfo(doc: Document, field: DocInfo, fieldName: string) =
-  if doc.info.hasKey(int(field)):
-    doc.put(fieldName, "(", escapeString(doc.info[int(field)]), ")")
-
-proc putInfo(doc: Document): int =
   var lt = getLocalTime(getTime())
+  doc.writeInfo(dict, DI_CREATOR)
+  doc.writeInfo(dict, DI_PRODUCER)
+  doc.writeInfo(dict, DI_TITLE)
+  doc.writeInfo(dict, DI_SUBJECT)
+  doc.writeInfo(dict, DI_KEYWORDS)
+  doc.writeInfo(dict, DI_AUTHOR)
+  dict.addString("CreationDate", "D:" & lt.format("yyyyMMddHHmmss"))
+  result = dict
 
-  let infoID = doc.newobj()
-  doc.put("<<")
-  doc.writeInfo(DI_CREATOR, "/Creator")
-  doc.writeInfo(DI_PRODUCER, "/Producer")
-  doc.writeInfo(DI_TITLE, "/Title")
-  doc.writeInfo(DI_SUBJECT, "/Subject")
-  doc.writeInfo(DI_AUTHOR, "/Author")
-  doc.writeInfo(DI_KEYWORDS, "/Keywords")
-  doc.put("/CreationDate (D:", lt.format("yyyyMMddHHmmss"), ")")
-  doc.put(">>")
-  doc.put("endobj")
+proc putLabels(doc: Document): dictObj =
+  if doc.labels.len == 0: return nil
 
-  result = infoID
+  var labels = dictObjNew()
+  doc.xref.add(labels)
+  var nums = arrayObjNew()
+  labels.addElement("Nums", nums)
 
-proc putLabels(doc: Document): int =
-  if doc.labels.len == 0: return -1
-
-  let labelsID = doc.newobj()
-  doc.put("<< /Nums [")
   for label in doc.labels:
-    doc.put($label.pageIndex, " << /S /", LABEL_STYLE_CH[int(label.style)])
+    var dict = dictObjNew()
+    nums.addNumber(label.pageIndex)
+    nums.add(dict)
+    dict.addName("S", LABEL_STYLE_CH[int(label.style)])
     if label.prefix != nil:
-      if label.prefix.len > 0: doc.put("/P (", escapeString(label.prefix), ")")
-    if label.start > 0: doc.put("/St ", $label.start)
-    doc.put(">>")
+      if label.prefix.len > 0: dict.addString("P", label.prefix)
+    if label.start > 0: dict.addNumber("St", label.start)
 
-  doc.put("] >>")
-  doc.put("endobj")
-  result = labelsID
+  result = labels
 
-proc assignID(o: Outline, objID: var int) =
-  for k in o.kids:
-    k.objID = objID
-    inc(objID)
-    assignID(k, objID)
+proc putOutlineItem(doc: Document, outlines: seq[Outline], parent: dictObj, root: Outline, i: int) =
+  for kid in root.kids:
+    doc.xref.add(kid)
 
-proc putOutlineItem(doc: Document, outlines: seq[Outline], parentID: int, ot: Outline, i: int) =
-  let objID = doc.newobj()
-  assert objID == ot.objID
-  #echo " ", $objID
+  root.addString("Title", root.title)
+  root.addElement("Parent", parent)
+  root.addNumber("Count", 0)
 
-  doc.put("<</Title (",escapeString(ot.title),")/Parent ", $parentID, " 0 R/Count 0")
   if outlines.len == 2:
-    if i == 0: doc.put("/Next ", $outlines[1].objID ," 0 R")
-    if i == 1: doc.put("/Prev ", $outlines[0].objID ," 0 R")
+    if i == 0: root.addElement("Next", outlines[1])
+    if i == 1: root.addElement("Prev", outlines[0])
   elif outlines.len > 2:
     let lastIdx = outlines.len - 1
-    if i == 0: doc.put("/Next ", $outlines[1].objID ," 0 R")
-    if i == lastIdx: doc.put("/Prev ", $outlines[lastIdx-1].objID ," 0 R")
+    if i == 0: root.addElement("Next", outlines[1])
+    if i == lastIdx: root.addElement("Prev", outlines[lastIdx-1])
     if i > 0 and i < lastIdx:
-      doc.put("/Next ", $outlines[i+1].objID ," 0 R")
-      doc.put("/Prev ", $outlines[i-i].objID ," 0 R")
+      root.addElement("Next", outlines[i+1])
+      root.addElement("Prev", outlines[i-1])
 
-  doc.putDestination(ot.dest)
+  doc.putDestination(root, root.dest)
 
-  if ot.kids.len > 0:
-    let firstKid = ot.kids[0].objID
-    let lastKid = ot.kids[ot.kids.len-1].objID
-    doc.put("/First ", $firstKid ," 0 R/Last ", $lastKid ," 0 R>>")
-  else:
-    doc.put(">>")
-  doc.put("endobj")
+  if root.kids.len > 0:
+    let firstKid = root.kids[0]
+    let lastKid = root.kids[root.kids.high]
+    root.addElement("First", firstKid)
+    root.addElement("Last", lastKid)
 
   var i = 0
-  for kid in ot.kids:
-    doc.putOutlineItem(ot.kids, ot.objID, kid, i)
+  for kid in root.kids:
+    doc.putOutlineItem(root.kids, root, kid, i)
     inc(i)
 
-proc putOutlines(doc: Document): int =
-  if doc.outlines.len == 0: return -1
+proc putOutlines(doc: Document): dictObj =
+  if doc.outlines.len == 0: return nil
 
-  let outlineID = doc.newobj()
-  var objID = outlineID + 1
-  for o in items(doc.outlines):
-    o.objID = objID
-    inc(objID)
-    assignID(o, objID)
+  for ot in doc.outlines:
+    doc.xref.add(ot)
 
-  let firstKid = doc.outlines[0].objID
-  let lastKid = doc.outlines[doc.outlines.len-1].objID
-  doc.put("<</Type/Outlines/First ", $firstKid ," 0 R/Last ", $lastKid ," 0 R>>")
-  doc.put("endobj")
+  var root = dictObjNew()
+  doc.xref.add(root)
+
+  let firstKid = doc.outlines[0]
+  let lastKid = doc.outlines[doc.outlines.high]
+  root.addName("Type", "Outlines")
+  root.addElement("First", firstKid)
+  root.addElement("Last", lastKid)
 
   var i = 0
-  for ot in items(doc.outlines):
-    doc.putOutlineItem(doc.outlines, outlineID, ot, i)
-    inc(i)
+  for ot in doc.outlines:
+    doc.putOutlineItem(doc.outlines, root, ot, i)
+    inc i
 
-  result = outlineID
+  result = root
 
 proc putCatalog(doc: Document) =
   doc.state = PGS_DOC_OPENED
-  let resourceID = doc.putResources()
-  let pageRootID = doc.putPages(resourceID)
+  let resource = doc.putResources()
+  let pageRoot = doc.putPages(resource)
   #let firstPageID = pageRootID + 1
 
-  let infoID = doc.putInfo()
-  let pageLabelsID = doc.putLabels()
-  let outlinesID = doc.putOutlines()
+  let info = doc.putInfo()
+  let labels = doc.putLabels()
+  let outlines = doc.putOutlines()
 
-  let catalogID = doc.newobj()
-  doc.put("<<")
-  doc.put("/Type /Catalog")
-  doc.put("/Pages ", $pageRootID, " 0 R")
-  if doc.labels.len > 0: doc.put("/PageLabels ", $pageLabelsID, " 0 R")
-  if doc.outlines.len > 0: doc.put("/Outlines ", $outlinesID, " 0 R")
+  var catalog = dictObjNew()
+  doc.xref.add(catalog)
+  catalog.addName("Type", "Catalog")
+  catalog.addElement("Pages", pageRoot)
+
+  if labels != nil: catalog.addElement("PageLabels", labels)
+  if outlines != nil: catalog.addElement("Outlines", outlines)
   #doc.put("/OpenAction [",$firstPageID," 0 R /FitH null]")
   #doc.put("/PageLayout /OneColumn")
-  doc.put(">>")
-  doc.put("endobj")
 
-  let start_xref = doc.content.len()
-  let numoffset = doc.offsets.len()
-  let numobject = numoffset + 1
-
-  doc.put("xref")
-  doc.put("0 ", $numobject)
-  doc.put("0000000000 65535 f ")
-
-  for i in 0..high(doc.offsets):
-    doc.put("0", i2s10(doc.offsets[i]), " 00000 n ", )
-
-  doc.put("trailer")
-  doc.put("<<")
-  doc.put("/Size ", $numobject)
-  doc.put("/Root ", $catalogID, " 0 R")
-  doc.put("/Info ", $infoID, " 0 R")
-  doc.put(">>")
-  doc.put("startxref")
-  doc.put($start_xref)
-  doc.put("%%EOF")
+  var trailer = doc.xref.getTrailer()
+  trailer.addElement("Root", catalog)
+  trailer.addElement("Info", info)
 
   doc.state = PGS_DOC_CLOSED
 
@@ -727,7 +445,7 @@ proc initPDF*(opts: DocOpt): Document =
   result.opts = opts
   result.labels = @[]
   result.outlines = @[]
-  result.put("%PDF-1.5")
+  result.xref = xrefNew()
   result.setInfo(DI_PRODUCER, "nimPDF")
 
 proc makeDocOpt*(): DocOpt =
@@ -775,7 +493,7 @@ proc setLabel*(doc: Document, style: LabelStyle, prefix: string) =
   label.start = -1
   doc.labels.add(label)
 
-proc loadImage*(doc: Document, fileName: string): PImage =
+proc loadImage*(doc: Document, fileName: string): Image =
   for p in doc.opts.imagesPath:
     let image = loadImage(p & dir_sep & fileName)
     if image != nil: return image
@@ -820,7 +538,9 @@ proc addPage*(doc: Document, s: PageSize, o: PageOrientationType): Page {.discar
 
 proc writePDF*(doc: Document, s: Stream) =
   doc.putCatalog()
-  s.write(doc.content)
+  #s.write(doc.content)
+  s.write("%PDF-1.5\x0A")
+  doc.xref.writeToStream(s, pdfEncrypt(nil))
 
 proc writePDF*(doc: Document, fileName: string): bool =
   result = false
@@ -982,7 +702,7 @@ proc toUser*(doc: Document, val:float64): float64 =
 proc fromUser*(doc: Document, val:float64): float64 =
   result = doc.docUnit.fromUser(val)
 
-proc drawImage*(doc: Document, x:float64, y:float64, source: PImage) =
+proc drawImage*(doc: Document, x:float64, y:float64, source: Image) =
   let size = doc.images.len()
   var found = false
   var img = source
@@ -1455,17 +1175,29 @@ proc makeFitBVDest*(doc: Document, page: Page, left: float64): Destination =
 
 proc makeOutline*(doc: Document, title: string, dest: Destination): Outline =
   new(result)
+  result.class = CLASS_DICT
+  result.subclass = SUBCLASS_OUTLINE
+  result.value  = initTable[string, pdfObj]()
+  result.filter = {}
+  result.filterParams = nil
   result.kids = @[]
   result.dest = dest
   result.title = title
   doc.outlines.add(result)
+  result.objID = 0
 
 proc makeOutline*(ot: Outline, title: string, dest: Destination): Outline =
   new(result)
+  result.class = CLASS_DICT
+  result.subclass = SUBCLASS_OUTLINE
+  result.value  = initTable[string, pdfObj]()
+  result.filter = {}
+  result.filterParams = nil
   result.kids = @[]
+  ot.kids.add(result)
   result.dest = dest
   result.title = title
-  ot.kids.add(result)
+  result.objID = 0
 
 proc initRect*(x,y,w,h: float64): Rectangle =
   result.x = x

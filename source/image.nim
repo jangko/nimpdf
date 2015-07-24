@@ -19,9 +19,8 @@ import bmp, os, strutils
 {.compile: "ujpeg.c".}
 
 type
-  PImage* = ref Image
-  Image* = object
-    width*, height*, ID*, objID*, maskID*: int
+  Image* = ref object
+    width*, height*, ID*: int
     data*, mask*: string
   TCompressFunc = proc(outdata: ptr ptr cuchar, outsize: ptr int, indata: ptr cuchar, insize: int, settings: ptr LodePNGCompressSettings)
   LodePNGCompressSettings {.final, pure.} = object
@@ -56,7 +55,7 @@ proc ujGetImageSize(img: ujImage) : int {.header: "ujpeg.h", importc: "ujGetImag
 proc ujGetImage(img: ujImage, dest: cstring) : cstring {.header: "ujpeg.h", importc: "ujGetImage".}
 proc ujDestroy(img: ujImage) {.header: "ujpeg.h", importc: "ujDestroy".}
 
-proc loadImagePNG(fileName:string) : PImage =
+proc loadImagePNG(fileName:string): Image =
   var data: ptr cuchar = nil
   var width, height : int = 0
   if lodepng_decode32_file(addr data, addr width, addr height, cstring(fileName)) == 0:
@@ -75,7 +74,7 @@ proc loadImagePNG(fileName:string) : PImage =
   else:
     result = nil
 
-proc loadImageJPG(fileName:string) : PImage =
+proc loadImageJPG(fileName:string): Image =
   var jpg = ujCreate()
   if jpg == nil: return nil
 
@@ -91,7 +90,7 @@ proc loadImageJPG(fileName:string) : PImage =
   else:
     result = nil
 
-proc loadImageBMP(fileName:string) : PImage =
+proc loadImageBMP(fileName:string): Image =
   var bmp: BMP
   bmp.init()
   if bmp.ReadFromFile(fileName):
@@ -112,29 +111,26 @@ proc loadImageBMP(fileName:string) : PImage =
   else:
     result = nil
 
-proc loadImage*(fileName:string) : PImage =
+proc loadImage*(fileName:string): Image =
   let path = splitFile(fileName)
   if path.ext.len() > 0:
     let ext = toLower(path.ext)
-    if ext == ".png":
-      return loadImagePNG(fileName)
-    if ext == ".bmp":
-      return loadImageBMP(fileName)
-    if ext == ".jpg" or ext == ".jpeg":
-      return loadImageJPG(fileName)
+    if ext == ".png": return loadImagePNG(fileName)
+    if ext == ".bmp": return loadImageBMP(fileName)
+    if ext == ".jpg" or ext == ".jpeg": return loadImageJPG(fileName)
   result = nil
 
-proc haveMask*(img: PImage): bool =
+proc haveMask*(img: Image): bool =
   result = img.mask.len() > 0
 
-proc clone*(img: PImage): PImage =
+proc clone*(img: Image): Image =
   new(result)
   result.width = img.width
   result.height = img.height
   result.data = img.data
   result.mask = img.mask
 
-proc adjustTransparency*(img: PImage, alpha:float) =
+proc adjustTransparency*(img: Image, alpha:float) =
   if img.haveMask():
     for i in 0..high(img.mask):
       img.mask[i] = char(float(img.mask[i]) * alpha)

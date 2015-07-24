@@ -150,7 +150,7 @@ proc createPDF(doc: Document) =
   doc.fillAndStroke()
 
 proc main(): bool {.discardable.} = 
-  var fileName = "test.pdf"
+  var fileName = "curve.pdf"
   var file = newFileStream(fileName, fmWrite)
   
   if file != nil:
