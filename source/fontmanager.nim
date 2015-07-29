@@ -142,7 +142,7 @@ method EscapeString*(f: TTFont, text: string): string =
 method GetTextWidth*(f: Font, text: string): TextWidth =
   discard
 
-method GetTextWidth*(f: TTFont, text: string): TextWidth =
+method GetTextWidth(f: TTFont, text: string): TextWidth =
   result.width = 0
   result.numchars = 0
   result.numwords = 0
@@ -182,7 +182,7 @@ method GetTextHeight*(f: TTFont, text: string): TextWidth =
   if not isWhiteSpace(runeAt(text, lastChar)):
     inc(result.numwords)
 
-method GetTextWidth*(f: Base14, text: string): TextWidth =
+method GetTextWidth(f: Base14, text: string): TextWidth =
   result.numchars = 0
   result.width = 0
   result.numspace = 0
@@ -299,7 +299,7 @@ proc searchFromTTCList(ff: FontManager, name:string): Font =
 proc makeSubsetTag*(number: int): string =
   let val = toBase26(number)
   let blank = 6 - val.len
-  result = repeatChar(blank, 'A')
+  result = repeat('A', blank)
   result.add(val)
   result.add('+')
 

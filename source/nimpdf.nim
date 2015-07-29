@@ -8,10 +8,10 @@
 
 import strutils, streams, sequtils, times, unsigned, math, basic2d, algorithm, tables
 import image, utf8, "subsetter/font", arc, gstate, path, fontmanager, unicode
-import objects, resources, encrypt
+import objects, resources, encryptdict, encrypt
 
 export fontmanager.Font, fontmanager.FontStyle, fontmanager.FontStyles
-export fontmanager.EncodingType
+export fontmanager.EncodingType, encryptdict.DocInfo, encrypt.encryptMode
 export gstate.PageUnitType, gstate.LineCap, gstate.LineJoin, gstate.DashMode
 export gstate.TextRenderingMode, gstate.RGBColor, gstate.CMYKColor, gstate.BlendMode
 export gstate.makeRGB, gstate.makeCMYK, gstate.makeLinearGradient, gstate.setUnit
@@ -61,16 +61,12 @@ const
   INFO_FIELD = ["Creator", "Producer", "Title", "Subject", "Author", "Keywords"]
 
 type
-  DocInfo* = enum
-    DI_CREATOR, DI_PRODUCER, DI_TITLE, DI_SUBJECT, DI_AUTHOR, DI_KEYWORDS
-
   LabelStyle* = enum
     LS_DECIMAL, LS_UPPER_ROMAN, LS_LOWER_ROMAN, LS_UPPER_LETTER, LS_LOWER_LETTER
 
   PageOrientationType* = enum
     PGO_PORTRAIT, PGO_LANDSCAPE
-  DocStateType* = enum
-    PGS_INITIALIZED, PGS_DOC_OPENED, PGS_PAGE_OPENED, PGS_DOC_CLOSED
+
   PageSize* = object
     width*, height*: float64
 
@@ -119,9 +115,6 @@ type
     title: string
 
   Document* = ref object of RootObj
-    state: DocStateType
-    content: string
-    offsets: seq[int]
     pages: seq[Page]
     docUnit: PageUnit
     size: PageSize
@@ -139,6 +132,7 @@ type
     setFontCall: int
     outlines: seq[Outline]
     xref: pdfXref
+    encrypt: encryptDict
 
   NamedPageSize = tuple[name: string, width: float64, height: float64]
 
@@ -179,29 +173,12 @@ proc escapeString(text: string): string =
     else: add(result, "\\" & toOctal(c))
 
 proc put(p: var Page, text: varargs[string]) =
-  for s in items(text):
-    p.content.add(s)
+  for s in items(text): p.content.add(s)
   p.content.add('\x0A')
 
 proc put(doc: Document, text: varargs[string]) =
-  if doc.state == PGS_PAGE_OPENED:
-    let p = doc.pages.high()
-    doc.pages[p].put(text)
-  else:
-    for s in items(text):
-      doc.content.add(s)
-    doc.content.add('\x0A')
-
-proc newobj(doc: Document) : int =
-  doc.offsets.add(doc.content.len())
-  result = doc.offsets.len()
-  doc.put($result, " 0 obj")
-
-proc putStream(doc: Document, text: string) =
-  doc.put("stream")
-  doc.content.add(text)
-  doc.content.add('\x0A')
-  doc.put("endstream")
+  let p = doc.pages.high()
+  doc.pages[p].put(text)
 
 template f2s(a: expr): expr =
   formatFloat(a,ffDecimal,4)
@@ -395,7 +372,6 @@ proc putOutlines(doc: Document): dictObj =
   result = root
 
 proc putCatalog(doc: Document) =
-  doc.state = PGS_DOC_OPENED
   let resource = doc.putResources()
   let pageRoot = doc.putPages(resource)
   #let firstPageID = pageRootID + 1
@@ -417,22 +393,34 @@ proc putCatalog(doc: Document) =
   var trailer = doc.xref.getTrailer()
   trailer.addElement("Root", catalog)
   trailer.addElement("Info", info)
+  if doc.encrypt != nil:
+    doc.encrypt.prepare(doc.info, doc.xref)
 
-  doc.state = PGS_DOC_CLOSED
+    var id = arrayObj(trailer.getItem("ID", CLASS_ARRAY))
+    if id == nil:
+      id = arrayObjNew()
+      trailer.addElement("ID", id)
+    else:
+      id.clear()
+
+    var enc = doc.encrypt.enc
+    var encrypt_id = newString(enc.encrypt_id.len)
+    for i in 0..enc.encrypt_id.high: encrypt_id[i] = chr(enc.encrypt_id[i])
+    id.addBinary(encrypt_id)
+    id.addBinary(encrypt_id)
+
+    trailer.addElement("Encrypt", doc.encrypt)
 
 proc setInfo*(doc: Document, field: DocInfo, info: string) =
   doc.info[int(field)] = info
 
 proc initPDF*(opts: DocOpt): Document =
   new(result)
-  result.state = PGS_INITIALIZED
-  result.offsets = @[]
   result.pages = @[]
   result.extGStates = @[]
   result.images = @[]
   result.gradients = @[]
   result.docUnit.setUnit(PGU_MM)
-  result.content = ""
   result.fontMan.init(opts.fontsPath)
   result.gstate = newGState()
   result.path_start_x = 0
@@ -531,7 +519,6 @@ proc addPage*(doc: Document, s: PageSize, o: PageOrientationType): Page {.discar
   if o == PGO_LANDSCAPE:
     p.size.swap()
   doc.pages.add(p)
-  doc.state = PGS_PAGE_OPENED
   doc.size = p.size
   doc.setFontCall = 0
   result = p
@@ -540,7 +527,9 @@ proc writePDF*(doc: Document, s: Stream) =
   doc.putCatalog()
   #s.write(doc.content)
   s.write("%PDF-1.5\x0A")
-  doc.xref.writeToStream(s, pdfEncrypt(nil))
+  var enc = pdfEncrypt(nil)
+  if doc.encrypt != nil: enc = doc.encrypt.enc
+  doc.xref.writeToStream(s, enc)
 
 proc writePDF*(doc: Document, fileName: string): bool =
   result = false
@@ -1226,3 +1215,16 @@ proc textAnnot*(doc: Document, rect: Rectangle, src: Page, content: string): Ann
   result.rect = initRect(xx,yy,ww,hh)
   result.content = content
   src.annots.add(result)
+
+proc setPassword*(doc: Document, owner_pass, user_pass: string): bool =
+  doc.encrypt = newEncryptDict()
+  result = doc.encrypt.setPassword(owner_pass, user_pass)
+  doc.xref.add(doc.encrypt)
+
+proc setEncryptionMode*(doc: Document, mode: encryptMode) =
+  if doc.encrypt == nil: return
+  var enc = doc.encrypt.enc
+
+  if mode == ENCRYPT_R2: enc.key_len = 5
+  else: enc.key_len = 16
+  enc.mode = mode

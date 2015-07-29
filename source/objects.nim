@@ -325,6 +325,9 @@ proc addPlain*(obj: arrayObj, val: string) =
 proc addNull*(obj: arrayObj) =
   obj.add nullObjNew()
 
+proc addBinary*(obj: arrayObj, val: string) =
+  obj.add binaryObjNew(val)
+
 proc arrayNew*(args: varargs[float64]): arrayObj =
   new(result)
   result.class = CLASS_ARRAY
@@ -393,13 +396,16 @@ proc insert*(arr: arrayObj, target, val: pdfObj): bool =
 proc clear*(obj: arrayObj) =
   obj.value = @[]
 
+proc dictObjInit*(dict: dictObj) =
+  dict.class = CLASS_DICT
+  dict.value  = initTable[string, pdfObj]()
+  dict.filter = {}
+  dict.filterParams = nil
+  dict.objID = 0
+
 proc dictObjNew*(): dictObj =
   new(result)
-  result.class = CLASS_DICT
-  result.value  = initTable[string, pdfObj]()
-  result.filter = {}
-  result.filterParams = nil
-  result.objID = 0
+  result.dictObjInit()
 
 proc getKeyByObj*(d: dictObj, obj: pdfObj): string =
   for k, v in pairs(d.value):
@@ -563,6 +569,8 @@ proc add*(x: pdfXref, obj: pdfObj) =
 proc getEntry(x: pdfXref, index: int): xrefEntry =
   result = x.entries[index]
 
+proc numEntries*(x: pdfXref): int = x.entries.len
+
 proc getEntryObjectById(x: pdfXref, objID: int): xrefEntry =
   var tmp = x
   while tmp != nil:
@@ -578,7 +586,7 @@ proc getEntryObjectById(x: pdfXref, objID: int): xrefEntry =
 
 proc i2string(val: int, len: int) : string =
   let s = $val
-  let blank = len - 1 - s.len()
+  let blank = len - s.len()
   if blank >= 0:
     result = repeat('0', blank)
     result.add(s)

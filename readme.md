@@ -12,14 +12,14 @@ nimPDF implements the following features(see [demo.pdf](https://github.com/jangk
   - BMP -- use [EasyBMP](http://easybmp.sourceforge.net), already ported to nim,      support 1bit, 4bit, 8bit, 16bit, 24bit, and 32bit images
   - beside transparency from original image(such as from PNG), you can adjust individual image transparency as easy as other elements in your document
 
-* **text and fonts** 
-  - support TTF/TTC font subsetting -- use [Google sfntly](code.google.com/p/sfntly), ported(partially) to nim and modified 
+* **text and fonts**
+  - support TTF/TTC font subsetting -- use [Google sfntly](code.google.com/p/sfntly), ported(partially) to nim and modified
   - you can easily tell the library to look for fonts in certain folder(s)
   - you only need to ask for font family name and it's style, the library will try to find the right one for you(if avilable)
   - text encoded in UTF-8 if you use TTF/TTC
   - 14 base font in PDF use Standard,MacRoman,WinAnsi encoding
   - TTF/TTC fonts can be written vertically if they have vertical metrics
- 
+
 * **Path construction**
   - straight segments, Bezier curves, elliptical arcs, roundrect
   - join styles and miter limits
@@ -27,7 +27,7 @@ nimPDF implements the following features(see [demo.pdf](https://github.com/jangk
   - path clipping
   - arbitrary path bounding box calculation(i use it to implement gradient too)
   - construct path from mathematical function - taken from [ C# GraphDisplay](http://www.codeproject.com/Articles/58280/GraphDisplay-a-Bezier-based-control-for-graphing-f)
- 
+
 * **Color spaces**
   - Gray, RGB, CMYK
   - alpha channel for text, path, and images too!
@@ -39,7 +39,9 @@ nimPDF implements the following features(see [demo.pdf](https://github.com/jangk
   - Document Outline
   - Hyperlinks
   - Text annotation
-  
+  - Encryption(protect document with password)
+
+
 * **others**
   - top-down mode
   - unit measured in point, inch, and mm
@@ -47,11 +49,11 @@ nimPDF implements the following features(see [demo.pdf](https://github.com/jangk
   - images, fonts, and other resources search path(s)
   - document compression using flate decode(use lodePNG compressor)
   - transformation and graphics state
-  
+
 * **unimplemented features**
   - CIE based color space
   - patterns(this can be achieved using PDF primitives and path clipping)
-  - encryption
+  - ~~encryption~~
   - ~~annotation~~
   - ~~hyperlinks~~
   - ~~other encoding beside UTF-8~~(nim has [encoding](http://nim-lang.org/docs/encodings.html) module, i will use it someday)
@@ -60,7 +62,7 @@ nimPDF implements the following features(see [demo.pdf](https://github.com/jangk
   - table generator(as in FPDF)(will be implemented as separate layer)
   - ~~document outline~~
   - permission
-  
+
 #Documentation
 The documentation is generated using docutils
 

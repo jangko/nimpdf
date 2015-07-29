@@ -1,6 +1,6 @@
 # Copyright (c) 2015 Andri Lim
 #
-# Distributed under the MIT license 
+# Distributed under the MIT license
 # (See accompanying file LICENSE.txt)
 #
 #-----------------------------------------
@@ -17,23 +17,21 @@ const
   quadratic_curve* = 2.0
   cubic_curve* = 3.0
   rectangle* = 4.0
-  
+
 type
-  poc = tuple[res:bool, p:TPoint2d]
   bound* = tuple[xmin,ymin,xmax,ymax:float64]
   TVals = object
     len: int
     vals: array[0..10, float64]
-    
+
   Path* = seq[float64]
 
 proc `[]`(t: var TVals, index: int): float64 {.inline.} = t.vals[index]
-proc len(t:TVals): int {.inline.} = t.len
 
 proc push(t: var TVals, val: float64) =
   t.vals[t.len] = val
   inc(t.len)
-  
+
 proc tvals(): TVals =
   result.len = 0
 
@@ -69,14 +67,14 @@ proc minmax(x1, x2, x3: float64): tuple[min,max:float64] =
   #if the control point is between the endpoints, the curve has no local extremas.
   if x2 >= minx and x2 <= maxx:
     return (min: minx, max: maxx)
-  
+
   #if the curve has local minima and/or maxima then adjust the bounding box.
   let t = derivative1_root(x1, x2, x3)
   if t >= 0 and t <= 1:
     let x = value(t, x1, x2, x3)
     minx = min(x, minx)
     maxx = max(x, maxx)
-  
+
   result = (min:minx, max:maxx)
 
 proc quadraticCurveBounds*(x1, y1, x2, y2, x3, y3: float64): bound =
@@ -88,9 +86,9 @@ proc cubicCurveBounds*(x0, y0, x1, y1, x2, y2, x3, y3: float64): bound =
   var tvalues = tvals()
   var boundx = tvals()
   var boundy = tvals()
-  
+
   var a, b, c, t, t1, t2, b2ac, sqrtb2ac: float64
-  
+
   for i in 0..1:
     if i == 0:
       b = 6 * x0 - 12 * x1 + 6 * x2
@@ -100,27 +98,27 @@ proc cubicCurveBounds*(x0, y0, x1, y1, x2, y2, x3, y3: float64): bound =
       b = 6 * y0 - 12 * y1 + 6 * y2
       a = -3 * y0 + 9 * y1 - 9 * y2 + 3 * y3
       c = 3 * y1 - 3 * y0
-  
+
 
     if abs(a) < 1e-12:   #Numerical robustness
       if abs(b) < 1e-12: continue #Numerical robustness
       t = -c / b
       if 0.0 < t and t < 1.0: tvalues.push(t)
       continue
-  
+
     b2ac = b * b - 4 * c * a
     sqrtb2ac = math.sqrt(b2ac)
     if b2ac < 0: continue
-  
+
     t1 = (-b + sqrtb2ac) / (2 * a)
     if 0.0 < t1 and t1 < 1.0: tvalues.push(t1)
-  
+
     t2 = (-b - sqrtb2ac) / (2 * a)
     if 0.0 < t2 and t2 < 1.0: tvalues.push(t2)
-   
+
   var x, y, mt: float64
   var j = tvalues.len
-  
+
   while j >= 0:
     t = tvalues[j]
     mt = 1 - t
@@ -129,22 +127,22 @@ proc cubicCurveBounds*(x0, y0, x1, y1, x2, y2, x3, y3: float64): bound =
     boundx.push(x)
     boundy.push(y)
     dec(j)
-  
+
   boundx.push(x0)
   boundx.push(x3)
   boundy.push(y0)
   boundy.push(y3)
-   
+
   result = (xmin:boundx.min(), ymin:boundy.min(), xmax:boundx.max(), ymax:boundy.max())
-  
+
 proc quadraticCurveBounds2*(ax, ay, bx, by, cx, cy: float64): bound =
   let two:float64 = 2/3
   let cx1 = ax + two * (bx-ax)
   let cx2 = cx + two * (bx-cx)
-  
+
   let cy1 = ay + two * (by-ay)
   let cy2 = cy + two * (by-cy)
-    
+
   result = cubicCurveBounds(ax,ay,cx1,cy1,cx2,cy2,cx,cy)
 
 proc makePath*(): Path =
@@ -159,7 +157,7 @@ proc addLine*(p: var Path, x1,y1,x2,y2:float64) =
 
 proc addLine*(p: var Path, p1,p2:TPoint2d) =
   p.addLine(p1.x,p1.y,p2.x,p2.y)
-  
+
 proc addRect*(p: var Path, x,y,w,h:float64) =
   p.add(rectangle)
   p.add(x)
@@ -178,7 +176,7 @@ proc addQuadraticCurve*(p: var Path, ax,ay,bx,by,cx,cy:float64) =
 
 proc addQuadraticCurve*(p: var Path, a,b,c:TPoint2d) =
   p.addQuadraticCurve(a.x,a.y,b.x,b.y,c.x,c.y)
-  
+
 proc addCubicCurve*(p: var Path, ax,ay,bx,by,cx,cy,dx,dy:float64) =
   p.add(cubic_curve)
   p.add(ax)
@@ -192,23 +190,23 @@ proc addCubicCurve*(p: var Path, ax,ay,bx,by,cx,cy,dx,dy:float64) =
 
 proc addCubicCurve*(p: var Path, a,b,c,d:TPoint2d) =
   p.addCubicCurve(a.x,a.y,b.x,b.y,c.x,c.y,d.x,d.y)
-  
+
 proc isClosed*(p: Path) : bool =
   if p.len == 0: return false
   if p.len == 5 and p[0] == rectangle: return true
   if p[1] == p[p.len - 2] and p[2] == p[p.len - 1]: return true
   result = false
-  
+
 proc calculateBounds*(p: Path): bound =
   let len = p.len
   if len < 5: return (xmin:0.0,ymin:0.0,xmax:0.0,ymax:0.0)
   var i = 0
   var xmin = p[1]
   var ymin = p[2]
-  
+
   var xmax = p[1]
   var ymax = p[2]
-  
+
   while i < len:
     let op = p[i]
     if op == straight_line or op == rectangle:

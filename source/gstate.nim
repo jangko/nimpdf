@@ -91,7 +91,7 @@ type
   CMYKColor* = object
     c*, m*, y*, k* : float64
 
-  WritingMode = enum
+  WritingMode* = enum
     WMODE_HORIZONTAL, WMODE_VERTICAL
 
   BlendMode* = enum
