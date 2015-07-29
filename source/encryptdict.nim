@@ -23,7 +23,7 @@ proc createID(dict: encryptDict, info: Table[int, string], xref: pdfXref) =
   var ctx: MD5Context
 
   ctx.md5Init()
-  when false:
+  when true:
     var t = getTime()
     ctx.md5Update(cast[cstring](addr(t)), sizeof(t))
     # create File Identifier from elements of Into dictionary.
@@ -34,8 +34,7 @@ proc createID(dict: encryptDict, info: Table[int, string], xref: pdfXref) =
     ctx.update(info, DI_SUBJECT)
     ctx.update(info, DI_KEYWORDS)
 
-  #var len = xref.numEntries()
-  var len = 10
+  var len = xref.numEntries()
   ctx.md5Update(cast[cstring](addr(len)), sizeof(len))
   ctx.md5Final(enc.encrypt_id)
 
