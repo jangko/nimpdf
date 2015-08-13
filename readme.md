@@ -40,6 +40,7 @@ nimPDF implements the following features(see [demo.pdf](https://github.com/jangk
   - Hyperlinks
   - Text annotation
   - Encryption(protect document with password)
+  - choose between ARC4-40, ARC4-128, AES-128, AES-256 encryption mode
 
 
 * **others**

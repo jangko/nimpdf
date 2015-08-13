@@ -1,5 +1,8 @@
 import encrypt, objects, times, md5, tables, strutils
 
+const
+  stdCFName = "StdCF"
+
 type
   DocInfo* = enum
     DI_CREATOR, DI_PRODUCER, DI_TITLE, DI_SUBJECT, DI_AUTHOR, DI_KEYWORDS
@@ -36,17 +39,55 @@ proc createID(dict: encryptDict, info: Table[int, string], xref: pdfXref) =
 
   var len = xref.numEntries()
   ctx.md5Update(cast[cstring](addr(len)), sizeof(len))
-  ctx.md5Final(enc.encrypt_id)
+  ctx.md5Final(enc.encryptID)
+
+proc makeCryptFilter(enc: pdfEncrypt, xref: pdfXref): dictObj =
+  result = dictObjNew()
+  #result.subclass = SUBCLASS_CRYPT_FILTERS
+  result.subclass = SUBCLASS_ENCRYPT
+  xref.add(result)
+
+  var stdCF = dictObjNew()
+  #stdCF.subclass = SUBCLASS_CRYPT_FILTER
+  stdCF.subclass = SUBCLASS_ENCRYPT
+  stdCF.addName("Type", "CryptFilter")
+  if enc.mode == ENCRYPT_R5:
+    stdCF.addName("CFM", "AESV3")
+  elif enc.mode == ENCRYPT_R4_AES:
+    stdCF.addName("CFM", "AESV2")
+  elif enc.mode == ENCRYPT_R4_ARC4:
+    stdCF.addName("CFM", "V2")
+  stdCF.addNumber("Length", enc.keyLen)
+  stdCF.addName("AuthEvent", "DocOpen")
+  xref.add(stdCF)
+
+  result.addElement(stdCFName, stdCF)
+
+proc saslprepFromUtf8(input: string): string =
+  #TODO: stringprep with SALSprep profile
+  if input.len > 127: result = input.substr(0, 127)
+  else: result = input
 
 proc prepare*(dict: encryptDict, info: Table[int, string], xref: pdfXref) =
   var enc = dict.enc
   dict.createID(info, xref)
-  enc.createOwnerKey()
-  enc.createEncryptionKey()
-  enc.createUserKey()
 
-  dict.addElement("O", binaryObjNew(enc.owner_key))
-  dict.addElement("U", binaryObjNew(enc.user_key))
+  if enc.mode == ENCRYPT_R5:
+    enc.ownerPasswd = saslprepFromUtf8(enc.ownerPasswd)
+    enc.userPasswd = saslprepFromUtf8(enc.userPasswd)
+    enc.computeEncryptionKeyR5()
+    enc.computeUE()
+    enc.computeOE()
+    enc.computePerms()
+  else:
+    enc.ownerPasswd = padOrTruncatePasswd(enc.ownerPasswd)
+    enc.userPasswd = padOrTruncatePasswd(enc.userPasswd)
+    enc.createOwnerKey()
+    enc.createEncryptionKey()
+    enc.createUserKey()
+
+  dict.addElement("O", binaryObjNew(enc.ownerKey))
+  dict.addElement("U", binaryObjNew(enc.userKey))
   dict.addName("Filter", "Standard")
 
   if enc.mode == ENCRYPT_R2:
@@ -55,14 +96,33 @@ proc prepare*(dict: encryptDict, info: Table[int, string], xref: pdfXref) =
   elif enc.mode == ENCRYPT_R3:
     dict.addNumber("V", 2)
     dict.addNumber("R", 3)
-    dict.addNumber("Length", enc.key_len * 8)
+    dict.addNumber("Length", enc.keyLen * 8)
+  elif enc.mode in {ENCRYPT_R4_ARC4, ENCRYPT_R4_AES}:
+    dict.addNumber("V", 4)
+    dict.addNumber("R", 4)
+  elif enc.mode == ENCRYPT_R5:
+    dict.addNumber("V", 5)
+    dict.addNumber("R", 5)
+
+  if enc.mode in {ENCRYPT_R4_ARC4, ENCRYPT_R4_AES, ENCRYPT_R5}:
+    dict.addName("StmF", stdCFName)
+    dict.addName("StrF", stdCFName)
+    var cryptFilter = enc.makeCryptFilter(xref)
+    dict.addElement("CF", cryptFilter)
+    dict.addBoolean("EncryptMetadata", enc.encryptMetadata)
+    dict.addNumber("Length", enc.keyLen * 8)
+
+  if enc.mode == ENCRYPT_R5:
+    dict.addElement("OE", binaryObjNew(enc.OE))
+    dict.addElement("UE", binaryObjNew(enc.UE))
+    dict.addElement("Perms", binaryObjNew(enc.perms))
 
   dict.addNumber("P", cast[int](enc.permission))
 
-proc setPassword*(dict: encryptDict, owner_pass, user_pass): bool =
+proc setPassword*(dict: encryptDict, ownerPass, userPass): bool =
   var enc = dict.enc
-  if owner_pass.len <= 2: return false
-  if owner_pass == user_pass: return false
-  enc.owner_passwd = padOrTruncatePasswd(owner_pass)
-  enc.user_passwd = padOrTruncatePasswd(user_pass)
+  if ownerPass.len <= 2: return false
+  if ownerPass == userPass: return false
+  enc.ownerPasswd = ownerPass
+  enc.userPasswd = userPass
   result = true

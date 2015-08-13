@@ -8,7 +8,7 @@
 
 import strutils, streams, sequtils, times, unsigned, math, basic2d, algorithm, tables
 import image, utf8, "subsetter/font", arc, gstate, path, fontmanager, unicode
-import objects, resources, encryptdict, encrypt
+import objects, resources, encryptdict, encrypt, os
 
 export fontmanager.Font, fontmanager.FontStyle, fontmanager.FontStyles
 export fontmanager.EncodingType, encryptdict.DocInfo, encrypt.encryptMode
@@ -20,15 +20,8 @@ export gstate.makeCoord,gstate.makeRadialGradient
 export image.Image, image.loadImage, arc.drawArc, arc.arcTo, arc.degree_to_radian
 export path.Path, path.calculateBounds, path.bound
 
-when defined(Windows):
-  const
-    dir_sep = "\\"
-else:
-  const
-    dir_sep = "/"
-
 const
-  nimPDFVersion = "0.2.0"
+  nimPDFVersion = "0.2.2"
   defaultFont = "Times"
   PageNames = [
     #my paper size
@@ -483,7 +476,7 @@ proc setLabel*(doc: Document, style: LabelStyle, prefix: string) =
 
 proc loadImage*(doc: Document, fileName: string): Image =
   for p in doc.opts.imagesPath:
-    let image = loadImage(p & dir_sep & fileName)
+    let image = loadImage(p & DirSep & fileName)
     if image != nil: return image
   result = nil
 
@@ -526,7 +519,7 @@ proc addPage*(doc: Document, s: PageSize, o: PageOrientationType): Page {.discar
 proc writePDF*(doc: Document, s: Stream) =
   doc.putCatalog()
   #s.write(doc.content)
-  s.write("%PDF-1.5\x0A")
+  s.write("%PDF-1.7\x0A")
   var enc = pdfEncrypt(nil)
   if doc.encrypt != nil: enc = doc.encrypt.enc
   doc.xref.writeToStream(s, enc)
@@ -1216,15 +1209,16 @@ proc textAnnot*(doc: Document, rect: Rectangle, src: Page, content: string): Ann
   result.content = content
   src.annots.add(result)
 
-proc setPassword*(doc: Document, owner_pass, user_pass: string): bool =
+proc setPassword*(doc: Document, ownerPass, userPass: string): bool =
   doc.encrypt = newEncryptDict()
-  result = doc.encrypt.setPassword(owner_pass, user_pass)
+  result = doc.encrypt.setPassword(ownerPass, userPass)
   doc.xref.add(doc.encrypt)
 
 proc setEncryptionMode*(doc: Document, mode: encryptMode) =
   if doc.encrypt == nil: return
   var enc = doc.encrypt.enc
 
-  if mode == ENCRYPT_R2: enc.key_len = 5
-  else: enc.key_len = 16
+  if mode == ENCRYPT_R2: enc.keyLen = 5
+  elif mode in {ENCRYPT_R3, ENCRYPT_R4_ARC4, ENCRYPT_R4_AES}: enc.keyLen = 16
+  else: enc.keyLen = 32 # ENCRYPT_R5
   enc.mode = mode

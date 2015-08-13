@@ -90,7 +90,7 @@ proc createPDF(doc: Document) =
   doc.drawImage(160, 280, secret)
   doc.restoreState()
   discard doc.setPassword("owner", "user")
-  #doc.setEncryptionMode(ENCRYPT_R3)
+  doc.setEncryptionMode(ENCRYPT_R4_AES)
 
 proc main() =
   var opts = makeDocOpt()

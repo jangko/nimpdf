@@ -10,14 +10,36 @@
 # support reading 1bit, 4bit, 8bit, 16bit, 24bit, and 32bit BMP
 # this is a BMP reader, not a writer
 
-import unsigned, streams, math
+import unsigned, streams, math, endians
 
 const
   #set to a default of 96 dpi
-  DefaultXPelsPerMeter=3780
-  DefaultYPelsPerMeter=3780
-  IsBigEndian = system.cpuEndian == bigEndian
+  DefaultXPelsPerMeter = 3780
+  DefaultYPelsPerMeter = 3780
 
+  DefaultPalette = [(7,192'u8,192'u8,192'u8),
+    (8,192'u8,220'u8,192'u8),
+    (9,166'u8,202'u8,240'u8),
+    (246,255'u8,251'u8,240'u8),
+    (247,160'u8,160'u8,164'u8),
+    (248,128'u8,128'u8,128'u8),
+    (249,255'u8,0'u8,0'u8),
+    (250,0'u8,255'u8,0'u8),
+    (251,255'u8,255'u8,0'u8),
+    (252,0'u8,0'u8,255'u8),
+    (253,255'u8,0'u8,255'u8),
+    (254,0'u8,255'u8,255'u8),
+    (255,255'u8,255'u8,255'u8)]
+
+  PalMaker = [(1,1,1,128,128,128),
+    (1,1,1,255,255,255),
+    (3,7,7,32,32,64)]
+
+when system.cpuEndian == littleEndian:
+  const BMPSignature = 0x4D42
+else:
+  const BMPSignature = 0x424D
+  
 type
   BYTE = uint8
   WORD = uint16
@@ -26,96 +48,58 @@ type
   RGBApixel* {.pure,final.}= object
     Blue*, Green*, Red*, Alpha*: BYTE
 
-  BMFH=object
-    bfType:WORD
-    bfSize:DWORD
-    bfReserved1:WORD
-    bfReserved2:WORD
-    bfOffBits:DWORD
+  BMFH = object
+    bfType: WORD
+    bfSize: DWORD
+    bfReserved1: WORD
+    bfReserved2: WORD
+    bfOffBits: DWORD
 
-  BMIH=object
-    biSize, biWidth, biHeight:DWORD
-    biPlanes, biBitCount:WORD
-    biCompression, biSizeImage, biXPelsPerMeter, biYPelsPerMeter, biClrUsed, biClrImportant : DWORD
+  BMIH = object
+    biSize, biWidth, biHeight: DWORD
+    biPlanes, biBitCount: WORD
+    biCompression, biSizeImage, biXPelsPerMeter: DWORD
+    biYPelsPerMeter, biClrUsed, biClrImportant : DWORD
 
   BMP* = object
     BitDepth*, Width*, Height*: int
-    #Pixels*:seq[seq[RGBApixel]]
-    Pixels*:seq[RGBApixel]
-    Colors:seq[RGBApixel]
+    Pixels*: seq[RGBApixel]
+    Colors: seq[RGBApixel]
     XPelsPerMeter, YPelsPerMeter: int
     MetaData1, MetaData2: seq[BYTE]
     SizeOfMetaData1, SizeOfMetaData2: int
 
-template square(e:expr):expr=e*e
-
-proc FlipWORD(val: WORD) : WORD {.inline.} = ( (val shr 8) or (val shl 8) )
-proc FlipDWORD(val:DWORD) : DWORD {.inline.} =
-  (((val and 0xFF000000'u32) shr 24) or DWORD((val and 0x000000FF'u32) shl 24) or DWORD((val and 0x00FF0000'u32) shr 8 ) or DWORD((val and 0x0000FF00'u32) shl 8))
-
-proc IntPow(base: int, exponent: int): int =
+proc BMPError(msg: string): ref Exception =
+  new(result)
+  result.msg = msg
+  
+proc pow(base: int, exponent: int): int =
   result = 1
   for i in 1..exponent: result *= base
 
-proc init(bm: var BMFH) =
-  bm.bfType = 19778
-  bm.bfReserved1 = 0
-  bm.bfReserved2 = 0
+proc readLE[T: WORD|DWORD](s: Stream, val: var T): bool =
+  if s.atEnd(): return false
+  var tmp: T
+  if s.readData(addr(tmp), sizeof(T)) != sizeof(T): return false
+  when T is WORD: littleEndian16(addr(val), addr(tmp))
+  else: littleEndian32(addr(val), addr(tmp))
+  result = true
 
-proc SwitchEndianess(bm: var BMFH) =
-  bm.bfType = FlipWORD(bm.bfType)
-  bm.bfSize = FlipDWORD(bm.bfSize)
-  bm.bfReserved1 = FlipWORD(bm.bfReserved1)
-  bm.bfReserved2 = FlipWORD(bm.bfReserved2)
-  bm.bfOffBits = FlipDWORD(bm.bfOffBits)
+proc readLE[T: object](s: Stream, val: var T) =
+  for field in fields(val):
+    if not s.readLE(field):
+      raise BMPError("error when reading file")
 
-proc init(bm: var BMIH) =
-  bm.biPlanes = 1
-  bm.biCompression = 0
-  bm.biXPelsPerMeter = DefaultXPelsPerMeter
-  bm.biYPelsPerMeter = DefaultYPelsPerMeter
-  bm.biClrUsed = 0
-  bm.biClrImportant = 0
+proc readWORD(s: Stream): WORD = 
+  if not s.readLE(result): raise BMPError("error when reading word")
 
-proc SwitchEndianess(bm: var BMIH) =
-  bm.biSize = FlipDWORD( bm.biSize )
-  bm.biWidth = FlipDWORD( bm.biWidth )
-  bm.biHeight = FlipDWORD( bm.biHeight )
-  bm.biPlanes = FlipWORD( bm.biPlanes )
-  bm.biBitCount = FlipWORD( bm.biBitCount )
-  bm.biCompression = FlipDWORD( bm.biCompression )
-  bm.biSizeImage = FlipDWORD( bm.biSizeImage )
-  bm.biXPelsPerMeter = FlipDWORD( bm.biXPelsPerMeter )
-  bm.biYPelsPerMeter = FlipDWORD( bm.biYPelsPerMeter )
-  bm.biClrUsed = FlipDWORD( bm.biClrUsed )
-  bm.biClrImportant = FlipDWORD( bm.biClrImportant )
-
-proc display(bm: BMIH) =
-  echo "biSize: ", $bm.biSize
-  echo "biWidth: ", $bm.biWidth
-  echo "biHeight: ", $bm.biHeight
-  echo "biPlanes: ", $bm.biPlanes
-  echo "biBitCount: ", $bm.biBitCount
-  echo "biCompression: ", $bm.biCompression
-  echo "biSizeImage: ", $bm.biSizeImage
-  echo "biXPelsPerMeter: ", $bm.biXPelsPerMeter
-  echo "biYPelsPerMeter: ", $bm.biYPelsPerMeter
-  echo "biClrUsed: ", $bm.biClrUsed
-  echo "biClrImportant: ", $bm.biClrImportant
-
-proc display(bm: BMFH) =
-  echo "bfType: ", $bm.bfType
-  echo "bfSize: ", $bm.bfSize
-  echo "bfReserved1: ", $bm.bfReserved1
-  echo "bfReserved2: ", $bm.bfReserved2
-  echo "bfOffBits: ", $bm.bfOffBits
-
-proc GetPixel(bm: BMP; x, y: int) : RGBAPixel = bm.Pixels[x*y]
-proc SetPixel(bm: var BMP; x, y: int, NewPixel: RGBApixel) = bm.Pixels[x*y] = NewPixel
-
+proc skip(s: Stream, nums: int) =
+  var tmp: char
+  for i in 0..nums-1: tmp = s.readChar()
+  
 proc TellNumberOfColors(bm: BMP): int =
-  result = IntPow(2, bm.BitDepth)
-  if bm.BitDepth == 32: result = IntPow(2, 24)
+  result = 2.pow(bm.BitDepth)
+  if bm.BitDepth == 32: result = 2.pow(24)
 
 proc SetColor(bm: var BMP, ColorNumber: int, NewColor: RGBApixel): bool =
   if bm.BitDepth != 1 and bm.BitDepth != 4 and bm.BitDepth != 8: return false
@@ -125,10 +109,7 @@ proc SetColor(bm: var BMP, ColorNumber: int, NewColor: RGBApixel): bool =
   result = true
 
 proc GetColor(bm: BMP, ColorNumber: int): RGBAPixel =
-  result.Red   = 255
-  result.Green = 255
-  result.Blue  = 255
-  result.Alpha = 0
+  result = RGBAPixel(Red: 255, Green: 255, Blue: 255, Alpha: 0)
 
   if bm.BitDepth != 1 and bm.BitDepth != 4 and bm.BitDepth != 8: return result
   if bm.Colors == nil: return result
@@ -145,14 +126,20 @@ proc init*(bm: var BMP) =
   bm.SizeOfMetaData1 = 0
   bm.SizeOfMetaData2 = 0
 
-proc SafeFread[T](s:Stream, val: var T): bool =
-  if s.atEnd(): return false
-  if readData(s, addr(val), sizeof(T)) != sizeof(T): return false
-  result = true
-
+proc fillColorTable[T](bm: var BMP, pm: T, idx: int): int =
+  var i = idx
+  for L in 0..pm[0]:
+    for K in 0..pm[1]:
+      for J in 0..pm[2]:
+        bm.Colors[i].Red   = BYTE(J*pm[3])
+        bm.Colors[i].Green = BYTE(K*pm[4])
+        bm.Colors[i].Blue  = BYTE(L*pm[5])
+        bm.Colors[i].Alpha = 0
+        inc i
+  result = i
+  
 proc CreateStandardColorTable(bm: var BMP): bool =
-  if bm.BitDepth != 1 and bm.BitDepth != 4 and bm.BitDepth != 8:
-    return false
+  if bm.BitDepth notin {1, 4, 8}:  return false
 
   if bm.BitDepth == 1:
     for i in 0..1:
@@ -163,131 +150,42 @@ proc CreateStandardColorTable(bm: var BMP): bool =
     return true
 
   if bm.BitDepth == 4:
-    var i = 0
-    for ell in 0..1:
-      for k in 0..1:
-        for j in 0..1:
-          bm.Colors[i].Red = BYTE(j*128)
-          bm.Colors[i].Green = BYTE(k*128)
-          bm.Colors[i].Blue = BYTE(ell*128)
-          i += 1
-
-    for ell in 0..1:
-      for k in 0..1:
-        for j in 0..1:
-          bm.Colors[i].Red = BYTE(j*255)
-          bm.Colors[i].Green = BYTE(k*255)
-          bm.Colors[i].Blue = BYTE(ell*255)
-          i += 1
+    var i = bm.fillColorTable(PalMaker[0], 0)
+    discard bm.fillColorTable(PalMaker[1], i)
 
     i=8
-    bm.Colors[i].Red = 192
+    bm.Colors[i].Red   = 192
     bm.Colors[i].Green = 192
-    bm.Colors[i].Blue = 192
-
-    for i in 0..15:
-      bm.Colors[i].Alpha = 0
+    bm.Colors[i].Blue  = 192
     return true
 
   if bm.BitDepth == 8:
-    var i = 0
-    for ell in 0..3:
-      for k in 0..7:
-        for j in 0..7:
-          bm.Colors[i].Red = BYTE(j*32)
-          bm.Colors[i].Green = BYTE(k*32)
-          bm.Colors[i].Blue = BYTE(ell*64)
-          bm.Colors[i].Alpha = 0
-          i += 1
-
-    i=0
-    for ell in 0..1:
-      for k in 0..1:
-        for j in 0..1:
-          bm.Colors[i].Red = BYTE(j*128)
-          bm.Colors[i].Green = BYTE(k*128)
-          bm.Colors[i].Blue = BYTE(ell*128)
-          bm.Colors[i].Alpha = 0
-          i += 1
-
-    i=7
-    bm.Colors[i].Red = 192
-    bm.Colors[i].Green = 192
-    bm.Colors[i].Blue = 192
-    i=8
-    bm.Colors[i].Red = 192
-    bm.Colors[i].Green = 220
-    bm.Colors[i].Blue = 192
-    i=9
-    bm.Colors[i].Red = 166
-    bm.Colors[i].Green = 202
-    bm.Colors[i].Blue = 240
-    i=246
-    bm.Colors[i].Red = 255
-    bm.Colors[i].Green = 251
-    bm.Colors[i].Blue = 240
-    i=247
-    bm.Colors[i].Red = 160
-    bm.Colors[i].Green = 160
-    bm.Colors[i].Blue = 164
-    i=248
-    bm.Colors[i].Red = 128
-    bm.Colors[i].Green = 128
-    bm.Colors[i].Blue = 128
-    i=249
-    bm.Colors[i].Red = 255
-    bm.Colors[i].Green = 0
-    bm.Colors[i].Blue = 0
-    i=250
-    bm.Colors[i].Red = 0
-    bm.Colors[i].Green = 255
-    bm.Colors[i].Blue = 0
-    i=251
-    bm.Colors[i].Red = 255
-    bm.Colors[i].Green = 255
-    bm.Colors[i].Blue = 0
-    i=252
-    bm.Colors[i].Red = 0
-    bm.Colors[i].Green = 0
-    bm.Colors[i].Blue = 255
-    i=253
-    bm.Colors[i].Red = 255
-    bm.Colors[i].Green = 0
-    bm.Colors[i].Blue = 255
-    i=254
-    bm.Colors[i].Red = 0
-    bm.Colors[i].Green = 255
-    bm.Colors[i].Blue = 255
-    i=255
-    bm.Colors[i].Red = 255
-    bm.Colors[i].Green = 255
-    bm.Colors[i].Blue = 255
+    discard bm.fillColorTable(PalMaker[2], 0)
+    discard bm.fillColorTable(PalMaker[0], 0)
+    for x in DefaultPalette:
+      let i = x[0] 
+      bm.Colors[i].Red   = x[1]
+      bm.Colors[i].Green = x[2]
+      bm.Colors[i].Blue  = x[3]
     return true
   return true
 
 proc SetBitDepth(bm: var BMP, NewDepth: int): bool =
-  if NewDepth notin {1,4,8,16,24,32}:
-    return false
+  if NewDepth notin {1,4,8,16,24,32}: return false
   bm.BitDepth = NewDepth
   if bm.BitDepth == 1 or bm.BitDepth == 4 or bm.BitDepth == 8:
-    let NumberOfColors = IntPow(2, bm.BitDepth)
+    let NumberOfColors = 2.pow(bm.BitDepth)
     newSeq(bm.Colors, NumberOfColors)
     discard bm.CreateStandardColorTable()
   result = true
 
 proc SetSize(bm: var BMP, NewWidth: int, NewHeight: int) =
   newSeq(bm.Pixels, NewWidth * NewHeight)
-  #for i in 0..NewWidth-1:
-    #newSeq(bm.Pixels[i], NewHeight)
   bm.Width = NewWidth
   bm.Height = NewHeight
 
-proc `&=`(a: var bool, b: bool) {.inline.} =
-  a = a and b
-
 proc Read32bitRow(bm: var BMP, Buffer: cstring, BufferSize: int, Row:int): bool =
-  if bm.Width*4 > BufferSize:
-    return false
+  if bm.Width*4 > BufferSize: return false
 
   for i in 0..bm.Width-1:
     let px = Row * bm.Width + i
@@ -299,8 +197,7 @@ proc Read32bitRow(bm: var BMP, Buffer: cstring, BufferSize: int, Row:int): bool 
   result = true
 
 proc Read24bitRow(bm: var BMP, Buffer: cstring, BufferSize: int, Row:int): bool =
-  if bm.Width*3 > BufferSize:
-    return false
+  if bm.Width*3 > BufferSize: return false
 
   for i in 0..bm.Width-1:
     let px = Row * bm.Width + i
@@ -311,8 +208,7 @@ proc Read24bitRow(bm: var BMP, Buffer: cstring, BufferSize: int, Row:int): bool 
   result = true
 
 proc Read8bitRow(bm: var BMP, Buffer: cstring, BufferSize: int, Row:int): bool =
-  if bm.Width > BufferSize:
-    return false
+  if bm.Width > BufferSize: return false
 
   for i in 0..bm.Width-1:
     bm.Pixels[Row * bm.Width + i] = bm.GetColor(int(Buffer[i]))
@@ -322,8 +218,7 @@ proc Read4bitRow(bm: var BMP, Buffer: cstring, BufferSize: int, Row:int): bool =
   let Shifts = [4, 0]
   let Masks =  [240,15]
 
-  if bm.Width > 2*BufferSize:
-    return false
+  if bm.Width > 2*BufferSize: return false
 
   var i=0
   var j=0
@@ -346,8 +241,7 @@ proc Read1bitRow(bm: var BMP, Buffer: cstring, BufferSize: int, Row:int): bool =
   var j=0
   var k=0
 
-  if bm.Width > 8*BufferSize:
-    return false
+  if bm.Width > 8*BufferSize: return false
 
   while i < bm.Width:
     j=0;
@@ -359,184 +253,102 @@ proc Read1bitRow(bm: var BMP, Buffer: cstring, BufferSize: int, Row:int): bool =
     k += 1
   result = true
 
-proc ReadFromFile*(bmp: var BMP, fileName: string): bool =
-  var fh:BMFH
-  var ih:BMIH
-  var NotCorrupted = true
-  var IsBitmap = false
-  var s = newFileStream(fileName, fmRead)
-
-  NotCorrupted &= s.SafeFread(fh.bfType)
-  if IsBigEndian and fh.bfType == 16973: IsBitmap = true
-  if not IsBigEndian and fh.bfType == 19778: IsBitmap = true
-
-  if not IsBitmap:
-    s.close()
-    return false
-
-  NotCorrupted &= s.SafeFread(fh.bfSize)
-  NotCorrupted &= s.SafeFread(fh.bfReserved1)
-  NotCorrupted &= s.SafeFread(fh.bfReserved2)
-  NotCorrupted &= s.SafeFread(fh.bfOffBits)
-
-  if IsBigEndian: fh.SwitchEndianess()
-
-  NotCorrupted &= s.SafeFread(ih.biSize)
-  NotCorrupted &= s.SafeFread(ih.biWidth)
-  NotCorrupted &= s.SafeFread(ih.biHeight)
-  NotCorrupted &= s.SafeFread(ih.biPlanes)
-  NotCorrupted &= s.SafeFread(ih.biBitCount)
-
-  NotCorrupted &= s.SafeFread(ih.biCompression)
-  NotCorrupted &= s.SafeFread(ih.biSizeImage)
-  NotCorrupted &= s.SafeFread(ih.biXPelsPerMeter)
-  NotCorrupted &= s.SafeFread(ih.biYPelsPerMeter)
-  NotCorrupted &= s.SafeFread(ih.biClrUsed)
-  NotCorrupted &= s.SafeFread(ih.biClrImportant)
-
-  if IsBigEndian: ih.SwitchEndianess()
-  if not NotCorrupted:
-    s.close()
-    return false
-
+proc readHeader(bmp: var BMP, ih: var BMIH, fh: var BMFH, s: Stream): bool =
+  s.readLE(fh)
+  s.readLE(ih)
   bmp.XPelsPerMeter = int(ih.biXPelsPerMeter)
   bmp.YPelsPerMeter = int(ih.biYPelsPerMeter)
 
-  if ih.biCompression == 1 or ih.biCompression == 2:
-    s.close()
-    return false
-
-  if ih.biCompression > DWORD(3):
-    s.close()
-    return false
-
-  if ih.biCompression == 3 and ih.biBitCount != 16:
-    s.close()
-    return false
-
-
-  if ih.biBitCount notin {1,4,8,16,24,32}:
-    s.close()
-    return false
-
+  if fh.bfType != BMPSignature: return false
+  if ih.biCompression == 1 or ih.biCompression == 2: return false
+  if ih.biCompression > DWORD(3): return false
+  if ih.biCompression == 3 and ih.biBitCount != 16: return false
+  if ih.biBitCount notin {1,4,8,16,24,32}: return false
   discard bmp.SetBitDepth(int(ih.biBitCount))
-
-  if ih.biWidth <= 0 and ih.biHeight <= 0:
-    s.close()
-    return false
-
+  if ih.biWidth <= 0 and ih.biHeight <= 0: return false
   bmp.SetSize( int(ih.biWidth), int(ih.biHeight) )
-  #ih.display()
-  #fh.display()
-
-  let dBytesPerPixel = float64(bmp.BitDepth) / 8.0
-  let dBytesPerRow   = math.ceil(dBytesPerPixel * float64(bmp.Width))
-
-  var BytePaddingPerRow = 4 - int(dBytesPerRow) mod 4
-  if BytePaddingPerRow == 4: BytePaddingPerRow = 0
-
+  
   if bmp.BitDepth < 16:
     var NumberOfColorsToRead = int((fh.bfOffBits - 54) div 4)
-    if NumberOfColorsToRead > IntPow(2,bmp.BitDepth):  NumberOfColorsToRead = IntPow(2,bmp.BitDepth)
+    if NumberOfColorsToRead > 2.pow(bmp.BitDepth):  NumberOfColorsToRead = 2.pow(bmp.BitDepth)
 
     for n in 0..NumberOfColorsToRead-1:
-      discard s.SafeFread(bmp.Colors[n])
+      if s.readData(addr(bmp.Colors[n]), 4) != 4: return false
 
-    var WHITE: RGBApixel
-    WHITE.Red = 255
-    WHITE.Green = 255
-    WHITE.Blue = 255
-    WHITE.Alpha = 0
-
+    var WHITE = RGBApixel(Red: 255, Green: 255, Blue: 255, Alpha: 0)
     for n in NumberOfColorsToRead..bmp.TellNumberOfColors()-1:
       discard bmp.SetColor( n , WHITE )
+      
+  result = true
 
+proc makeShift(mask: WORD): WORD =
+  result = 0
+  var TempShift = mask
+  while TempShift > WORD(31):
+    TempShift = TempShift shr 1
+    inc result
+
+proc ReadFromFile*(bmp: var BMP, fileName: string): bool =
+  var ih: BMIH
+  var fh: BMFH
+  var s = newFileStream(fileName, fmRead)
+  if s == nil: return false
+  if not bmp.readHeader(ih, fh, s):
+    s.close()
+    return false
+  
   var BytesToSkip = int(fh.bfOffBits - 54)
-  if bmp.BitDepth < 16:
-    BytesToSkip -= 4*IntPow(2,bmp.BitDepth)
-  if bmp.BitDepth == 16 and ih.biCompression == 3:
-    BytesToSkip -= 3*4
-  if BytesToSkip < 0:
-    BytesToSkip = 0
-  if BytesToSkip > 0 and bmp.BitDepth != 16:
-    var skip:BYTE
-    for i in 1..BytesToSkip:
-      discard s.SafeFread(skip)
-
+  if bmp.BitDepth < 16: BytesToSkip -= 4 * 2.pow(bmp.BitDepth)
+  if bmp.BitDepth == 16 and ih.biCompression == 3: BytesToSkip -= 3 * 4
+  if BytesToSkip < 0: BytesToSkip = 0
+  if BytesToSkip > 0 and bmp.BitDepth != 16: s.skip(BytesToSkip)
+      
   if bmp.BitDepth != 16:
-    var BufferSize = int( (bmp.Width*bmp.BitDepth) / 8)
-    while 8*BufferSize < bmp.Width*bmp.BitDepth:
-      BufferSize += 1
-    while (BufferSize mod 4) > 0:
-      BufferSize += 1
+    let BufferSize = 4 * ((bmp.Width * bmp.BitDepth + 31) div 32)
 
-    var Buffer: string = newString(BufferSize)
+    var Buffer = newString(BufferSize)
     var j = bmp.Height-1
     while j > -1:
-      let BytesRead = readData(s, cstring(Buffer), BufferSize)
-      if BytesRead < BufferSize: break
-      else:
-        var Success = false
-        case bmp.BitDepth
-        of 1: Success = bmp.Read1bitRow(  Buffer, BufferSize, j )
-        of 4: Success = bmp.Read4bitRow(  Buffer, BufferSize, j )
-        of 8: Success = bmp.Read8bitRow(  Buffer, BufferSize, j )
-        of 24: Success = bmp.Read24bitRow( Buffer, BufferSize, j )
-        of 32: Success = bmp.Read32bitRow( Buffer, BufferSize, j )
-        else: break
-        if not Success: break
-      j -= 1
+      if readData(s, cstring(Buffer), BufferSize) != BufferSize: break
+      var Success = false
+      case bmp.BitDepth
+      of 1: Success = bmp.Read1bitRow(  Buffer, BufferSize, j )
+      of 4: Success = bmp.Read4bitRow(  Buffer, BufferSize, j )
+      of 8: Success = bmp.Read8bitRow(  Buffer, BufferSize, j )
+      of 24: Success = bmp.Read24bitRow( Buffer, BufferSize, j )
+      of 32: Success = bmp.Read32bitRow( Buffer, BufferSize, j )
+      else: break
+      if not Success: break
+      dec j
 
   if bmp.BitDepth == 16:
-    let DataBytes = bmp.Width*2
-    let PaddingBytes = ( 4 - DataBytes mod 4 ) mod 4
+    let DataBytes = bmp.Width * 2
+    let PaddingBytes = (4 - DataBytes mod 4) mod 4
 
-    var BlueMask : WORD = 31
-    var GreenMask : WORD = 992
-    var RedMask : WORD = 31744
+    var BlueMask: WORD = 31
+    var GreenMask: WORD = 992
+    var RedMask: WORD = 31744
 
     if ih.biCompression != 0:
       var TempMask: WORD
-      discard s.SafeFread(RedMask)
-      if IsBigEndian: RedMask = FlipWORD(RedMask)
-      discard s.SafeFread(TempMask)
-      discard s.SafeFread(GreenMask)
-      if IsBigEndian: GreenMask = FlipWORD(GreenMask)
-      discard s.SafeFread(TempMask)
-      discard s.SafeFread(BlueMask)
-      if IsBigEndian: BlueMask = FlipWORD(BlueMask)
-      discard s.SafeFread(TempMask)
-
-    if BytesToSkip > 0:
-      var skip:BYTE
-      for i in 1..BytesToSkip:
-        discard s.SafeFread(skip)
-
-    var GreenShift: WORD = 0
-    var TempShift:WORD = GreenMask
-    while TempShift > WORD(31):
-      TempShift = TempShift shr 1
-      GreenShift += 1
-
-    var BlueShift:WORD = 0
-    TempShift = BlueMask
-    while TempShift > WORD(31):
-      TempShift = TempShift shr 1
-      BlueShift += 1
-
-    var RedShift:WORD = 0
-    TempShift = RedMask
-    while TempShift > WORD(31):
-      TempShift = TempShift shr 1
-      RedShift += 1
-
+      RedMask   = s.readWORD()
+      TempMask  = s.readWORD()
+      GreenMask = s.readWORD()
+      TempMask  = s.readWORD()
+      BlueMask  = s.readWORD()
+      TempMask  = s.readWORD()
+      
+    if BytesToSkip > 0: s.skip(BytesToSkip)
+    
+    var GreenShift = makeShift(GreenMask)
+    var BlueShift = makeShift(BlueMask)
+    var RedShift = makeShift(RedMask)
+    
     for j in countdown(bmp.Height-1, 0):
       var i = 0
       var ReadNumber = 0
       while ReadNumber < DataBytes:
-        var temp: WORD
-        discard s.SafeFread(temp)
-        if IsBigEndian: temp = FlipWORD(temp)
+        var temp = s.readWORD()
         ReadNumber += 2
 
         let BlueBYTE  = BYTE(WORD(8)*((BlueMask and temp) shr BlueShift))
@@ -550,11 +362,7 @@ proc ReadFromFile*(bmp: var BMP, fileName: string): bool =
 
         i += 1
 
-      ReadNumber = 0
-      while ReadNumber < PaddingBytes:
-        var temp : BYTE
-        discard s.SafeFread(temp)
-        ReadNumber += 1
+      s.skip(PaddingBytes)
 
   s.close()
   result = true
