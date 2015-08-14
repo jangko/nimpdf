@@ -78,7 +78,7 @@ proc computeTable*(): AESTable =
     result.RT2[i] = ROTL8(result.RT1[i])
     result.RT3[i] = ROTL8(result.RT2[i])
 
-proc version(major, minor, patch): int {.compiletime.} =
+proc version(major, minor, patch: int): int {.compiletime.} =
   result = major+minor+patch
 
 const compilerVersion = version(NimMajor,NimMinor,NimPatch)
@@ -100,7 +100,7 @@ proc PUT_ULONG_LE(n: uint32, b: var cstring, i: int) =
 proc AESSetKeyEnc*(ctx: var AESContext, key: string): bool =
   var keySize = key.len * 8
   zeroMem(addr(ctx), sizeof(ctx))
-
+  
   case keySize:
   of 128: ctx.nr = 10
   of 192: ctx.nr = 12
@@ -167,7 +167,7 @@ proc AESSetKeyEnc*(ctx: var AESContext, key: string): bool =
 proc AESSetKeyDec*(ctx: var AESContext, key: string): bool =
   var keySize = key.len * 8
   zeroMem(addr(ctx), sizeof(ctx))
-
+  
   case keySize:
   of 128: ctx.nr = 10
   of 192: ctx.nr = 12
@@ -350,6 +350,23 @@ proc AESDecryptECB*(ctx: AESContext, input: cstring, output: var cstring) =
   PUT_ULONG_LE(X2, output, 8)
   PUT_ULONG_LE(X3, output, 12)
 
+proc AESCryptOFB*(ctx: AESContext, nonce: var cstring, input: string): string =
+  var len = input.len
+  if (len mod 16) != 0: return nil
+
+  result = newString(len)
+  var x = 0
+  while len > 0:
+    var output = cast[cstring](addr(result[x]))
+    AESEncryptECB(ctx, nonce, output)
+    copyMem(addr(nonce[0]), output, 16)
+      
+    for i in 0..15:
+      output[i] = chr(ord(output[i]) xor ord(input[x+i]))
+      
+    inc(x, 16)
+    dec(len, 16)
+    
 proc AESEncryptCBC*(ctx: AESContext, iv: cstring, input: string): string =
   var len = input.len
   if (len mod 16) != 0: return nil
@@ -389,6 +406,7 @@ proc AESDecryptCBC*(ctx: AESContext, iv: cstring, inp: string): string =
 
     inc(x, 16)
     dec(len, 16)
+
 
 proc AESEncryptCFB128*(ctx: AESContext, iv_off: var int, iv: var cstring, input: string): string =
   var n = iv_off
@@ -454,21 +472,22 @@ proc AESDecryptCFB8*(ctx: AESContext, iv: var cstring, input: string): string =
     inc i
     dec len
 
-proc AESCryptCTR*(ctx: AESContext, nc_off: var int, nonce: var array[0..15, uint8], input: string): string =
+proc AESCryptCTR*(ctx: AESContext, nc_off: var int, nonce: var cstring, input: string): string =
   var n = nc_off
   var x = 0
   var len = input.len
-  var counter = cast[cstring](addr(nonce[0]))
+  var counter = cast[ptr array[0..15, uint8]](nonce)
+    
   var temp: array[0..15, uint8]
   var stream_block = cast[cstring](addr(temp[0]))
   result = newString(len)
 
   while len > 0:
     if n == 0:
-      AESEncryptECB(ctx, counter, stream_block)
+      AESEncryptECB(ctx, nonce, stream_block)
       for i in countdown(16, 1):
-        nonce[i-1] += 1
-        if nonce[i-1] != 0: break
+        counter[][i-1] += 1
+        if counter[][i-1] != 0: break
 
     result[x] = chr(ord(input[x]) xor ord(stream_block[n]))
 
@@ -477,3 +496,5 @@ proc AESCryptCTR*(ctx: AESContext, nc_off: var int, nonce: var array[0..15, uint
     inc x
 
   nc_off = n
+
+

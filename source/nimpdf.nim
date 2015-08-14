@@ -21,7 +21,7 @@ export image.Image, image.loadImage, arc.drawArc, arc.arcTo, arc.degree_to_radia
 export path.Path, path.calculateBounds, path.bound
 
 const
-  nimPDFVersion = "0.2.2"
+  nimPDFVersion = "0.2.3"
   defaultFont = "Times"
   PageNames = [
     #my paper size

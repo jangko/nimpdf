@@ -4,10 +4,12 @@ nimPDF is a free PDF writer library, written mostly in nim programming language
 
 nimPDF was heavily inspired by PHP-[FPDF](http://www.fpdf.org) but also influenced by  [jagPDF](http://www.jagpdf.org), [libHaru](http://www.libharu.org)(especially for the demo), [PyFPDF](https://code.google.com/p/pyfpdf), [pdfkit](http://devongovett.github.io/pdfkit)
 
+after lodePNG substituted with PNG decoder written in nim, nimPDF become one step close to 100% pure nim
+
 nimPDF implements the following features(see [demo.pdf](https://github.com/jangko/nimpdf/blob/master/demo.pdf)):
 
 * **images**
-  - PNG -- use [LodePNG](lodev.org/lodepng), still in C
+  - PNG -- ~~use [LodePNG](lodev.org/lodepng), still in C~~ now written in nim
   - JPEG -- use [uJPEG (MicroJPEG) -- KeyJ's Small Baseline JPEG Decoder](http://keyj.emphy.de/nanojpeg), still in C
   - BMP -- use [EasyBMP](http://easybmp.sourceforge.net), already ported to nim,      support 1bit, 4bit, 8bit, 16bit, 24bit, and 32bit images
   - beside transparency from original image(such as from PNG), you can adjust individual image transparency as easy as other elements in your document
