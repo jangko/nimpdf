@@ -1,4 +1,4 @@
-import nimpdf
+import nimPDF
 
 var doc = initPDF()
 doc.addPage(getSizeFromName("A4"), PGO_PORTRAIT)

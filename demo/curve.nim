@@ -7,7 +7,7 @@
 #
 
 import streams, math, basic2d
-import nimpdf, spline
+import nimPDF, spline
 
 type
   Canvas = ref object

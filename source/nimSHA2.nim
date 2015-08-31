@@ -1,4 +1,29 @@
-import unsigned, endians
+# SHA-2 implementation written in nim
+#
+# Copyright (c) 2015 Andri Lim
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+#
+#
+#-------------------------------------
+
+import unsigned, endians, strutils
 
 const
   SHA256_K = [
@@ -130,6 +155,9 @@ proc initSHA*(ctx: var SHA512) =
   ctx.state[6] = 0x1F83D9ABFB41BD6B'u64
   ctx.state[7] = 0x5BE0CD19137E2179'u64
 
+proc initSHA*[T](): T =
+  result.initSHA()
+
 proc GET_UINT32_BE(b: cstring, i: int): uint32 =
   var val = b
   bigEndian32(addr(result), addr(val[i]))
@@ -220,7 +248,7 @@ proc update*(ctx: var SHA224, input: string) =
     if (ctx.count[0] and 0x3F) == 0:
       transform256(ctx.state, cast[cstring](addr(ctx.buffer[0])))
 
-proc update*(ctx: var SHA256, input: string) =
+proc update*(ctx: var SHA256, input: string) {.inline.} =
   SHA224(ctx).update(input)
 
 proc transform512(state: var array[0..7, uint64], input: cstring) =
@@ -272,7 +300,7 @@ proc update*(ctx: var SHA384, input: string) =
     if (ctx.count[0] and 0x7F) == 0:
       transform512(ctx.state, cast[cstring](addr(ctx.buffer[0])))
 
-proc update*(ctx: var SHA512, input: string) =
+proc update*(ctx: var SHA512, input: string) {.inline.} =
   SHA384(ctx).update(input)
 
 proc final224_256(ctx: var SHA224) =
@@ -360,8 +388,13 @@ proc computeSHA512*(input: string, rep: int = 1): SHA512Digest = computeSHA[SHA5
 proc toString[T](input: T): string =
   result = newString(input.len)
   for i in 0..input.len-1: result[i] = input[i]
-
+  
 proc `$`*(sha: SHA224Digest): string = toString(sha)
 proc `$`*(sha: SHA256Digest): string = toString(sha)
 proc `$`*(sha: SHA384Digest): string = toString(sha)
-proc `$`*(sha: SHA512Digest): string = toString(sha)
+proc `$`*(sha: SHA512Digest): string = toString(sha)  
+
+proc toHex*[T: SHA224Digest|SHA256Digest|SHA384Digest|SHA512Digest](input: T): string =
+  result = ""
+  for c in input:
+    result.add toHex(ord(c), 2)

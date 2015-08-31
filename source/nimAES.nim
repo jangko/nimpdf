@@ -1,7 +1,32 @@
+# AES, Rijndael Algorithm implementation written in nim
+#
+# Copyright (c) 2015 Andri Lim
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+#
+#
+#-------------------------------------
+
 import unsigned, strutils
 
 type
-  AESTable* = object
+  AESTable = object
     FSb, RSb: array[0..255, uint8]
     FT0, FT1, FT2, FT3, RT0, RT1, RT2, RT3: array[0..255, uint32]
     RCON: array[0..9, uint32]
@@ -11,6 +36,11 @@ type
     rk: int
     buf: array[0..67, uint32]
 
+proc initAES*(): AESContext =
+  result.nr = 0
+  result.rk = 0
+  for i in 0..result.buf.len-1: result.buf[i] = 0
+  
 proc ROTL8(x: uint32): uint32 =
   result = (x shl 8) or (x shr 24)
 
@@ -97,10 +127,10 @@ proc PUT_ULONG_LE(n: uint32, b: var cstring, i: int) =
   b[i+2] = chr(int((n shr 16) and 0xFF))
   b[i+3] = chr(int((n shr 24) and 0xFF))
 
-proc AESSetKeyEnc*(ctx: var AESContext, key: string): bool =
+proc setEncodeKey*(ctx: var AESContext, key: string): bool =
   var keySize = key.len * 8
   zeroMem(addr(ctx), sizeof(ctx))
-  
+
   case keySize:
   of 128: ctx.nr = 10
   of 192: ctx.nr = 12
@@ -164,17 +194,17 @@ proc AESSetKeyEnc*(ctx: var AESContext, key: string): bool =
 
   result = true
 
-proc AESSetKeyDec*(ctx: var AESContext, key: string): bool =
+proc setDecodeKey*(ctx: var AESContext, key: string): bool =
   var keySize = key.len * 8
   zeroMem(addr(ctx), sizeof(ctx))
-  
+
   case keySize:
   of 128: ctx.nr = 10
   of 192: ctx.nr = 12
   of 256: ctx.nr = 14
   else: return false
   var cty: AESContext
-  if not cty.AESSetKeyEnc(key): return false
+  if not cty.setEncodeKey(key): return false
   var SK = cty.nr * 4
   var RK = 0
 
@@ -252,7 +282,7 @@ template AES_RROUND(X0,X1,X2,X3,Y0,Y1,Y2,Y3: expr): stmt =
     SBOX.RT3[int((Y0 shr 24) and 0xFF)]
   inc RK
 
-proc AESEncryptECB*(ctx: AESContext, input: cstring, output: var cstring) =
+proc encryptECB*(ctx: AESContext, input: cstring, output: var cstring) =
   var X0, X1, X2, X3, Y0, Y1, Y2, Y3: uint32
   var RK = 0
 
@@ -301,7 +331,13 @@ proc AESEncryptECB*(ctx: AESContext, input: cstring, output: var cstring) =
   PUT_ULONG_LE(X2, output, 8)
   PUT_ULONG_LE(X3, output, 12)
 
-proc AESDecryptECB*(ctx: AESContext, input: cstring, output: var cstring) =
+proc encryptECB*(ctx: AESContext, input: string): string =
+  assert input.len == 16
+  result = newString(16)
+  var output = cstring(result)
+  ctx.encryptECB(cstring(input), output)
+
+proc decryptECB*(ctx: AESContext, input: cstring, output: var cstring) =
   var X0, X1, X2, X3, Y0, Y1, Y2, Y3: uint32
   var RK = 0
 
@@ -350,7 +386,13 @@ proc AESDecryptECB*(ctx: AESContext, input: cstring, output: var cstring) =
   PUT_ULONG_LE(X2, output, 8)
   PUT_ULONG_LE(X3, output, 12)
 
-proc AESCryptOFB*(ctx: AESContext, nonce: var cstring, input: string): string =
+proc decryptECB*(ctx: AESContext, input: string): string =
+  assert input.len == 16
+  result = newString(16)
+  var output = cstring(result)
+  ctx.decryptECB(cstring(input), output)
+  
+proc cryptOFB*(ctx: AESContext, nonce: var cstring, input: string): string =
   var len = input.len
   if (len mod 16) != 0: return nil
 
@@ -358,16 +400,22 @@ proc AESCryptOFB*(ctx: AESContext, nonce: var cstring, input: string): string =
   var x = 0
   while len > 0:
     var output = cast[cstring](addr(result[x]))
-    AESEncryptECB(ctx, nonce, output)
+    encryptECB(ctx, nonce, output)
     copyMem(addr(nonce[0]), output, 16)
-      
+
     for i in 0..15:
       output[i] = chr(ord(output[i]) xor ord(input[x+i]))
-      
+
     inc(x, 16)
     dec(len, 16)
-    
-proc AESEncryptCBC*(ctx: AESContext, iv: cstring, input: string): string =
+
+proc cryptOFB*(ctx: AESContext, nonce: var string, input: string): string =
+  assert(nonce.len == 16)
+  assert((input.len mod 16) == 0)
+  var counter = cstring(nonce)
+  result = ctx.cryptOFB(counter, input)
+
+proc encryptCBC*(ctx: AESContext, iv: cstring, input: string): string =
   var len = input.len
   if (len mod 16) != 0: return nil
 
@@ -379,13 +427,17 @@ proc AESEncryptCBC*(ctx: AESContext, iv: cstring, input: string): string =
     for i in 0..15:
       output[i] = chr(ord(input[x+i]) xor ord(iv[i]))
 
-    AESEncryptECB(ctx, output, output)
+    encryptECB(ctx, output, output)
     copyMem(iv, output, 16)
 
     inc(x, 16)
     dec(len, 16)
 
-proc AESDecryptCBC*(ctx: AESContext, iv: cstring, inp: string): string =
+proc encryptCBC*(ctx: AESContext, iv: string, input: string): string =
+  assert iv.len == 16
+  result = ctx.encryptCBC(cstring(iv), input)
+
+proc decryptCBC*(ctx: AESContext, iv: cstring, inp: string): string =
   var len = inp.len
   if (len mod 16) != 0: return nil
 
@@ -397,7 +449,7 @@ proc AESDecryptCBC*(ctx: AESContext, iv: cstring, inp: string): string =
     var input = cast[cstring](addr(data[x]))
     var output = cast[cstring](addr(result[x]))
     copyMem(addr(temp[0]), input, 16)
-    AESDecryptECB(ctx, input, output)
+    ctx.decryptECB(input, output)
 
     for i in 0..15:
       output[i] = chr(ord(output[i]) xor ord(iv[i]))
@@ -407,15 +459,18 @@ proc AESDecryptCBC*(ctx: AESContext, iv: cstring, inp: string): string =
     inc(x, 16)
     dec(len, 16)
 
-
-proc AESEncryptCFB128*(ctx: AESContext, iv_off: var int, iv: var cstring, input: string): string =
+proc decryptCBC*(ctx: AESContext, iv: string, input: string): string =
+  assert iv.len == 16
+  result = ctx.decryptCBC(cstring(iv), input)
+  
+proc encryptCFB128*(ctx: AESContext, iv_off: var int, iv: var cstring, input: string): string =
   var n = iv_off
   var len = input.len
   var i = 0
   result = newString(len)
 
   while len > 0:
-    if n == 0: AESEncryptECB(ctx, iv, iv)
+    if n == 0: encryptECB(ctx, iv, iv)
     iv[n] = chr( ord(iv[n]) xor ord(input[i]) )
     result[i] = iv[n]
 
@@ -425,14 +480,19 @@ proc AESEncryptCFB128*(ctx: AESContext, iv_off: var int, iv: var cstring, input:
 
   iv_off = n
 
-proc AESDecryptCFB128*(ctx: AESContext, iv_off: var int, iv: var cstring, input: string): string =
+proc encryptCFB128*(ctx: AESContext, iv_off: var int, iv: var string, input: string): string =
+  assert iv.len == 16
+  var initVector = cstring(iv)
+  result = ctx.encryptCFB128(iv_off, initVector, input)
+
+proc decryptCFB128*(ctx: AESContext, iv_off: var int, iv: var cstring, input: string): string =
   var n = iv_off
   var len = input.len
   var i = 0
   result = newString(len)
 
   while len > 0:
-    if n == 0: AESEncryptECB(ctx, iv, iv)
+    if n == 0: encryptECB(ctx, iv, iv)
     result[i] = chr(ord(input[i]) xor ord(iv[n]))
     iv[n] = input[i]
 
@@ -442,7 +502,12 @@ proc AESDecryptCFB128*(ctx: AESContext, iv_off: var int, iv: var cstring, input:
 
   iv_off = n
 
-proc AESEncryptCFB8*(ctx: AESContext, iv: var cstring, input: string): string =
+proc decryptCFB128*(ctx: AESContext, iv_off: var int, iv: var string, input: string): string =
+  assert iv.len == 16
+  var initVector = cstring(iv)
+  result = ctx.decryptCFB128(iv_off, initVector, input)
+
+proc encryptCFB8*(ctx: AESContext, iv: var cstring, input: string): string =
   var len = input.len
   var i = 0
   result = newString(len)
@@ -450,14 +515,19 @@ proc AESEncryptCFB8*(ctx: AESContext, iv: var cstring, input: string): string =
 
   while len > 0:
     copyMem(addr(ov), iv, 16)
-    AESEncryptECB(ctx, iv, iv)
+    encryptECB(ctx, iv, iv)
     result[i] = chr(ord(iv[0]) xor ord(input[i]))
     ov[16] = result[i]
     copyMem(iv, addr(ov[1]), 16)
     inc i
     dec len
 
-proc AESDecryptCFB8*(ctx: AESContext, iv: var cstring, input: string): string =
+proc encryptCFB8*(ctx: AESContext, iv: var string, input: string): string =
+  assert iv.len == 16
+  var initVector = cstring(iv)
+  result = ctx.encryptCFB8(initVector, input)
+
+proc decryptCFB8*(ctx: AESContext, iv: var cstring, input: string): string =
   var len = input.len
   var i = 0
   result = newString(len)
@@ -465,26 +535,31 @@ proc AESDecryptCFB8*(ctx: AESContext, iv: var cstring, input: string): string =
 
   while len > 0:
     copyMem(addr(ov), iv, 16)
-    AESEncryptECB(ctx, iv, iv)
+    encryptECB(ctx, iv, iv)
     ov[16] = input[i]
     result[i] = chr(ord(iv[0]) xor ord(input[i]))
     copyMem(iv, addr(ov[1]), 16)
     inc i
     dec len
 
-proc AESCryptCTR*(ctx: AESContext, nc_off: var int, nonce: var cstring, input: string): string =
+proc decryptCFB8*(ctx: AESContext, iv: var string, input: string): string =
+  assert iv.len == 16
+  var initVector = cstring(iv)
+  result = ctx.decryptCFB8(initVector, input)
+
+proc cryptCTR*(ctx: AESContext, nc_off: var int, nonce: var cstring, input: string): string =
   var n = nc_off
   var x = 0
   var len = input.len
   var counter = cast[ptr array[0..15, uint8]](nonce)
-    
+
   var temp: array[0..15, uint8]
   var stream_block = cast[cstring](addr(temp[0]))
   result = newString(len)
 
   while len > 0:
     if n == 0:
-      AESEncryptECB(ctx, nonce, stream_block)
+      encryptECB(ctx, nonce, stream_block)
       for i in countdown(16, 1):
         counter[][i-1] += 1
         if counter[][i-1] != 0: break
@@ -497,4 +572,7 @@ proc AESCryptCTR*(ctx: AESContext, nc_off: var int, nonce: var cstring, input: s
 
   nc_off = n
 
-
+proc cryptCTR*(ctx: AESContext, nc_off: var int, nonce: var string, input: string): string =
+  assert nonce.len == 16
+  var initVector = cstring(nonce)
+  result = ctx.cryptCTR(nc_off, initVector, input)

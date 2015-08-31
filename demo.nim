@@ -7,7 +7,7 @@
 # demo for various features implemented in nimPDF
 # also act as how to use, while the proper documentation being generated
 
-import streams, math, basic2d, nimpdf, spline
+import streams, math, basic2d, nimPDF, spline
 
 type
   Canvas = ref object

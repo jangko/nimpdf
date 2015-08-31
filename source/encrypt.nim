@@ -1,4 +1,4 @@
-import md5, unsigned, strutils, sha2, aes, math
+import md5, unsigned, strutils, nimSHA2, nimAES, math
 
 const
   PDF_ID_LEN            =  16
@@ -93,7 +93,7 @@ proc encryptReset*(enc: pdfEncrypt) =
     ARC4Init(enc.ARC4Ctx, enc.objectKey, keyLen)
   elif enc.mode in {ENCRYPT_R4_AES, ENCRYPT_R5}:
     var key = toString(enc.objectKey, enc.keyLen)
-    if not AESSetKeyEnc(enc.AESCtx, key):
+    if not setEncodeKey(enc.AESCtx, key):
       raise ENCError("wrong encryption key len")
 
 proc createRandom16(input: string): string =
@@ -118,13 +118,13 @@ proc encryptCryptBuf*(enc: pdfEncrypt, input: string): string =
     var newInput = input
     newInput.add padding
     result = iv
-    result.add AESEncryptCBC(enc.AESCtx, cstring(iv), newInput)
+    result.add encryptCBC(enc.AESCtx, cstring(iv), newInput)
 
 proc encryptInitKey*(enc: pdfEncrypt, object_id, gen_no: int) =
   if enc.mode == ENCRYPT_R5:
     copyMem(addr(enc.objectKey), addr(enc.encryptionKey), enc.keyLen)
     var key = toString(enc.objectKey, enc.keyLen)
-    if not AESSetKeyEnc(enc.AESCtx, key):
+    if not setEncodeKey(enc.AESCtx, key):
       raise ENCError("wrong encryption key len")
     return
 
@@ -300,10 +300,10 @@ proc computeUE*(enc: pdfEncrypt) =
   seed.add keySalt
   let key = $computeSHA256(seed)
   var iv = repeat(chr(0), 16)
-  let ok = AESSetKeyEnc(enc.AESCtx, key)
+  let ok = setEncodeKey(enc.AESCtx, key)
   assert ok == true
   var encKey = toString(enc.encryptionKey, enc.keyLen)
-  enc.UE = AESEncryptCBC(enc.AESCtx, cstring(iv), encKey)
+  enc.UE = encryptCBC(enc.AESCtx, cstring(iv), encKey)
   assert enc.UE.len == 32
 
 proc computeOE*(enc: pdfEncrypt) =
@@ -326,10 +326,10 @@ proc computeOE*(enc: pdfEncrypt) =
   seed.add enc.userKey
   let key = $computeSHA256(seed)
   var iv = repeat(chr(0), 16)
-  let ok = AESSetKeyEnc(enc.AESCtx, key)
+  let ok = setEncodeKey(enc.AESCtx, key)
   assert ok == true
   var encKey = toString(enc.encryptionKey, enc.keyLen)
-  enc.OE = AESEncryptCBC(enc.AESCtx, cstring(iv), encKey)
+  enc.OE = encryptCBC(enc.AESCtx, cstring(iv), encKey)
   assert enc.OE.len == 32
 
 proc computePerms*(enc: pdfEncrypt) =
@@ -354,8 +354,8 @@ proc computePerms*(enc: pdfEncrypt) =
   perms[15] = chr(0)
 
   var encKey = toString(enc.encryptionKey, enc.keyLen)
-  let ok = AESSetKeyEnc(enc.AESCtx, encKey)
+  let ok = setEncodeKey(enc.AESCtx, encKey)
   assert ok == true
   enc.perms = newString(16)
   var output = cstring(enc.perms)
-  AESEncryptECB(enc.AESCtx, cast[cstring](addr(perms[0])), output)
+  encryptECB(enc.AESCtx, cast[cstring](addr(perms[0])), output)

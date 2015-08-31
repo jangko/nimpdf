@@ -1,4 +1,4 @@
-import streams, nimpdf
+import streams, nimPDF
 
 proc createPDF(doc: Document) = 
     let size = getSizeFromName("A4")

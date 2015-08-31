@@ -1,4 +1,4 @@
-import nimpdf, strutils, math
+import nimPDF, strutils, math
 
 include names
 

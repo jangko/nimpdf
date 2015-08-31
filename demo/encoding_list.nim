@@ -1,4 +1,4 @@
-import streams, nimpdf, strutils
+import streams, nimPDF, strutils
 
 const
   PGSIZE = getSizeFromName("A4")
