@@ -783,7 +783,7 @@ proc getHash(nz: nzStream, size, pos: int): int =
 
 proc countZeros(nz: nzStream, size, pos: int): int =
   var datapos = pos
-  var dataend = min(datapos + MAX_SUPPORTED_DEFLATE_LENGTH, datapos + size)
+  var dataend = min(datapos + MAX_SUPPORTED_DEFLATE_LENGTH, size)
   while datapos < dataend and nz.data[datapos] == chr(0): inc datapos
   #subtracting two addresses returned as 32-bit number (max value is MAX_SUPPORTED_DEFLATE_LENGTH)
   result = datapos - pos
@@ -1210,6 +1210,14 @@ proc nzDeflate(nz: nzStream) =
 
     if nz.btype == 1: nz.deflateFixed(hash, datapos, dataend, final)
     elif nz.btype == 2: nz.deflateDynamic(hash, datapos, dataend, final)
+
+let lorem_ipsum = """
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec a neque ac ligula pellentesque dictum et ut tortor. Fusce non sem egestas, interdum justo ac, scelerisque augue. Proin vitae massa ut lectus porttitor mattis. Mauris blandit lectus massa, nec iaculis lacus auctor et. Proin aliquet molestie arcu, in finibus ligula mattis sed. Cras ut pulvinar ante, et elementum neque. Praesent tincidunt erat mi, non imperdiet nisi consectetur in. Nam luctus in ex non commodo. Fusce euismod consequat ipsum.
+Vestibulum augue leo, fermentum ut velit laoreet, convallis posuere dui. Suspendisse potenti. Nulla facilisi. Quisque feugiat maximus cursus. Nunc quam massa, interdum quis sodales non, aliquet ut ligula. Ut scelerisque commodo urna, sed cursus ante tincidunt et. Sed vitae quam sed nisl varius porta. Maecenas bibendum feugiat lacus nec tempor. Sed ullamcorper aliquam viverra. Suspendisse vitae sem porta sem finibus facilisis vitae vel nunc. Quisque at nibh eu neque sodales consectetur. Praesent porta maximus leo, ut auctor lorem aliquam non. Quisque fringilla felis id semper laoreet.
+Sed quis vehicula purus. Mauris consectetur sem dui, vitae tincidunt tellus semper at. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Fusce sed augue eros. Aenean non sagittis ligula. Vestibulum sit amet tincidunt diam. Sed purus ex, egestas id bibendum eu, venenatis vitae eros. Integer lobortis turpis ut risus tempor, nec accumsan urna feugiat. Pellentesque sed nisl ligula. Aenean mattis nisl ut ante sodales efficitur. Suspendisse turpis est, hendrerit at porttitor eget, feugiat vel eros. Etiam sodales a metus at malesuada.
+Mauris id sagittis dolor, ac facilisis risus. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Donec varius sagittis consectetur. Donec quis ex consequat, tempor enim ac, facilisis nisl. Proin interdum nisl vel orci feugiat, sit amet ultricies erat lobortis. Aenean nec semper neque. Duis scelerisque est ac enim gravida semper at vitae sapien. Maecenas eleifend auctor lacinia. Donec venenatis mi eget nibh pretium facilisis. Ut sit amet mauris eu dui maximus imperdiet eu in felis. Ut eu nibh eget orci tincidunt vulputate et vitae eros. Morbi ullamcorper elementum quam, ac tincidunt dolor. Aliquam in pulvinar metus. Suspendisse laoreet neque nisi, quis mollis risus tempor in. Etiam accumsan leo nec metus tristique, a pellentesque nisl fringilla. Sed at est egestas, facilisis mi at, pulvinar magna.
+Mauris tristique, lectus iaculis mattis fringilla, libero ex molestie ex, et finibus neque ante non velit. Nunc mollis consequat ultricies. Nam maximus metus velit, molestie fermentum ex ornare fermentum. Nam quis maximus magna. Aliquam bibendum sem tellus, at commodo lacus rhoncus a. Pellentesque vitae magna vel orci ullamcorper accumsan. Fusce condimentum magna magna, ut pretium odio semper id. Duis vitae arcu ac turpis vehicula interdum et nec risus.
+"""
 
 proc nzInit(nz: nzStream) =
   const DEFAULT_WINDOWSIZE = 2048

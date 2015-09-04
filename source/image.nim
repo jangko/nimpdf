@@ -10,7 +10,7 @@
 # currently, identify file format only by it's file name extension
 # eg: .png, .jpg, .jpeg, .bmp
 
-import bmp, os, strutils, png, nimz
+import nimBMP, os, strutils, nimPNG, nimz
 
 #{.deadCodeElim: on.}
 #{.passC: "-D LODEPNG_NO_COMPILE_CPP".}
@@ -87,23 +87,13 @@ proc loadImageJPG(fileName:string): Image =
     result = nil
 
 proc loadImageBMP(fileName:string): Image =
-  var bmp: BMP
-  bmp.init()
-  if bmp.ReadFromFile(fileName):
+  var bmp = loadBMP24(fileName)
+  if bmp != nil:
     new(result)
-    let size=bmp.Width*bmp.Height
-    result.width = bmp.Width
-    result.height = bmp.Height
-    result.data = newString(size * 3)
+    result.width = bmp.width
+    result.height = bmp.height
+    result.data = bmp.data
     result.mask = ""
-    var pos = 0
-    for y in 0..bmp.Height-1:
-      for x in 0..bmp.Width-1:
-        let px = y * bmp.Width + x
-        result.data[pos] = char(bmp.Pixels[px].Red)
-        result.data[pos + 1] = char(bmp.Pixels[px].Green)
-        result.data[pos + 2] = char(bmp.Pixels[px].Blue)
-        pos += 3
   else:
     result = nil
 
