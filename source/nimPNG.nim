@@ -1742,7 +1742,7 @@ proc convert*(png: PNG, colorType: PNGcolorType, bitDepth: int): PNGResult =
 
   convert(output, input, modeOut, modeIn, numPixels)
 
-proc PNGDecode*(s: Stream, colorType: PNGcolorType, bitDepth: int, settings = PNGDecoder(nil)): PNGResult =
+proc decodePNG*(s: Stream, colorType: PNGcolorType, bitDepth: int, settings = PNGDecoder(nil)): PNGResult =
   if not bitDepthAllowed(colorType, bitDepth):
       raise PNGError("colorType and bitDepth combination not allowed")
   var png = s.parsePNG(settings)
@@ -1757,7 +1757,7 @@ proc PNGDecode*(s: Stream, colorType: PNGcolorType, bitDepth: int, settings = PN
     result.height = header.height
     result.data   = png.pixels
 
-proc PNGDecode*(s: Stream, settings = PNGDecoder(nil)): PNG =
+proc decodePNG*(s: Stream, settings = PNGDecoder(nil)): PNG =
   var png = s.parsePNG(settings)
   png.postProcessscanLines()
   result = png
@@ -1766,7 +1766,7 @@ proc loadPNG*(fileName: string, colorType: PNGcolorType, bitDepth: int, settings
   try:
     var s = newFileStream(fileName, fmRead)
     if s == nil: return nil
-    result = s.PNGDecode(colorType, bitDepth, settings)
+    result = s.decodePNG(colorType, bitDepth, settings)
     s.close()
   except:
     debugEcho getCurrentExceptionMsg()
@@ -1778,20 +1778,20 @@ proc loadPNG32*(fileName: string, settings = PNGDecoder(nil)): PNGResult =
 proc loadPNG24*(fileName: string, settings = PNGDecoder(nil)): PNGResult =
   result = loadPNG(fileName, LCT_RGB, 8, settings)
 
-proc PNGDecode32*(input: string, settings = PNGDecoder(nil)): PNGResult =
+proc decodePNG32*(input: string, settings = PNGDecoder(nil)): PNGResult =
   try:
     var s = newStringStream(input)
     if s == nil: return nil
-    result = s.PNGDecode(LCT_RGBA, 8, settings)
+    result = s.decodePNG(LCT_RGBA, 8, settings)
   except:
     debugEcho getCurrentExceptionMsg()
     result = nil
 
-proc PNGDecode24*(input: string, settings = PNGDecoder(nil)): PNGResult =
+proc decodePNG24*(input: string, settings = PNGDecoder(nil)): PNGResult =
   try:
     var s = newStringStream(input)
     if s == nil: return nil
-    result = s.PNGDecode(LCT_RGB, 8, settings)
+    result = s.decodePNG(LCT_RGB, 8, settings)
   except:
     debugEcho getCurrentExceptionMsg()
     result = nil
@@ -2812,16 +2812,7 @@ proc addChunkIEND(png: PNG) =
   var chunk = make[PNGEnd](IEND, 0)
   png.chunks.add chunk
 
-proc `$`(colorType: PNGColorType): string =
-  case colorType
-  of LCT_GREY: result = "LCT_GREY"
-  of LCT_RGB: result = "LCT_RGB"
-  of LCT_PALETTE: result = "LCT_PALETTE"
-  of LCT_GREY_ALPHA: result = "LCT_GREY_ALPHA"
-  of LCT_RGBA: result = "LCT_RGBA"
-  else: result = "LCT_UNKNOWN"
-
-proc PNGEncode*(input: string, w, h: int, settings = PNGEncoder(nil)): PNG =
+proc encodePNG*(input: string, w, h: int, settings = PNGEncoder(nil)): PNG =
   var png: PNG
   new(png)
   png.chunks = @[]
@@ -2914,7 +2905,7 @@ proc PNGEncode*(input: string, w, h: int, settings = PNGEncoder(nil)): PNG =
   png.addChunkIEND()
   result = png
 
-proc PNGEncode*(input: string, colorType: PNGcolorType, bitDepth, w, h: int, settings = PNGEncoder(nil)): PNG =
+proc encodePNG*(input: string, colorType: PNGcolorType, bitDepth, w, h: int, settings = PNGEncoder(nil)): PNG =
   if not bitDepthAllowed(colorType, bitDepth):
       raise PNGError("colorType and bitDepth combination not allowed")
 
@@ -2924,13 +2915,13 @@ proc PNGEncode*(input: string, colorType: PNGcolorType, bitDepth, w, h: int, set
 
   state.modeIn.colorType = colorType
   state.modeIn.bitDepth = bitDepth
-  result = PNGEncode(input, w, h, state)
+  result = encodePNG(input, w, h, state)
 
-proc PNGEncode32*(input: string, w, h: int): PNG =
-  result = PNGEncode(input, LCT_RGBA, 8, w, h)
+proc encodePNG32*(input: string, w, h: int): PNG =
+  result = encodePNG(input, LCT_RGBA, 8, w, h)
 
-proc PNGEncode24*(input: string, w, h: int): PNG =
-  result = PNGEncode(input, LCT_RGB, 8, w, h)
+proc encodePNG24*(input: string, w, h: int): PNG =
+  result = encodePNG(input, LCT_RGB, 8, w, h)
 
 proc writeChunks*(png: PNG, s: Stream) =
   s.write PNGSignature
@@ -2948,7 +2939,7 @@ proc writeChunks*(png: PNG, s: Stream) =
 
 proc savePNG32*(fileName, input: string, w, h: int): bool =
   try:
-    var png = PNGEncode(input, LCT_RGBA, 8, w, h)
+    var png = encodePNG(input, LCT_RGBA, 8, w, h)
     var s = newFileStream(fileName, fmWrite)
     png.writeChunks s
     s.close()
@@ -2959,7 +2950,7 @@ proc savePNG32*(fileName, input: string, w, h: int): bool =
 
 proc savePNG24*(fileName, input: string, w, h: int): bool =
   try:
-    var png = PNGEncode(input, LCT_RGB, 8, w, h)
+    var png = encodePNG(input, LCT_RGB, 8, w, h)
     var s = newFileStream(fileName, fmWrite)
     png.writeChunks s
     s.close()
