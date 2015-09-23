@@ -90,8 +90,6 @@ method Read*(s: FileInputStream, b: var ByteVector, offset, length: int): int =
     raise newEIO("no opened file")
     
   if endOfFile(s.f):
-    #echo "avail ", $s.Available(), " offset: " , $offset, " length : ",  $length
-    #raise newEIO("eof reached")
     return -1
     
   let read_count = min(s.len - s.pos, length)

@@ -54,14 +54,14 @@ type
   FontDef* = ref object
     checksum: int64
     tables: FontTableMap
-    sfnt_version, num_tables, search_range, entry_selector, range_shift: int
+    sfntVersion, numTables, searchRange, entrySelector, rangeShift: int
 
   FontArray* = seq[FontDef]
 
   FontDescriptor* = ref object
     postscriptName*: string
-    FirstChar*: int
-    LastChar*: int
+    firstChar*: int
+    lastChar*: int
     fontFamily*: string
     Flags*:int
     BBox*: array[0..3, int]
@@ -69,9 +69,9 @@ type
     Ascent*: int
     Descent*: int
     capHeight*: int
-    StemV*:int
+    stemV*:int
     xHeight*:int
-    MissingWidth*: int
+    missingWidth*: int
     
 proc GetTable(header: Header, data: FontData): FontTable =
   let tag = header.tag()
@@ -101,7 +101,7 @@ proc GetTable(header: Header, data: FontData): FontTable =
     new(result)
     initFontTable(result, header, data)
   
-proc GetSfntVersion*(f: FontDef): int = f.sfnt_version
+proc GetSfntVersion*(f: FontDef): int = f.sfntVersion
 proc GetChecksum*(f: FontDef): int64 = f.checksum
 proc GetNumTables*(f: FontDef): int = f.tables.len
 
@@ -115,21 +115,21 @@ proc GetTableMap*(f: FontDef): FontTableMap = f.tables
 
 proc makeFont*(): FontDef =
   new(result)
-  result.sfnt_version = Fixed1616Fixed(SFNTVERSION_MAJOR, SFNTVERSION_MINOR)
+  result.sfntVersion = Fixed1616Fixed(SFNTVERSION_MAJOR, SFNTVERSION_MINOR)
 
 proc ReadHeader(f: FontDef, fis: FontInputStream): TableHeaderList =
   result = @[]
   
-  f.sfnt_version   = fis.ReadFixed()
-  f.num_tables   = fis.ReadUShort()
-  f.search_range   = fis.ReadUShort()
-  f.entry_selector = fis.ReadUShort()
-  f.range_shift  = fis.ReadUShort()
+  f.sfntVersion   = fis.ReadFixed()
+  f.numTables   = fis.ReadUShort()
+  f.searchRange   = fis.ReadUShort()
+  f.entrySelector = fis.ReadUShort()
+  f.rangeShift  = fis.ReadUShort()
 
-  for table_number in 0..f.num_tables-1:
+  for table_number in 0..f.numTables-1:
     #Need to use temporary vars here.  C++ evaluates function parameters from
     #right to left and thus breaks the order of input stream.
-    let tag    = TTag(fis.ReadULongAsInt())
+    let tag      = TTag(fis.ReadULongAsInt())
     let checksum = fis.ReadULong()
     let offset   = fis.ReadULongAsInt()
     let length   = fis.ReadULongAsInt()
@@ -140,21 +140,21 @@ proc ReadHeader(f: FontDef, fis: FontInputStream): TableHeaderList =
 
 proc ReadHeader(f: FontDef, fd: FontData, offset: int): TableHeaderList =
   result = @[]
-  f.sfnt_version   = fd.ReadFixed(offset + kSfntVersion)
-  f.num_tables   = fd.ReadUShort(offset + kNumTables)
-  f.search_range   = fd.ReadUShort(offset + kSearchRange)
-  f.entry_selector = fd.ReadUShort(offset + kEntrySelector)
-  f.range_shift  = fd.ReadUShort(offset + kRangeShift)
+  f.sfntVersion   = fd.ReadFixed(offset + kSfntVersion)
+  f.numTables     = fd.ReadUShort(offset + kNumTables)
+  f.searchRange   = fd.ReadUShort(offset + kSearchRange)
+  f.entrySelector = fd.ReadUShort(offset + kEntrySelector)
+  f.rangeShift    = fd.ReadUShort(offset + kRangeShift)
 
-  var table_offset = offset + kTableRecordBegin
-  for table_number in 0..f.num_tables-1:
-    let tag    = TTag(fd.ReadULongAsInt(table_offset + kTableTag))
-    let checksum = fd.ReadULong(table_offset + kTableCheckSum)
-    let offset   = fd.ReadULongAsInt(table_offset + kTableOffset)
-    let length   = fd.ReadULongAsInt(table_offset + kTableLength)
+  var tableOffset = offset + kTableRecordBegin
+  for table_number in 0..f.numTables-1:
+    let tag      = TTag(fd.ReadULongAsInt(tableOffset + kTableTag))
+    let checksum = fd.ReadULong(tableOffset + kTableCheckSum)
+    let offset   = fd.ReadULongAsInt(tableOffset + kTableOffset)
+    let length   = fd.ReadULongAsInt(tableOffset + kTableLength)
     var header   = makeHeader(tag, checksum, offset, length)
     result.add(header)
-    inc(table_offset, kTableRecordSize)
+    inc(tableOffset, kTableRecordSize)
   
   result.sort(proc(x,y: Header): int = OffsetSortedComparator(x,y) )
 
@@ -163,7 +163,6 @@ proc LoadTable(headers: TableHeaderList, fis: FontInputStream): FontTableMap =
   for header in headers:
     discard fis.Skip(header.offset() - fis.Position())
     var data = makeFontData(header.length())
-    #echo TagToString(header.tag()), " avail: ", $fis.Available(), " request: ", $header.length()
     data.CopyFrom(fis, header.length())
     result[header.tag()] = GetTable(header, data)
 
@@ -241,13 +240,13 @@ proc LoadCollection*(fd: FontData): FontArray =
   discard fd.ReadFixed(kVersion)
   let num_fonts = fd.ReadULongAsInt(kNumFonts)
   
-  var offset_table_offset = kOffsetTable
+  var offset_tableOffset = kOffsetTable
   for i in 0..num_fonts-1:
-    let offset = fd.ReadULongAsInt(offset_table_offset)
+    let offset = fd.ReadULongAsInt(offset_tableOffset)
     var font = makeFont()
     LoadFont(font, fd, offset)
     result.add(font)
-    offset_table_offset += DataSize.kULONG
+    offset_tableOffset += DataSize.kULONG
 
 proc LoadCollection*(istream: InputStream): FontArray =
   var fd = makeFontData(istream.Available())
@@ -310,44 +309,40 @@ proc SerializeFont*(tables: var seq[FontTable]): FontData =
       headoffset = offset
       
     discard tables[i].CalculatedChecksum()  
-    #if chk != tables[i].HeaderChecksum():
-      #echo "checksum error ", TagToString(tables[i].HeaderTag()), " " , $chk, " ", $tables[i].HeaderChecksum()
     tables[i].SetTableOffset(offset)    
     offset += ((tables[i].DataLength() + 3) and not 3) 
   
   var fd = makeFontData(offset)
-  #echo "data length ", $fd.Length()
   
   discard fd.WriteFixed(kSfntVersion, Fixed1616Fixed(SFNTVERSION_MAJOR, SFNTVERSION_MINOR))
   discard fd.WriteUShort(kNumTables, numTables)
   
   let log2_of_max_power_of_2 = Log2(numTables)
-  let search_range = 2 shl (log2_of_max_power_of_2 - 1 + 4)
+  let searchRange = 2 shl (log2_of_max_power_of_2 - 1 + 4)
   
-  discard fd.WriteUShort(kSearchRange, search_range)
+  discard fd.WriteUShort(kSearchRange, searchRange)
   discard fd.WriteUShort(kEntrySelector, log2_of_max_power_of_2)
-  discard fd.WriteUShort(kRangeShift, (numTables * kTableRecordSize) - search_range)
+  discard fd.WriteUShort(kRangeShift, (numTables * kTableRecordSize) - searchRange)
   
-  var table_offset = kTableRecordBegin
+  var tableOffset = kTableRecordBegin
   for i in 0..tables.len-1:
     if tables[i] == nil: continue
     let header = tables[i].GetHeader()
-    #echo "table offset ", $table_offset
-    discard fd.WriteULong(table_offset + kTableTag, int(header.tag()))
-    discard fd.WriteULong(table_offset + kTableCheckSum, header.checksum())
-    discard fd.WriteULong(table_offset + kTableOffset, header.offset())
-    discard fd.WriteULong(table_offset + kTableLength, header.length())
-    table_offset += kTableRecordSize
+    discard fd.WriteULong(tableOffset + kTableTag, int(header.tag()))
+    discard fd.WriteULong(tableOffset + kTableCheckSum, header.checksum())
+    discard fd.WriteULong(tableOffset + kTableOffset, header.offset())
+    discard fd.WriteULong(tableOffset + kTableLength, header.length())
+    tableOffset += kTableRecordSize
   
   for i in 0..tables.len-1:
     if tables[i] == nil: continue
-    discard tables[i].Serialize(fd, table_offset)
-    let table_size = tables[i].DataLength()
-    let filler_size = ((table_size + 3) and not 3) - table_size
-    table_offset += table_size
-    for i in 0..filler_size-1:
-      discard fd.WriteByte(table_offset, chr(0))
-      inc(table_offset)
+    discard tables[i].Serialize(fd, tableOffset)
+    let tableSize = tables[i].DataLength()
+    let paddingSize = ((tableSize + 3) and not 3) - tableSize
+    tableOffset += tableSize
+    for i in 0..paddingSize-1:
+      discard fd.WriteByte(tableOffset, chr(0))
+      inc(tableOffset)
 
   var checksum = checksum(fd, fd.Length())
   discard fd.WriteULong(headoffset + 8, 0xB1B0AFBA - checksum)
@@ -385,7 +380,7 @@ proc Subset*(font: FontDef, CH2GID: CH2GIDMAP, newTag: string): FontData =
   
   GID2GID.sort(proc(x,y: tuple[key,val: int] ):int = cmp(x.val, y.val) )
 
-  var newglyf = EncodeGLYPHTable(glyf, GID2GID) #GID2GID maybe larger than before after this line
+  var newglyf = EncodeGLYPHTable(glyf, GID2GID) #GID2GID maybe larger after this line
   var newloca = newglyf.GetLoca()
   head.SetIndexToLocFormat(newLoca.GetFormatVersion())
   hhea.SetNumberOfHMetrics(GID2GID.len)
@@ -395,7 +390,6 @@ proc Subset*(font: FontDef, CH2GID: CH2GIDMAP, newTag: string): FontData =
   var newname = EncodeNAMETable(name, newTag)
   var newpost = EncodePOSTTable(post)
 
-  #echo "numGlyphs: ", $GID2GID.len
   #cmap, glyf, head, hhea, hmtx, loca, maxp, name, post, os/2
   var tables = @[newcmap, newglyf, head, hhea, newhmtx, newloca, maxp, newname, os2, newpost, prep, cvt, fpgm, gasp]
   if vhea != nil and vmtx != nil:
@@ -453,8 +447,8 @@ proc makeDescriptor*(font: FontDef, CH2GID: CH2GIDMAP): FontDescriptor =
   fd.BBox[2] = math.round(float(head.XMax()) * scaleFactor)
   fd.BBox[3] = math.round(float(head.YMax()) * scaleFactor)
   
-  fd.MissingWidth = math.round(float(hmtx.AdvanceWidth(0)) * scaleFactor)
-  fd.StemV = 50 + int(math.pow(float(usWeightClass) / 65.0, 2))
+  fd.missingWidth = math.round(float(hmtx.AdvanceWidth(0)) * scaleFactor)
+  fd.stemV = 50 + int(math.pow(float(usWeightClass) / 65.0, 2))
   
   fd.Ascent = math.round(float(Ascent) * scaleFactor)
   fd.Descent = math.round(float(Descent) * scaleFactor)
@@ -485,10 +479,10 @@ proc makeDescriptor*(font: FontDef, CH2GID: CH2GIDMAP): FontDescriptor =
   var i = 0
   for ch in keys(CH2GID):
     if i == 0:
-      fd.FirstChar = ch
-      fd.LastChar = ch
-    fd.FirstChar = min(fd.FirstChar, ch)
-    fd.LastChar = max(fd.LastChar, ch)
+      fd.firstChar = ch
+      fd.lastChar = ch
+    fd.firstChar = min(fd.firstChar, ch)
+    fd.lastChar = max(fd.lastChar, ch)
     inc(i)
     
   result = fd

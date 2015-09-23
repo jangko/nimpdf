@@ -101,7 +101,7 @@ proc putTrueTypeFonts(xref: pdfXref, font: Font, seed: int): dictObj =
   descriptor.addNumber("Ascent", desc.Ascent)
   descriptor.addNumber("Descent", desc.Descent)
   descriptor.addNumber("CapHeight", desc.capHeight)
-  descriptor.addNumber("StemV", desc.StemV)
+  descriptor.addNumber("StemV", desc.stemV)
   descriptor.addNumber("XHeight", desc.xHeight)
   descriptor.addElement("FontFile2", fontFile)
 
@@ -114,7 +114,7 @@ proc putTrueTypeFonts(xref: pdfXref, font: Font, seed: int): dictObj =
   descendant.addName("BaseFont", psName)
   descendant.addPlain("CIDSystemInfo", "<</Registry(Adobe)/Ordering(Identity)/Supplement 0>>")
   descendant.addElement("FontDescriptor", descriptor)
-  descendant.addNumber("DW", desc.MissingWidth)
+  descendant.addNumber("DW", desc.missingWidth)
   descendant.addPlain("W", widths)
 
   # ToUnicode
@@ -149,8 +149,8 @@ end"""
   fn.addName("Encoding", "Identity-H")
   fn.addElement("DescendantFonts", childs)
   fn.addElement("ToUnicode", toUnicode)
-  fn.addNumber("FirstChar", desc.FirstChar)
-  fn.addNumber("LastChar", desc.LastChar)
+  fn.addNumber("FirstChar", desc.firstChar)
+  fn.addNumber("LastChar", desc.lastChar)
 
   result = fn
 

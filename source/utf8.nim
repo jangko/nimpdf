@@ -37,7 +37,7 @@ type
 proc mask8[T](oc: T): uint8 {.inline.} = cast[uint8](0xff'u8 and uint8(oc))
 proc mask16[T](oc: T): uint16 {.inline.} = cast[uint16](0xffff'u16 and uint16(oc))
 proc is_trail[T](oc: T): bool {.inline.} = (mask8(oc) shr 6) == 0x02
-proc is_lead_surrogate[T](cp: T): bool {.inline.} = (cp >= uint32(LEAD_SURROGATE_MIN) and cp <= uint32(LEAD_SURROGATE_MAX))
+proc is_lead_surrogate*(cp: uint32): bool {.inline.} = ((cp >= uint32(LEAD_SURROGATE_MIN)) and (cp <= uint32(LEAD_SURROGATE_MAX)))
 proc is_trail_surrogate[T](cp: T): bool {.inline.} = (cp >= TRAIL_SURROGATE_MIN and cp <= TRAIL_SURROGATE_MAX)
 proc is_surrogate(cp: uint32): bool {.inline.} = (cp >= uint32(LEAD_SURROGATE_MIN) and cp <= uint32(TRAIL_SURROGATE_MAX))
 proc is_code_point_valid(cp: uint32) : bool {.inline.} = (cp <= CODE_POINT_MAX and not is_surrogate(cp))
