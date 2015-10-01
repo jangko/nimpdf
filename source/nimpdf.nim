@@ -15,13 +15,13 @@ export fontmanager.EncodingType, encryptdict.DocInfo, encrypt.encryptMode
 export gstate.PageUnitType, gstate.LineCap, gstate.LineJoin, gstate.DashMode
 export gstate.TextRenderingMode, gstate.RGBColor, gstate.CMYKColor, gstate.BlendMode
 export gstate.makeRGB, gstate.makeCMYK, gstate.makeLinearGradient, gstate.setUnit
-export gstate.fromMM, gstate.fromCM, gstate.fromIN, gstate.fromUser, gstate.toUser
-export gstate.makeCoord,gstate.makeRadialGradient
+export gstate.fromMM, gstate.fromCM, gstate.fromIN, gstate.fromPT, gstate.fromUser
+export gstate.toUser, gstate.makeCoord,gstate.makeRadialGradient
 export image.Image, image.loadImage, arc.drawArc, arc.arcTo, arc.degree_to_radian
 export path.Path, path.calculateBounds, path.bound
 
 const
-  nimPDFVersion = "0.2.3"
+  nimPDFVersion = "0.2.6"
   defaultFont = "Times"
   PageNames = [
     #my paper size
@@ -67,7 +67,7 @@ type
     x,y,w,h: float64
 
   AnnotType = enum
-    ANNOT_LINK, ANNOT_TEXT
+    ANNOT_LINK, ANNOT_TEXT, ANNOT_WIDGET
 
   Annot = ref object
     rect: Rectangle
@@ -76,6 +76,8 @@ type
       dest: Destination
     of ANNOT_TEXT:
       content: string
+    of ANNOT_WIDGET:
+      annot: dictObj
 
   Page = ref object
     content: string
@@ -107,6 +109,14 @@ type
     dest: Destination
     title: string
 
+  AcroForm* = ref object
+    r,g,b:float64
+    fontSize:float64
+    fontFamily: string
+    fontStyle: FontStyles
+    encoding: EncodingType
+    fields: seq[Annot]
+    
   Document* = ref object of RootObj
     pages: seq[Page]
     docUnit: PageUnit
@@ -126,6 +136,7 @@ type
     outlines: seq[Outline]
     xref: pdfXref
     encrypt: encryptDict
+    acroForm: AcroForm
 
   NamedPageSize = tuple[name: string, width: float64, height: float64]
 
@@ -237,6 +248,7 @@ proc putPages(doc: Document, resource: dictObj): dictObj =
     page.addElement("MediaBox", box)
 
   #the page.page must be initialized first to prevent crash
+  var i = 1
   for p in doc.pages:
     if p.annots.len == 0: continue
     var annots = arrayObjNew()
@@ -249,12 +261,18 @@ proc putPages(doc: Document, resource: dictObj): dictObj =
       if a.annotType == ANNOT_LINK:
         annot.addName("Subtype", "Link")
         doc.putDestination(annot, a.dest)
+      elif a.annotType == ANNOT_WIDGET:
+        annot.addName("Subtype", "Widget")
+        annot.addName("FT", "Tx")
+        annot.addString("T", "Text" & $i) #unique label
+        a.annot = annot
       else:
         annot.addName("Subtype", "Text")
         annot.addString("Contents", a.content)
       annot.addElement("Rect", arrayNew(a.rect.x, a.rect.y, a.rect.w, a.rect.h))
       annot.addElement("Border", arrayNew(16, 16, 1))
       annot.addPlain("BS", "<</W 0>>")
+      inc i
   result = root
 
 proc putResources(doc: Document): dictObj =
@@ -365,19 +383,39 @@ proc putOutlines(doc: Document): dictObj =
   result = root
 
 proc putCatalog(doc: Document) =
+  var catalog = dictObjNew()
+  doc.xref.add(catalog)
+  catalog.addName("Type", "Catalog")
+  
+  var font: Font
+  if doc.acroForm != nil:
+    #set acroform default appearance
+    font = doc.fontMan.makeFont(doc.acroForm.fontFamily, doc.acroForm.fontStyle, doc.acroForm.encoding)
+  
   let resource = doc.putResources()
   let pageRoot = doc.putPages(resource)
   #let firstPageID = pageRootID + 1
 
+  if doc.acroForm != nil:
+    let fontSize = doc.docunit.fromUser(doc.acroForm.fontSize)
+    var acro = dictObjNew()
+    doc.xref.add(acro)
+    var fields = arrayObjNew()
+    for a in doc.acroForm.fields:
+      fields.add a.annot
+    catalog.addElement("AcroForm", acro)
+    acro.addElement("DR", resource)
+    let fontColor = "(" & f2s(doc.acroForm.r) & " " & f2s(doc.acroForm.g) & " " & f2s(doc.acroForm.b) & " rg /F"
+    let fontID = $font.ID & " " & f2s(fontSize) & " Tf)"
+    acro.addPlain("DA", fontColor & fontID)
+    acro.addElement("Fields", fields)
+    
   let info = doc.putInfo()
   let labels = doc.putLabels()
   let outlines = doc.putOutlines()
 
-  var catalog = dictObjNew()
-  doc.xref.add(catalog)
-  catalog.addName("Type", "Catalog")
   catalog.addElement("Pages", pageRoot)
-
+  
   if labels != nil: catalog.addElement("PageLabels", labels)
   if outlines != nil: catalog.addElement("Outlines", outlines)
   #doc.put("/OpenAction [",$firstPageID," 0 R /FitH null]")
@@ -1222,3 +1260,48 @@ proc setEncryptionMode*(doc: Document, mode: encryptMode) =
   elif mode in {ENCRYPT_R3, ENCRYPT_R4_ARC4, ENCRYPT_R4_AES}: enc.keyLen = 16
   else: enc.keyLen = 32 # ENCRYPT_R5
   enc.mode = mode
+
+proc initAcroForm*(doc: Document): AcroForm =
+  if doc.acroForm != nil: return doc.acroForm
+  new(result)
+  result.r = 0.0
+  result.g = 0.0
+  result.b = 0.0
+  result.fontSize = doc.docunit.toUser(12)
+  result.fontFamily = "Helvetica"
+  result.fontStyle = {FS_REGULAR}
+  result.encoding = ENC_STANDARD
+  result.fields = @[]
+  doc.acroForm = result
+
+proc setFontColor*(a: AcroForm, r,g,b: float64) =
+  a.r = r
+  a.g = r
+  a.b = r
+  
+proc setFontColor*(a: AcroForm, col: RGBColor) =
+  a.setFontColor(col.r,col.g,col.b)
+  
+proc setFontSize*(a: AcroForm, size: float64) =
+  a.fontSize = size
+  
+proc setFontFamily*(a: AcroForm, family: string) =
+  a.fontFamily = family
+  
+proc setFontStyle*(a: AcroForm, style: FontStyles) =
+  a.fontStyle = style
+
+proc setEncoding*(a: AcroForm, enc: EncodingType) =
+  a.encoding = enc
+  
+proc textField*(doc: Document, rect: Rectangle, src: Page): Annot =
+  var acro = doc.initAcroForm()
+  new(result)
+  let xx = doc.docUnit.fromUser(rect.x)
+  let yy = doc.size.height - doc.docUnit.fromUser(rect.y)
+  let ww = doc.docUnit.fromUser(rect.x + rect.w)
+  let hh = doc.size.height - doc.docUnit.fromUser(rect.y + rect.h)
+  result.annotType = ANNOT_WIDGET
+  result.rect = initRect(xx,yy,ww,hh)
+  src.annots.add(result)
+  acro.fields.add(result)

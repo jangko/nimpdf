@@ -43,7 +43,7 @@ nimPDF implements the following features(see [demo.pdf](https://github.com/jangk
   - Text annotation
   - Encryption(protect document with password)
   - choose between ARC4-40, ARC4-128, AES-128, AES-256 encryption mode
-
+  - Form Field: TextField
 
 * **others**
   - top-down mode

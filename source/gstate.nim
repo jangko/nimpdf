@@ -210,6 +210,7 @@ proc setUnit*(this: var PageUnit, v: PageUnitType) : int {.discardable.} =
 proc fromMM*(mm: float64) : float64 = PGU_K_MM * mm
 proc fromCM*(cm: float64) : float64 = PGU_K_CM * cm
 proc fromIN*(inch: float64) : float64 =  PGU_K_IN * inch
+proc fromPT*(pt: float64): float64 = pt
 
 proc fromUser*(this: PageUnit, val: float64) : float64 =  this.k * val
 proc toUser*(this: PageUnit, val: float64) : float64 = val / this.k

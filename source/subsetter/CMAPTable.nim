@@ -42,6 +42,8 @@ const
   kEndCode = 4
   kStartGlyphCode = 8
   
+  kLength32 = 4
+  kVersion32 = 8
 type
   TONGID* = tuple[oldGID, newGID: int]
   CH2GIDMAP* = OrderedTable[int, TONGID]
@@ -71,10 +73,10 @@ method Version(t: CMAP): int =
   result = t.data.ReadUShort(kVersion)
 
 method Length(t: CMAP12): int =
-  result = t.data.ReadULongAsInt(4)
+  result = t.data.ReadULongAsInt(kLength32)
 
 method Version(t: CMAP12): int =
-  result = t.data.ReadULongAsInt(8)
+  result = t.data.ReadULongAsInt(kVersion32)
   
 method GlyphIndex*(t: CMAP, charCode: int): int = 
   discard
@@ -505,8 +507,8 @@ proc EncodeCMAP12(CH2GID: CH2GIDMAP): FontData =
   let size = 16 + kGroupSize * nGroups
   var fd = makeFontData(size)
   discard fd.WriteUShort(kFormat, 12)
-  discard fd.WriteULong(4, size)
-  discard fd.WriteULong(8, 0)
+  discard fd.WriteULong(kLength32, size)
+  discard fd.WriteULong(kVersion32, 0)
   discard fd.WriteULong(knGroups, nGroups)
     
   for i in 0.. <nGroups:
