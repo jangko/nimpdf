@@ -7,12 +7,12 @@ proc drawTitle(doc: Document, text:string) =
 
   doc.setFont("Helvetica", {FS_BOLD}, 5)
   let tw = doc.getTextWidth(text)
-  let x = size.width/2 - tw/2
+  let x = size.width.toMM/2 - tw/2
 
   doc.setRGBFill(0,0,0)
   doc.drawText(x, 10.0, text)
   doc.setRGBStroke(0,0,0)
-  doc.drawRect(10,15,size.width - 20, size.height-25)
+  doc.drawRect(10,15,size.width.toMM - 20, size.height.toMM-25)
   doc.stroke()
 
 proc rndlen(len: int): string =
@@ -43,9 +43,9 @@ proc createPDF(doc: Document) =
 
   doc.saveState()
   doc.setRGBFill(makeRGB("lightgray"))
-  var y = size.height / 2.0
-  doc.rotate(45, size.width/2.0, y)
-  doc.drawText((size.width-doc.getTextWidth(text))/2.0 + 10, y, text)
+  var y = size.height.toMM / 2.0
+  doc.rotate(45, size.width.toMM/2.0, y)
+  doc.drawText((size.width.toMM-doc.getTextWidth(text))/2.0 + 10, y, text)
   doc.restoreState()
 
   var bank = doc.loadImage("greedybank.png")

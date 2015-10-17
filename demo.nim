@@ -39,12 +39,12 @@ proc draw_title(doc: Document, text:string) =
 
   doc.setFont("Helvetica", {FS_BOLD}, 5)
   let tw = doc.getTextWidth(text)
-  let x = size.width/2 - tw/2
+  let x = size.width.toMM/2 - tw/2
 
   doc.setRGBFill(0,0,0)
   doc.drawText(x, 10.0, text)
   doc.setRGBStroke(0,0,0)
-  doc.drawRect(10,15,size.width - 20, size.height-25)
+  doc.drawRect(10,15,size.width.toMM - 20, size.height.toMM-25)
   doc.stroke()
 
 proc draw_demo_1(doc: Document) =
@@ -215,8 +215,8 @@ proc draw_demo_4(doc: Document) =
   doc.setRGBFill(gray_thin)
   doc.setRGBStroke(gray_bold)
 
-  let width = size.width
-  let height = size.height
+  let width = size.width.toMM
+  let height = size.height.toMM
 
   #Draw horizontal lines
   var y = 0.0
@@ -767,7 +767,7 @@ proc draw_demo_8(doc: Document) =
 
   # text along a circle
   let size = getSizeFromName("A4")
-  let height = fromMM(size.height)
+  let height = size.height.toPT
 
   doc.setRGBStroke(makeRGB("fuchsia"))
   doc.setRGBFill(makeRGB("orange"))
@@ -784,14 +784,14 @@ proc draw_demo_8(doc: Document) =
   doc.setFont("Courier", {FS_BOLD}, 16)
   doc.beginText()
   var buf = " "
-  let radii = fromMM(76)
+  let radii = fromMM(76).toPT
 
   for c in samp_text:
     let rad1 = degree_to_radian(angle2 - 90)
     let rad2 = degree_to_radian(angle2)
 
-    let x = fromMM(cx) + cos(rad2) * radii
-    let y = height - fromMM(cy) + sin(rad2) * radii
+    let x = fromMM(cx).toPT + cos(rad2) * radii
+    let y = height - fromMM(cy).toPT + sin(rad2) * radii
 
     doc.setTextMatrix(matrix2d(cos(rad1), sin(rad1), -sin(rad1), cos(rad1), x, y))
 

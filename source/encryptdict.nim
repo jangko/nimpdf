@@ -119,7 +119,7 @@ proc prepare*(dict: encryptDict, info: Table[int, string], xref: pdfXref) =
 
   dict.addNumber("P", cast[int](enc.permission))
 
-proc setPassword*(dict: encryptDict, ownerPass, userPass): bool =
+proc setPassword*(dict: encryptDict, ownerPass, userPass: string): bool =
   var enc = dict.enc
   if ownerPass.len <= 2: return false
   if ownerPass == userPass: return false

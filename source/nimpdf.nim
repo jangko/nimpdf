@@ -16,12 +16,13 @@ export gstate.PageUnitType, gstate.LineCap, gstate.LineJoin, gstate.DashMode
 export gstate.TextRenderingMode, gstate.RGBColor, gstate.CMYKColor, gstate.BlendMode
 export gstate.makeRGB, gstate.makeCMYK, gstate.makeLinearGradient, gstate.setUnit
 export gstate.fromMM, gstate.fromCM, gstate.fromIN, gstate.fromPT, gstate.fromUser
-export gstate.toUser, gstate.makeCoord,gstate.makeRadialGradient
+export gstate.toUser, gstate.makeCoord, gstate.makeRadialGradient
+export gstate.toMM, gstate.toCM, gstate.toIN, gstate.toPT, gstate.SizeUnit
 export image.Image, image.loadImage, arc.drawArc, arc.arcTo, arc.degree_to_radian
 export path.Path, path.calculateBounds, path.bound
 
 const
-  nimPDFVersion = "0.2.6"
+  nimPDFVersion = "0.2.7"
   defaultFont = "Times"
   PageNames = [
     #my paper size
@@ -60,8 +61,11 @@ type
   PageOrientationType* = enum
     PGO_PORTRAIT, PGO_LANDSCAPE
 
+  CoordinateMode* = enum
+    TOP_DOWN, BOTTOM_UP
+    
   PageSize* = object
-    width*, height*: float64
+    width*, height*: SizeUnit
 
   Rectangle= object
     x,y,w,h: float64
@@ -137,6 +141,7 @@ type
     xref: pdfXref
     encrypt: encryptDict
     acroForm: AcroForm
+    coordinateMode: CoordinateMode
 
   NamedPageSize = tuple[name: string, width: float64, height: float64]
 
@@ -148,19 +153,23 @@ proc init(gs: var ExtGState; id: int; sA, nsA: float64, bm: string = "Normal") =
 
 proc swap(this: var PageSize) = swap(this.width, this.height)
 
-proc searchPageSize(x: openArray[NamedPageSize], y: string, z: var PageSize) : bool =
+proc searchPageSize(x: openArray[NamedPageSize], y: string, z: var PageSize): bool =
   for t in items(x):
     if t.name == y:
-      z.width = t.width
-      z.height = t.height
+      z.width = fromMM(t.width)
+      z.height = fromMM(t.height)
       return true
   result = false
 
-proc getSizeFromName*(name: string) : PageSize =
+proc getSizeFromName*(name: string): PageSize =
   if not searchPageSize(PageNames, name, result):
-    result.width  = 210
-    result.height = 297
+    result.width  = fromMM(210)
+    result.height = fromMM(297)
 
+proc makePageSize*(w, h: SizeUnit): PageSize =
+  result.width = w
+  result.height = h
+  
 proc escapeString(text: string): string =
   result = ""
   for c in items(text):
@@ -244,7 +253,7 @@ proc putPages(doc: Document, resource: dictObj): dictObj =
     page.addElement("Contents", content)
 
     #Output the page size.
-    var box = arrayNew(0.0,0.0, p.size.width, p.size.height)
+    var box = arrayNew(0.0,0.0, p.size.width.toPT, p.size.height.toPT)
     page.addElement("MediaBox", box)
 
   #the page.page must be initialized first to prevent crash
@@ -451,6 +460,7 @@ proc initPDF*(opts: DocOpt): Document =
   result.extGStates = @[]
   result.images = @[]
   result.gradients = @[]
+  result.coordinateMode = TOP_DOWN
   result.docUnit.setUnit(PGU_MM)
   result.fontMan.init(opts.fontsPath)
   result.gstate = newGState()
@@ -481,6 +491,23 @@ proc addImagesPath*(opt: DocOpt, path: string) =
 
 proc addFontsPath*(opt: DocOpt, path: string) =
   opt.fontsPath.add(path)
+
+proc clearFontsPath*(opt: DocOpt) =
+  opt.fontsPath.setLen(0)
+  
+proc clearImagesPath*(opt: DocOpt) =
+  opt.imagesPath.setLen(0)
+
+proc clearResourcesPath*(opt: DocOpt) =
+  opt.resourcesPath.setLen(0)
+  
+proc clearAllPath*(opt: DocOpt) =
+  opt.clearFontsPath()
+  opt.clearImagesPath()
+  opt.clearResourcesPath()
+
+proc getOpt*(doc: Document): DocOpt =
+  result = doc.opts
 
 proc initPDF*(): Document =
   var opts = makeDocOpt()
@@ -527,9 +554,28 @@ proc getVersion*(doc: Document): string =
 proc setUnit*(doc: Document, unit: PageUnitType) =
   doc.docUnit.setUnit(unit)
 
-proc getSize*(doc: Document): PageSize =
-  result.width = doc.docUnit.toUser(doc.size.width)
-  result.height = doc.docUnit.toUser(doc.size.height)
+proc getUnit*(doc: Document): PageUnitType =
+  result = doc.docUnit.unitType
+  
+proc setCoordinateMode*(doc: Document, mode: CoordinateMode) =
+  doc.coordinateMode = mode
+  
+proc getCoordinateMode*(doc: Document): CoordinateMode =
+  result = doc.coordinateMode
+  
+proc vPoint(doc: Document, val: float64): float64 =
+  if doc.coordinateMode == TOP_DOWN:
+    result = doc.size.height.toPT - doc.docUnit.fromUser(val)
+  else:
+    result = doc.docUnit.fromUser(val)
+
+proc vPointMirror(doc: Document, val: float64): float64 =
+  if doc.coordinateMode == TOP_DOWN:
+    result = doc.docUnit.fromUser(-val)
+  else:
+    result = doc.docUnit.fromUser(val)
+    
+proc getSize*(doc: Document): PageSize = doc.size
 
 proc setFont*(doc: Document, family:string, style: FontStyles, size: float64, enc: EncodingType = ENC_STANDARD) =
   var font = doc.fontMan.makeFont(family, style, enc)
@@ -540,14 +586,14 @@ proc setFont*(doc: Document, family:string, style: FontStyles, size: float64, en
   doc.gstate.font_size = fontSize
   inc(doc.setFontCall)
 
-proc addPage*(doc: Document, s: PageSize, o: PageOrientationType): Page {.discardable.} =
+proc addPage*(doc: Document, size: PageSize, orient = PGO_PORTRAIT): Page {.discardable.} =
   var p : Page
   new(p)
-  p.size.width = fromMM(s.width)
-  p.size.height = fromMM(s.height)
+  p.size.width = size.width
+  p.size.height = size.height
   p.content = ""
   p.annots = @[]
-  if o == PGO_LANDSCAPE:
+  if orient == PGO_LANDSCAPE:
     p.size.swap()
   doc.pages.add(p)
   doc.size = p.size
@@ -572,7 +618,7 @@ proc writePDF*(doc: Document, fileName: string): bool =
 
 proc drawText*(doc: Document; x,y: float64; text: string) =
   let xx = doc.docUnit.fromUser(x)
-  let yy = doc.size.height - doc.docUnit.fromUser(y)
+  let yy = doc.vPoint(y)
 
   if doc.gstate.font == nil or doc.setFontCall == 0:
     doc.setFont(defaultFont, {FS_REGULAR}, 5)
@@ -597,7 +643,7 @@ proc drawVText*(doc: Document; x,y: float64; text: string) =
     return
 
   var xx = doc.docUnit.fromUser(x)
-  var yy = doc.size.height - doc.docUnit.fromUser(y)
+  var yy = doc.vPoint(y)
   let utf8 = replace_invalid(text)
   let cid = font.EscapeString(utf8)
 
@@ -622,12 +668,12 @@ proc beginText*(doc: Document; x,y: float64) =
     doc.setFont(defaultFont, {FS_REGULAR}, 5)
 
   let xx = doc.docUnit.fromUser(x)
-  let yy = doc.size.height - doc.docUnit.fromUser(y)
+  let yy = doc.vPoint(y)
   doc.put("BT ", f2s(xx)," ",f2s(yy)," Td")
 
 proc moveTextPos*(doc: Document; x,y: float64) =
   let xx = doc.docUnit.fromUser(x)
-  let yy = doc.docUnit.fromUser(-y)
+  let yy = doc.vPointMirror(y)
   doc.put(f2s(xx)," ",f2s(yy)," Td")
 
 proc setTextRenderingMode*(doc: Document, rm: TextRenderingMode) =
@@ -661,6 +707,10 @@ proc setCharSpace*(doc: Document; val: float64) =
   doc.put(f2s(val)," Tc")
   doc.gstate.char_space = val
 
+proc setTextHScale*(doc: Document; val: float64) =
+  doc.put(f2s(val)," Th")
+  doc.gstate.h_scaling = val
+
 proc setWordSpace*(doc: Document; val: float64) =
   doc.put(f2s(val)," Tw")
   doc.gstate.word_space = val
@@ -674,12 +724,12 @@ proc rotate*(doc: Document, angle:float64) =
 
 proc rotate*(doc: Document, angle, x,y:float64) =
   let xx = doc.docUnit.fromUser(x)
-  let yy = doc.size.height - doc.docUnit.fromUser(y)
+  let yy = doc.vPoint(y)
   doc.setTransform(rotate(degree_to_radian(angle), point2d(xx, yy)))
 
 proc move*(doc: Document, x,y:float64) =
   let xx = doc.docUnit.fromUser(x)
-  let yy = -doc.docUnit.fromUser(y)
+  let yy = doc.vPointMirror(y)
   doc.setTransform(move(xx,yy))
 
 proc scale*(doc: Document, s:float64) =
@@ -687,7 +737,7 @@ proc scale*(doc: Document, s:float64) =
 
 proc scale*(doc: Document, s, x,y:float64) =
   let xx = doc.docUnit.fromUser(x)
-  let yy = doc.size.height - doc.docUnit.fromUser(y)
+  let yy = doc.vPoint(y)
   doc.setTransform(scale(s, point2d(xx, yy)))
 
 proc stretch*(doc: Document, sx,sy:float64) =
@@ -695,7 +745,7 @@ proc stretch*(doc: Document, sx,sy:float64) =
 
 proc stretch*(doc: Document, sx,sy,x,y:float64) =
   let xx = doc.docUnit.fromUser(x)
-  let yy = doc.size.height - doc.docUnit.fromUser(y)
+  let yy = doc.vPoint(y)
   doc.setTransform(stretch(sx, sy, point2d(xx, yy)))
 
 proc shear(sx,sy,x,y:float64): TMatrix2d =
@@ -711,7 +761,7 @@ proc skew*(doc: Document, sx,sy:float64) =
 
 proc skew*(doc: Document, sx,sy,x,y:float64) =
   let xx = doc.docUnit.fromUser(x)
-  let yy = doc.size.height - doc.docUnit.fromUser(y)
+  let yy = doc.vPoint(y)
   let tsx = math.tan(degree_to_radian(sx))
   let tsy = math.tan(degree_to_radian(sy))
   doc.setTransform(shear(tsx, tsy, xx, yy))
@@ -746,20 +796,20 @@ proc drawImage*(doc: Document, x:float64, y:float64, source: Image) =
   let hh = float(img.height)
   let ww = float(img.width)
 
-  if img.haveMask():
-    doc.put("q")
-
-    #embed hidden, outside canvas
-    var xx = doc.docUnit.fromUser(doc.size.width + 10)
-    var yy = doc.docUnit.fromUser(doc.size.height + 10)
-
-    doc.put(f2s(ww)," 0 0 ",f2s(hh)," ",f2s(xx)," ",f2s(yy)," cm")
-    doc.put("/Im",$img.ID," Do")
-    doc.put("Q")
+  #if img.haveMask():
+    #doc.put("q")
+    #
+    ##embed hidden, outside canvas
+    #var xx = doc.size.width.toPT + fromMM(10.0).toPT
+    #var yy = doc.size.height.toPT + fromMM(10.0).toPT
+    #
+    #doc.put(f2s(ww)," 0 0 ",f2s(hh)," ",f2s(xx)," ",f2s(yy)," cm")
+    #doc.put("/Im",$img.ID," Do")
+    #doc.put("Q")
 
   doc.put("q")
   var xx = doc.docUnit.fromUser(x)
-  var yy = doc.size.height - doc.docUnit.fromUser(y)
+  var yy = doc.vPoint(y)
 
   doc.put(f2s(ww)," 0 0 ",f2s(hh)," ",f2s(xx)," ",f2s(yy)," cm")
 
@@ -772,14 +822,14 @@ proc drawRect*(doc: Document, x: float64, y: float64, w: float64, h: float64) =
     doc.shapes.add(makePath())
   else:
     let xx = doc.docUnit.fromUser(x)
-    let yy = doc.size.height - doc.docUnit.fromUser(y)
+    let yy = doc.vPoint(y)
     let ww = doc.docUnit.fromUser(w)
-    let hh = -doc.docUnit.fromUser(h)
+    let hh = doc.vPointMirror(h)
     doc.put(f2s(xx)," ",f2s(yy)," ",f2s(ww)," ",f2s(hh)," re")
 
 proc moveTo*(doc: Document, x: float64, y: float64) =
   let xx = doc.docUnit.fromUser(x)
-  let yy = doc.size.height - doc.docUnit.fromUser(y)
+  let yy = doc.vPoint(y)
   doc.put(f2s(xx)," ",f2s(yy)," m")
   doc.path_start_x = x
   doc.path_start_y = y
@@ -795,7 +845,7 @@ proc lineTo*(doc: Document, x: float64, y: float64) =
       doc.shapes.add(makePath())
   else:
     let xx = doc.docUnit.fromUser(x)
-    let yy = doc.size.height - doc.docUnit.fromUser(y)
+    let yy = doc.vPoint(y)
     doc.put(f2s(xx)," ",f2s(yy)," l")
   doc.path_end_x = x
   doc.path_end_y = y
@@ -812,9 +862,9 @@ proc bezierCurveTo*(doc: Document; cp1x, cp1y, cp2x, cp2y, x, y: float64) =
     let cp2xx = doc.docUnit.fromUser(cp2x)
     let xx = doc.docUnit.fromUser(x)
 
-    let cp1yy = doc.size.height - doc.docUnit.fromUser(cp1y)
-    let cp2yy = doc.size.height - doc.docUnit.fromUser(cp2y)
-    let yy = doc.size.height - doc.docUnit.fromUser(y)
+    let cp1yy = doc.vPoint(cp1y)
+    let cp2yy = doc.vPoint(cp2y)
+    let yy = doc.vPoint(y)
     doc.put(f2s(cp1xx)," ",f2s(cp1yy)," ",f2s(cp2xx)," ",f2s(cp2yy)," ",f2s(xx)," ",f2s(yy)," c")
   doc.path_end_x = x
   doc.path_end_y = y
@@ -829,8 +879,8 @@ proc curveTo1*(doc: Document; cpx, cpy, x, y: float64) =
   else:
     let cpxx = doc.docUnit.fromUser(cpx)
     let xx = doc.docUnit.fromUser(x)
-    let cpyy = doc.size.height - doc.docUnit.fromUser(cpy)
-    let yy = doc.size.height - doc.docUnit.fromUser(y)
+    let cpyy = doc.vPoint(cpy)
+    let yy = doc.vPoint(y)
     doc.put(f2s(cpxx)," ",f2s(cpyy)," ",f2s(xx)," ",f2s(yy)," v")
   doc.path_end_x = x
   doc.path_end_y = y
@@ -845,8 +895,8 @@ proc curveTo2*(doc: Document; cpx, cpy, x, y: float64) =
   else:
     let cpxx = doc.docUnit.fromUser(cpx)
     let xx = doc.docUnit.fromUser(x)
-    let cpyy = doc.size.height - doc.docUnit.fromUser(cpy)
-    let yy = doc.size.height - doc.docUnit.fromUser(y)
+    let cpyy = doc.vPoint(cpy)
+    let yy = doc.vPoint(y)
     doc.put(f2s(cpxx)," ",f2s(cpyy)," ",f2s(xx)," ",f2s(yy)," y")
   doc.path_end_x = x
   doc.path_end_y = y
@@ -1085,7 +1135,7 @@ proc applyGradient(doc: Document) =
       doc.put("W n") #set gradient clipping area
       let bb = calculateBounds(p)
       let xx = doc.docUnit.fromUser(bb.xmin)
-      let yy = doc.size.height - doc.docUnit.fromUser(bb.ymin + bb.ymax - bb.ymin)
+      let yy = doc.vPoint(bb.ymin + bb.ymax - bb.ymin)
       let ww = doc.docUnit.fromUser(bb.xmax - bb.xmin)
       let hh = doc.docUnit.fromUser(bb.ymax - bb.ymin)
       #set up transformation matrix for gradient
@@ -1147,7 +1197,7 @@ proc makeXYZDest*(doc: Document, page: Page, x,y,z: float64): Destination =
   result.style = DS_XYZ
   result.page  = page
   result.a = doc.docUnit.fromUser(x)
-  result.b = doc.size.height - doc.docUnit.fromUser(y)
+  result.b = doc.vPoint(y)
   result.c = z
 
 proc makeFitDest*(doc: Document, page: Page): Destination =
@@ -1159,7 +1209,7 @@ proc makeFitHDest*(doc: Document, page: Page, top: float64): Destination =
   new(result)
   result.style = DS_FITH
   result.page  = page
-  result.a = doc.size.height - doc.docUnit.fromUser(top)
+  result.a = doc.vPoint(top)
 
 proc makeFitVDest*(doc: Document, page: Page, left: float64): Destination =
   new(result)
@@ -1172,9 +1222,9 @@ proc makeFitRDest*(doc: Document, page: Page, left,bottom,right,top: float64): D
   result.style = DS_FITR
   result.page  = page
   result.a = doc.docUnit.fromUser(left)
-  result.b = doc.size.height - doc.docUnit.fromUser(bottom)
+  result.b = doc.vPoint(bottom)
   result.c = doc.docUnit.fromUser(right)
-  result.d = doc.size.height - doc.docUnit.fromUser(top)
+  result.d = doc.vPoint(top)
 
 proc makeFitBDest*(doc: Document, page: Page): Destination =
   new(result)
@@ -1185,7 +1235,7 @@ proc makeFitBHDest*(doc: Document, page: Page, top: float64): Destination =
   new(result)
   result.style = DS_FITBH
   result.page  = page
-  result.a = doc.size.height - doc.docUnit.fromUser(top)
+  result.a = doc.vPoint(top)
 
 proc makeFitBVDest*(doc: Document, page: Page, left: float64): Destination =
   new(result)
@@ -1228,9 +1278,9 @@ proc initRect*(x,y,w,h: float64): Rectangle =
 proc linkAnnot*(doc: Document, rect: Rectangle, src: Page, dest: Destination): Annot =
   new(result)
   let xx = doc.docUnit.fromUser(rect.x)
-  let yy = doc.size.height - doc.docUnit.fromUser(rect.y)
+  let yy = doc.vPoint(rect.y)
   let ww = doc.docUnit.fromUser(rect.x + rect.w)
-  let hh = doc.size.height - doc.docUnit.fromUser(rect.y + rect.h)
+  let hh = doc.vPoint(rect.y + rect.h)
   result.annotType = ANNOT_LINK
   result.rect = initRect(xx,yy,ww,hh)
   result.dest = dest
@@ -1239,9 +1289,9 @@ proc linkAnnot*(doc: Document, rect: Rectangle, src: Page, dest: Destination): A
 proc textAnnot*(doc: Document, rect: Rectangle, src: Page, content: string): Annot =
   new(result)
   let xx = doc.docUnit.fromUser(rect.x)
-  let yy = doc.size.height - doc.docUnit.fromUser(rect.y)
+  let yy = doc.vPoint(rect.y)
   let ww = doc.docUnit.fromUser(rect.x + rect.w)
-  let hh = doc.size.height - doc.docUnit.fromUser(rect.y + rect.h)
+  let hh = doc.vPoint(rect.y + rect.h)
   result.annotType = ANNOT_TEXT
   result.rect = initRect(xx,yy,ww,hh)
   result.content = content
@@ -1298,9 +1348,9 @@ proc textField*(doc: Document, rect: Rectangle, src: Page): Annot =
   var acro = doc.initAcroForm()
   new(result)
   let xx = doc.docUnit.fromUser(rect.x)
-  let yy = doc.size.height - doc.docUnit.fromUser(rect.y)
+  let yy = doc.vPoint(rect.y)
   let ww = doc.docUnit.fromUser(rect.x + rect.w)
-  let hh = doc.size.height - doc.docUnit.fromUser(rect.y + rect.h)
+  let hh = doc.vPoint(rect.y + rect.h)
   result.annotType = ANNOT_WIDGET
   result.rect = initRect(xx,yy,ww,hh)
   src.annots.add(result)

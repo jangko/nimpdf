@@ -21,12 +21,12 @@ proc draw_title(doc: Document, text:string) =
   
   doc.setFont("Helvetica", {FS_BOLD}, 5)
   let tw = doc.getTextWidth(text)
-  let x = size.width/2 - tw/2
+  let x = size.width.toMM/2 - tw/2
   
   doc.setRGBFill(0,0,0)
   doc.drawText(x, 10.0, text)
   doc.setRGBStroke(0,0,0)
-  doc.drawRect(10,15,size.width - 20, size.height-25)
+  doc.drawRect(10,15,size.width.toMM - 20, size.height.toMM-25)
   doc.stroke()
  
 proc makeCanvas(doc: Document): Canvas =

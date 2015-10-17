@@ -72,6 +72,7 @@ proc hash*(c: Header): THash =
   h = h !& int(c.mtag)
   h = h !& c.moffset
   h = h !& c.mlength
+  result = !$h
 
 proc makeHeader*(tag: TTag, checksum: int64, offset, length: int): Header =
   result.mtag = tag

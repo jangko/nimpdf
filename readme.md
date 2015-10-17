@@ -45,9 +45,12 @@ nimPDF implements the following features(see [demo.pdf](https://github.com/jangk
   - choose between ARC4-40, ARC4-128, AES-128, AES-256 encryption mode
   - Form Field: TextField
 
-* **others**
+* **Coordinate Space**
   - top-down mode
+  - bottom-up mode
   - unit measured in point, inch, and mm
+  
+* **others**
   - output to file or memory using nim stream module
   - images, fonts, and other resources search path(s)
   - document compression using flate decode(use lodePNG compressor)

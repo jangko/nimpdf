@@ -150,7 +150,8 @@ method GetTextWidth(f: TTFont, text: string): TextWidth =
 
   for b in runes(text):
     inc(result.numchars)
-    result.width += f.GetCharWidth(int(b))
+    let GID = f.cmap.GlyphIndex(int(b))
+    result.width += f.GetCharWidth(GID)
     if isWhiteSpace(b):
       inc(result.numspace)
       inc(result.numwords)
@@ -245,6 +246,9 @@ proc init*(ff: var FontManager, fontDirs: seq[string]) =
     collectTTF(fontDir, ff.TTFontList)
     collectTTC(fontDir, ff.TTCList)
 
+  #echo ff.TTFontList
+  #echo ff.TTCList
+    
   newSeq(ff.BaseFont, 14)
 
   for i in 0..high(BUILTIN_FONTS):

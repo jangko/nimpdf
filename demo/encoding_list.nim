@@ -4,7 +4,7 @@ const
   PGSIZE = getSizeFromName("A4")
   CELL_WIDTH  = 10.0
   CELL_HEIGHT = 10.0
-  LEFT = (PGSIZE.width/2) - ((CELL_WIDTH * 17)/2)
+  LEFT = (PGSIZE.width.toMM/2) - ((CELL_WIDTH * 17)/2)
   TOP = 20.0
   
   encodings = [
@@ -17,12 +17,12 @@ const
 proc draw_title(doc: Document, text:string) = 
   doc.setFont("Helvetica", {FS_BOLD}, 5)
   let tw = doc.getTextWidth(text)
-  let x = PGSIZE.width/2 - tw/2
+  let x = PGSIZE.width.toMM/2 - tw/2
   
   doc.setRGBFill(0,0,0)
   doc.drawText(x, 10.0, text)
   doc.setRGBStroke(0,0,0)
-  doc.drawRect(10,15,PGSIZE.width - 20, PGSIZE.height-25)
+  doc.drawRect(10,15,PGSIZE.width.toMM - 20, PGSIZE.height.toMM-25)
   doc.stroke()
 
 proc draw_grid(doc: Document) =

@@ -54,6 +54,8 @@ type
   PageUnitType* = enum
     PGU_PT, PGU_MM, PGU_CM, PGU_IN
 
+  SizeUnit* = distinct float64
+  
   PageUnit* = object
     unitType*: PageUnitType
     k*: float64
@@ -199,7 +201,7 @@ proc init*(c: var DashMode) =
   c.num_ptn = 0
   c.phase = 0
 
-proc setUnit*(this: var PageUnit, v: PageUnitType) : int {.discardable.} =
+proc setUnit*(this: var PageUnit, v: PageUnitType): int {.discardable.} =
   this.unitType = v
   case v
     of PGU_PT: this.k = 1.0
@@ -207,26 +209,31 @@ proc setUnit*(this: var PageUnit, v: PageUnitType) : int {.discardable.} =
     of PGU_CM: this.k = PGU_K_CM
     of PGU_IN: this.k = PGU_K_IN
 
-proc fromMM*(mm: float64) : float64 = PGU_K_MM * mm
-proc fromCM*(cm: float64) : float64 = PGU_K_CM * cm
-proc fromIN*(inch: float64) : float64 =  PGU_K_IN * inch
-proc fromPT*(pt: float64): float64 = pt
+proc fromMM*(mm: float64): SizeUnit = SizeUnit(PGU_K_MM * mm)
+proc fromCM*(cm: float64): SizeUnit = SizeUnit(PGU_K_CM * cm)
+proc fromIN*(inch: float64): SizeUnit =  SizeUnit(PGU_K_IN * inch)
+proc fromPT*(pt: float64): SizeUnit = SizeUnit(pt)
 
-proc fromUser*(this: PageUnit, val: float64) : float64 =  this.k * val
-proc toUser*(this: PageUnit, val: float64) : float64 = val / this.k
+proc fromUser*(this: PageUnit, val: float64): float64 =  this.k * val
+proc toUser*(this: PageUnit, val: float64): float64 = val / this.k
+
+proc toMM*(v: SizeUnit): float64 = float64(v) / PGU_K_MM
+proc toCM*(v: SizeUnit): float64 = float64(v) / PGU_K_CM
+proc toIN*(v: SizeUnit): float64 = float64(v) / PGU_K_IN
+proc toPT*(v: SizeUnit): float64 = float64(v)
 
 proc newGState*(): GState =
   let black = makeRGB(0,0,0)
   let cmyk_black = makeCMYK(0,0,0,0)
   new(result)
 
-  result.trans_matrix   = IDMATRIX
-  result.line_width   = fromMM(1.0)
+  result.trans_matrix = IDMATRIX
+  result.line_width   = fromMM(1.0).toPT
   result.line_cap     = BUTT_END
   result.line_join    = MITER_JOIN
-  result.miter_limit  = fromMM(10)
+  result.miter_limit  = fromMM(10).toPT
   result.dash.init()
-  result.flatness     = fromMM(1.0)
+  result.flatness     = fromMM(1.0).toPT
 
   result.char_space   = 0
   result.word_space   = 0
@@ -250,7 +257,7 @@ proc newGState*(): GState =
   result.image_fill   = nil
 
   result.font       = nil
-  result.font_size    = fromMM(10)
+  result.font_size    = fromMM(10).toPT
   result.writing_mode   = WMODE_HORIZONTAL
   result.prev       = nil
 
