@@ -51,7 +51,7 @@ type
 proc GenerateTag*(cc: string): TTag = 
   result = TTag(((ord(cc[0]) shl 24) or (ord(cc[1]) shl 16) or (ord(cc[2]) shl 8) or ord(cc[3])))
 
-proc hash*(c: TTag): THash =
+proc hash*(c: TTag): Hash =
   result = !$ (0 !& int(c))
 
 proc TagToString*(tag: TTag): string =
@@ -67,8 +67,8 @@ proc TagSortedComparator*(x,y: Header): int = cmp(int(x.mtag), int(y.mtag))
 
 proc OffsetSortedComparator*(x,y: Header): int = cmp(x.moffset, y.moffset)
 
-proc hash*(c: Header): THash =
-  var h: THash = 0
+proc hash*(c: Header): Hash =
+  var h: Hash = 0
   h = h !& int(c.mtag)
   h = h !& c.moffset
   h = h !& c.mlength
@@ -320,7 +320,7 @@ proc ReadUFWord*(fd: FontData, index: int): int =
   result = fd.ReadUShort(index)
 
 proc CopyTo*(fd: FontData, os: OutputStream): int =
-  result = fd.data.CopyTo(os, fd.BoundOffset(0), fd.Length())
+  result = fd.data.CopyToOS(fd.BoundOffset(0), fd.Length(), os)
   
 proc CopyTo*(fd: FontData, wfd: FontData): int = 
   result = fd.data.CopyTo(wfd.BoundOffset(0), wfd.data, fd.BoundOffset(0), fd.Length())

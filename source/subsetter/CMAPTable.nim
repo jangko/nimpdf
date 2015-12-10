@@ -4,7 +4,7 @@
 # (See accompanying file LICENSE.txt)
 #
 #-----------------------------------------
-import FontIOStreams, FontData, tables, unsigned
+import FontIOStreams, FontData, tables
 
 const
   kTableVersion = 0
@@ -63,13 +63,13 @@ type
   CMAPTable* = ref object of FontTable
     encodingcmap: CMAP
   
-proc Format(t: CMAP): int =
+proc Format*(t: CMAP): int =
   result = t.data.ReadUShort(kFormat)
 
-method Length(t: CMAP): int =
+method Length*(t: CMAP): int {.base.} =
   result = t.data.ReadUShort(kLength)
 
-method Version(t: CMAP): int =
+method Version*(t: CMAP): int {.base.} =
   result = t.data.ReadUShort(kVersion)
 
 method Length(t: CMAP12): int =
@@ -78,7 +78,7 @@ method Length(t: CMAP12): int =
 method Version(t: CMAP12): int =
   result = t.data.ReadULongAsInt(kVersion32)
   
-method GlyphIndex*(t: CMAP, charCode: int): int = 
+method GlyphIndex*(t: CMAP, charCode: int): int {.base.} = 
   discard
 
 method GlyphIndex*(t: CMAP0, charCode: int): int = 
@@ -119,28 +119,28 @@ proc GlyphIdArrayLength(t: CMAP4): int =
   let offset = kSegmentStart + segcount * DataSize.kUSHORT + Datasize.kUSHORT
   result = int((t.Length() - offset) div 2)
   
-#proc GlyphIndex1*(t: CMAP4, charCode: int): int = 
-#  let segCount = t.SegCount()
-#  if segCount == 0: return 0 #no glyph
-#
-#  var i = 0
-#  while i < segCount:
-#    if charCode <= t.EndCode(i): break
-#    inc(i)
-#  
-#  let startCode = t.StartCode(i)
-#  let idDelta = t.idDelta(i)
-#  let idRangeOffset = t.idRangeOffset(i)
-#  
-#  if startCode > charCode: return 0 #missing glyph
-#  if idRangeOffset == 0: return (charCode + idDelta) and 0xFFFF
-#  
-#  let idx = int(idRangeOffset div 2) + (charCode - startCode) - (segCount - i)
-#  if idx >= t.GlyphIdArrayLength(): return 0
-#  
-#  let GlyphId = t.GlyphIdArray(idx)
-#  if GlyphId == 0: return 0
-#  result = (GlyphId + idDelta) and 0xFFFF
+proc GlyphIndex1*(t: CMAP4, charCode: int): int = 
+  let segCount = t.SegCount()
+  if segCount == 0: return 0 #no glyph
+
+  var i = 0
+  while i < segCount:
+    if charCode <= t.EndCode(i): break
+    inc(i)
+  
+  let startCode = t.StartCode(i)
+  let idDelta = t.idDelta(i)
+  let idRangeOffset = t.idRangeOffset(i)
+  
+  if startCode > charCode: return 0 #missing glyph
+  if idRangeOffset == 0: return (charCode + idDelta) and 0xFFFF
+  
+  let idx = int(idRangeOffset div 2) + (charCode - startCode) - (segCount - i)
+  if idx >= t.GlyphIdArrayLength(): return 0
+  
+  let GlyphId = t.GlyphIdArray(idx)
+  if GlyphId == 0: return 0
+  result = (GlyphId + idDelta) and 0xFFFF
 
 method GlyphIndex*(t: CMAP4, charCode: int): int = 
   let segCount = t.SegCount()
@@ -176,19 +176,19 @@ proc SubHeaderKey(t: CMAP2, idx: int): int =
   result = t.data.ReadUShort(kSubHeaderKeyStart + Datasize.kUSHORT * idx) div 8
 
 proc FirstCode(t: CMAP2, idx: int): int =
-  assert (idx >=0 and idx <= t.numSubHeaders)
+  assert (idx >= 0 and idx <= t.numSubHeaders)
   result = t.data.ReadUShort(kSubHeaderStart + kSubHeaderSize * idx + kFirstCode)
 
 proc EntryCount(t: CMAP2, idx: int): int =
-  assert (idx >=0 and idx <= t.numSubHeaders)
+  assert (idx >= 0 and idx <= t.numSubHeaders)
   result = t.data.ReadUShort(kSubHeaderStart + kSubHeaderSize * idx + kEntryCount)
 
 proc IdDelta(t: CMAP2, idx: int): int =
-  assert (idx >=0 and idx <= t.numSubHeaders)
+  assert (idx >= 0 and idx <= t.numSubHeaders)
   result = t.data.ReadShort(kSubHeaderStart + kSubHeaderSize * idx + kIdDelta)
 
 proc IdRangeOffset(t: CMAP2, idx: int): int =
-  assert (idx >=0 and idx <= t.numSubHeaders)
+  assert (idx >= 0 and idx <= t.numSubHeaders)
   result = t.data.ReadUShort(kSubHeaderStart + kSubHeaderSize * idx + kIdRangeOffset)
   
 proc GlyphIdArrayLength(t: CMAP2): int =
@@ -397,12 +397,12 @@ proc makeRanges*(CH2GID: CH2GIDMAP): RANGES =
   for cid, gid in pairs(CH2GID):
     glidx = gid.newGID
     if (cid == (prevcid + 1) and glidx == (prevglidx + 1)):
-      ranger.mget(rangeid).add(glidx)
+      ranger[rangeid].add(glidx)
     else:
       # new range
       rangeid = cid
       ranger[rangeid] = @[]
-      ranger.mget(rangeid).add(glidx)
+      ranger[rangeid].add(glidx)
     prevcid = cid
     prevglidx = glidx
 

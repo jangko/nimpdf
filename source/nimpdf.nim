@@ -6,7 +6,7 @@
 #-----------------------------------------
 # the main module for nimPDF, import this one from your project
 
-import strutils, streams, sequtils, times, unsigned, math, basic2d, algorithm, tables
+import strutils, streams, sequtils, times, math, basic2d, algorithm, tables
 import image, utf8, "subsetter/font", arc, gstate, path, fontmanager, unicode
 import objects, resources, encryptdict, encrypt, os
 
@@ -44,9 +44,9 @@ const
     #others
     ,("Organizer J",70.0,127.0),("Compact", 108.0,171.0),("Organizer L",140.0,216.0),("Statement",140.0,216.0),("Half Letter",140.0,216.0)
     ,("Memo",140.0,216.0),("Jepps",140.0,216.0),("Executive",184.0,267.0),("Monarch",184.0,267.0),("Government-Letter",103.0,267.0)
-    ,("Foolscap",210.0,330.0),("Folio[9]",210.0,330.0),("Letter",216.0,279.0),("Organizer M",216.0,279.0),("Fanfold",216.0,304.0)
-    ,("German Std Fanfold",216.0,304.0),("Government-Legal",216.0,330.0),("Folio",216.0,330.0),("Legal",216.0,356.0),("Quarto",229.0,279.0)
-    ,("US Std Fanfold",279.0,377.0),("Ledger",279.0,432.0),("Tabloid",279.0,432.0),("Organizer K",279.0,432.0),("Bible",279.0,432.0)
+    ,("Foolscap",210.0,330.0),("Folio[9]",210.0,330.0),("Organizer M",216.0,279.0),("Fanfold",216.0,304.0)
+    ,("German Std Fanfold",216.0,304.0),("Government-Legal",216.0,330.0),("Folio",216.0,330.0),("Quarto",229.0,279.0)
+    ,("US Std Fanfold",279.0,377.0),("Organizer K",279.0,432.0),("Bible",279.0,432.0)
     ,("Super-B",330.0,483.0),("Post",394.0,489.0),("Crown",381.0,508.0),("Large Post",419.0,533.0),("Demy",445.0,572.0),("Medium",457.0,584.0)
     ,("Broadsheet",457.0,610.0),("Royal",508.0,635.0),("Elephant",584.0,711.0),("REAL Demy",572.0,889.0),("Quad Demy",889.0,1143.0)]
 
@@ -545,7 +545,7 @@ proc loadImage*(doc: Document, fileName: string): Image =
     if image != nil: return image
   result = nil
 
-proc getVersion(): string =
+proc getVersion*(): string =
   result = nimPDFVersion
 
 proc getVersion*(doc: Document): string =
@@ -681,7 +681,7 @@ proc setTextRenderingMode*(doc: Document, rm: TextRenderingMode) =
   if doc.gstate.rendering_mode != rm: doc.put($trm, " Tr")
   doc.gstate.rendering_mode = rm
 
-proc setTextMatrix*(doc: Document, m: TMatrix2d) =
+proc setTextMatrix*(doc: Document, m: Matrix2d) =
   doc.put(f2s(m.ax)," ", f2s(m.ay), " ", f2s(m.bx), " ", f2s(m.by), " ", f2s(m.tx)," ",f2s(m.ty)," Tm")
 
 proc showText*(doc: Document, text:string) =
@@ -715,7 +715,7 @@ proc setWordSpace*(doc: Document; val: float64) =
   doc.put(f2s(val)," Tw")
   doc.gstate.word_space = val
 
-proc setTransform*(doc: Document, m: TMatrix2d) =
+proc setTransform*(doc: Document, m: Matrix2d) =
   doc.put(f2s(m.ax)," ", f2s(m.ay), " ", f2s(m.bx), " ", f2s(m.by), " ", f2s(m.tx)," ",f2s(m.ty)," cm")
   doc.gstate.trans_matrix = doc.gstate.trans_matrix & m
 
@@ -748,7 +748,7 @@ proc stretch*(doc: Document, sx,sy,x,y:float64) =
   let yy = doc.vPoint(y)
   doc.setTransform(stretch(sx, sy, point2d(xx, yy)))
 
-proc shear(sx,sy,x,y:float64): TMatrix2d =
+proc shear(sx,sy,x,y:float64): Matrix2d =
   let
     m = move(-x,-y)
     s = matrix2d(1,sx,sy,1,0,0)
@@ -836,7 +836,7 @@ proc moveTo*(doc: Document, x: float64, y: float64) =
   doc.path_end_x = x
   doc.path_end_y = y
 
-proc moveTo*(doc: Document, p: TPoint2d) {.inline.} = doc.moveTo(p.x, p.y)
+proc moveTo*(doc: Document, p: Point2d) {.inline.} = doc.moveTo(p.x, p.y)
 
 proc lineTo*(doc: Document, x: float64, y: float64) =
   if doc.record_shape:
@@ -850,7 +850,7 @@ proc lineTo*(doc: Document, x: float64, y: float64) =
   doc.path_end_x = x
   doc.path_end_y = y
 
-proc lineTo*(doc: Document, p: TPoint2d) {.inline.} = doc.lineTo(p.x, p.y)
+proc lineTo*(doc: Document, p: Point2d) {.inline.} = doc.lineTo(p.x, p.y)
 
 proc bezierCurveTo*(doc: Document; cp1x, cp1y, cp2x, cp2y, x, y: float64) =
   if doc.record_shape:
@@ -869,7 +869,7 @@ proc bezierCurveTo*(doc: Document; cp1x, cp1y, cp2x, cp2y, x, y: float64) =
   doc.path_end_x = x
   doc.path_end_y = y
 
-proc bezierCurveTo*(doc: Document; cp1, cp2, p: TPoint2d) {.inline.}= doc.bezierCurveTo(cp1.x,cp1.y,cp2.x,cp2.y,p.x,p.y)
+proc bezierCurveTo*(doc: Document; cp1, cp2, p: Point2d) {.inline.}= doc.bezierCurveTo(cp1.x,cp1.y,cp2.x,cp2.y,p.x,p.y)
 
 proc curveTo1*(doc: Document; cpx, cpy, x, y: float64) =
   if doc.record_shape:
@@ -885,7 +885,7 @@ proc curveTo1*(doc: Document; cpx, cpy, x, y: float64) =
   doc.path_end_x = x
   doc.path_end_y = y
 
-proc curveTo1*(doc: Document; cp, p: TPoint2d) {.inline.}= doc.curveTo1(cp.x,cp.y,p.x,p.y)
+proc curveTo1*(doc: Document; cp, p: Point2d) {.inline.}= doc.curveTo1(cp.x,cp.y,p.x,p.y)
 
 proc curveTo2*(doc: Document; cpx, cpy, x, y: float64) =
   if doc.record_shape:
@@ -901,7 +901,7 @@ proc curveTo2*(doc: Document; cpx, cpy, x, y: float64) =
   doc.path_end_x = x
   doc.path_end_y = y
 
-proc curveTo2*(doc: Document; cp, p: TPoint2d) {.inline.}= doc.curveTo2(cp.x,cp.y,p.x,p.y)
+proc curveTo2*(doc: Document; cp, p: Point2d) {.inline.}= doc.curveTo2(cp.x,cp.y,p.x,p.y)
 
 proc closePath*(doc: Document) =
   if doc.record_shape:

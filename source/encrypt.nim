@@ -1,4 +1,4 @@
-import md5, unsigned, strutils, nimSHA2, nimAES, math
+import md5, strutils, nimSHA2, nimAES, math
 
 const
   PDF_ID_LEN            =  16
@@ -11,7 +11,7 @@ const
   PADDING_STRING = "\x28\xBF\x4E\x5E\x4E\x75\x8A\x41\x64\x00\x4E\x56\xFF\xFA\x01\x08" &
     "\x2E\x2E\x00\xB6\xD0\x68\x3E\x80\x2F\x0C\xA9\xFE\x64\x53\x69\x7A"
 
-  PDF_ENABLE_READ     = 0'u32
+  #PDF_ENABLE_READ     = 0'u32
   PDF_ENABLE_PRINT    = 4'u32
   PDF_ENABLE_EDIT_ALL = 8'u32
   PDF_ENABLE_COPY     = 16'u32
@@ -276,11 +276,6 @@ proc computeEncryptionKeyR5*(enc: pdfEncrypt) =
   let hash = $computeSHA256(r)
   let key  = hash.substr(0, enc.keyLen)
   for i in 0..enc.keyLen-1: enc.encryptionKey[i] = ord(key[i])
-
-proc toHex(input: string): string =
-  result = ""
-  for c in input:
-    result.add toHex(ord(c), 2)
 
 proc computeUE*(enc: pdfEncrypt) =
   # Algorithm 3.8 step 1

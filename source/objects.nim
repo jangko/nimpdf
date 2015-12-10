@@ -107,7 +107,7 @@ type
     prev: pdfXref
     trailer: dictObj
 
-method write*(obj: pdfObj, s: Stream, enc: pdfEncrypt) =
+method write*(obj: pdfObj, s: Stream, enc: pdfEncrypt) {.base.} =
   assert(false)
 
 proc nullObjNew*(): nullObj =
@@ -472,9 +472,9 @@ proc addFilterParam*(d: dictObj, filterParam: dictObj) =
     d.addElement("DecodeParms", paramArray)
   paramArray.add filterParam
 
-method beforeWrite(d: dictObj) = discard
-method onWrite(d: dictObj, s: Stream) = discard
-method afterWrite(d: dictObj) = discard
+method beforeWrite(d: dictObj) {.base.} = discard
+method onWrite(d: dictObj, s: Stream) {.base.} = discard
+method afterWrite(d: dictObj) {.base.} = discard
 
 proc writeToStream(src: string, dst: Stream, filter: set[filterMode], enc: pdfEncrypt) =
   # initialize input stream
@@ -572,7 +572,7 @@ proc getEntry(x: pdfXref, index: int): xrefEntry =
 
 proc numEntries*(x: pdfXref): int = x.entries.len
 
-proc getEntryObjectById(x: pdfXref, objID: int): xrefEntry =
+proc getEntryObjectById*(x: pdfXref, objID: int): xrefEntry =
   var tmp = x
   while tmp != nil:
     assert ((tmp.entries.len + tmp.start_offset) <= objID)

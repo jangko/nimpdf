@@ -118,7 +118,7 @@ type
       radCoord*: CoordRadial
 
   GState* = ref object
-    trans_matrix*: TMatrix2d
+    trans_matrix*: Matrix2d
     line_width*: float64
     line_cap*: LineCap
     line_join*: LineJoin

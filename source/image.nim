@@ -22,32 +22,10 @@ type
   Image* = ref object
     width*, height*, ID*: int
     data*, mask*: string
-#  TCompressFunc = proc(outdata: ptr ptr cuchar, outsize: ptr int, indata: ptr cuchar, insize: int, settings: ptr LodePNGCompressSettings)
-#  LodePNGCompressSettings {.final, pure.} = object
-#    #LZ77 related settings
-#    btype: int #the block type for LZ (0, 1, 2 or 3, see zlib standard). Should be 2 for proper compression.
-#    use_lz77: int #whether or not to use LZ77. Should be 1 for proper compression.
-#    windowsize: int #must be a power of two <= 32768. higher compresses more but is slower. Default value: 2048.
-#    minmatch: int #mininum lz77 length. 3 is normally best, 6 can be better for some PNGs. Default: 0
-#    nicematch: int #stop searching if >= this length found. Set to 258 for best compression. Default: 128
-#    lazymatching: int #use lazy matching: better compression but a bit slower. Default: true
-#    #use custom zlib encoder instead of built in one (default: null)
-#    custom_zlib: TCompressFunc
-#    #use custom deflate encoder instead of built in one (default: null)
-#    #if custom_zlib is used, custom_deflate is ignored since only the built in
-#    #zlib function will call custom_deflate
-#    custom_deflate: TCompressFunc
-#    custom_context: ptr cuchar #optional custom settings for custom functions
-
   ujImage = pointer
 
-#proc lodepng_decode32_file(data: ptr ptr cuchar, w: ptr int, h: ptr int, filename : cstring) : int {.header: "lodepng.h", importc: "lodepng_decode32_file".}
-#proc lodepng_zlib_compress(outdata: ptr ptr cuchar, outsize: ptr int, indata: pointer, insize: int, settings: ptr LodePNGCompressSettings): int {.header: "lodepng.h", importc: "lodepng_zlib_compress".}
-#proc lodepng_compress_settings_init(settings: ptr LodePNGCompressSettings) {.header: "lodepng.h", importc: "lodepng_compress_settings_init".}
-#proc c_free(data: ptr cuchar) {.header: "<stdlib.h>", importc: "free".}
-
 proc ujCreate() : ujImage {.header: "ujpeg.h", importc: "ujCreate".}
-proc ujDecode(img: ujImage, data: ptr cuchar, size: int) : ujImage {.header: "ujpeg.h", importc: "ujDecode".}
+#proc ujDecode(img: ujImage, data: ptr cuchar, size: int) : ujImage {.header: "ujpeg.h", importc: "ujDecode".}
 proc ujDecodeFile(img: ujImage, filename: cstring) : ujImage {.header: "ujpeg.h", importc: "ujDecodeFile".}
 proc ujGetWidth(img: ujImage) : int {.header: "ujpeg.h", importc: "ujGetWidth".}
 proc ujGetHeight(img: ujImage) : int {.header: "ujpeg.h", importc: "ujGetHeight".}

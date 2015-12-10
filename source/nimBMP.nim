@@ -23,8 +23,7 @@
 #
 #-------------------------------------
 
-import streams, endians, unsigned, tables, hashes
-import strutils
+import streams, endians, tables, hashes, strutils
 
 const
   #set to a default of 96 dpi
@@ -625,8 +624,8 @@ type
     pixels: string
     cvt: proc(p: var BMPRGBA, input: string, px: int)
 
-proc hash*(c: BMPRGBA): THash =
-  var h: THash = 0
+proc hash*(c: BMPRGBA): Hash =
+  var h: Hash = 0
   h = h !& ord(c.r)
   h = h !& ord(c.g)
   h = h !& ord(c.b)
@@ -777,19 +776,9 @@ proc writeLE[T: WORD|DWORD|LONG](s: Stream, val: T) =
 proc writeLE[T: BMPHeader|BMPInfo](s: Stream, val: T) =
   for field in fields(val): s.writeLE(field)
 
-proc writeWORD(s: Stream, val: int) =
-  let tmp = val.WORD
-  s.writeLE(tmp)
-  
-proc writeDWORD(s: Stream, val: int) =
-  let tmp = val.DWORD
-  s.writeLE(tmp)
-
 proc encodeBMP*(s: Stream, input: string, w, h, bitsPerPixel: int) =
   let bmp = autoChooseColor(input, w, h, bitsPerPixel)
   let scanlineSize = 4 * ((w * bmp.bitsPerPixel + 31) div 32)
-  let rowSize = (w * bmp.bitsPerPixel + 7) div 8
-  let paddingSize = scanlineSize - rowSize
   let dataSize = scanlineSize * h
   let offset = 54 + bmp.colors.len * 4
  

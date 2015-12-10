@@ -56,12 +56,12 @@ proc newAssertionError*(msg: string): ref AssertionError =
   result.msg = msg
 
 #----------------------------------------------------------
-method Available*(s: InputStream): int = discard
-method Close*(s: InputStream) = discard
-method Read*(s: InputStream): int = discard
-method Read*(s: InputStream, b: var ByteVector): int = discard
-method Read*(s: InputStream, b: var ByteVector, offset, length: int): int = discard
-method Skip*(s: InputStream, n: int64): int64 = discard
+method Available*(s: InputStream): int {.base.} = discard
+method Close*(s: InputStream) {.base.} = discard
+method Read*(s: InputStream): int {.base.} = discard
+method Read*(s: InputStream, b: var ByteVector): int {.base.} = discard
+method Read*(s: InputStream, b: var ByteVector, offset, length: int): int {.base.} = discard
+method Skip*(s: InputStream, n: int64): int64 {.base.} = discard
 
 #-------------------------------------------------------
 method Available*(s: FileInputStream): int = s.len - s.pos
@@ -98,7 +98,7 @@ method Read*(s: FileInputStream, b: var ByteVector, offset, length: int): int =
   
   if b.len < (offset + read_count):
     let grow = (offset + read_count) - b.len
-    b.add(repeatChar(grow, chr(0)))
+    b.add(repeat(chr(0), grow))
     
   let actual_read = readBuffer(s.f, addr(b[offset]), read_count)
   inc(s.pos, actual_read)
@@ -152,7 +152,7 @@ method Read*(s: MemoryInputStream, b: var ByteVector, offset, length: int): int 
   let read_count = min(s.len - s.pos, length)
   if b.len < offset + read_count:
     let grow = (offset + read_count) - b.len
-    b.add(repeatChar(grow, chr(0)))
+    b.add(repeat(chr(0), grow))
   
   copyMem(addr(b[offset]), addr(s.buf[s.pos]), read_count)
   
@@ -185,11 +185,11 @@ proc makeMemoryInputStream*(b: ByteVector, length: size_t): MemoryInputStream =
   result.buf = b
 
 #---------------------------------------------------------------
-method Close*(s:OutputStream) = discard
-method Flush*(s:OutputStream) = discard
-method Write*(s:OutputStream, b: ByteVector): int = discard
-method Write*(s:OutputStream, b: ByteVector, offset, length:int): int = discard
-method Write*(s:OutputStream, b: char): int = discard
+method Close*(s:OutputStream) {.base.} = discard
+method Flush*(s:OutputStream) {.base.} = discard
+method Write*(s:OutputStream, b: ByteVector): int {.base.} = discard
+method Write*(s:OutputStream, b: ByteVector, offset, length:int): int{.base.} = discard
+method Write*(s:OutputStream, b: char): int {.base.} = discard
 
 #---------------------------------------------------------------
 method Close*(s:MemoryOutputStream) = discard
@@ -306,39 +306,39 @@ method Read*(s: FontInputStream, b: var ByteVector, offset, length: int): int =
 method Read*(s: FontInputStream, b: var ByteVector): int =
   result = s.Read(b, 0, b.len)
 
-method Position*(s: FontInputStream): int64 =
+method Position*(s: FontInputStream): int64 {.base.} =
   result = s.position
   
-method ReadChar*(s: FontInputStream): int =
+method ReadChar*(s: FontInputStream): int {.base.} =
   result = s.Read()
 
-method ReadUShort*(s: FontInputStream): int =
+method ReadUShort*(s: FontInputStream): int {.base.} =
   result = 0xffff and (s.Read() shl 8 or s.Read())
   
-method ReadShort*(s: FontInputStream): int =
+method ReadShort*(s: FontInputStream): int {.base.} =
   result = ((s.Read() shl 8 or s.Read()) shl 16) shr 16
 
-method ReadUInt24*(s: FontInputStream): int =
+method ReadUInt24*(s: FontInputStream): int {.base.} =
   result = 0xffffff and (s.Read() shl 16 or s.Read() shl 8 or s.Read())
 
-method ReadLong*(s: FontInputStream): int =
+method ReadLong*(s: FontInputStream): int {.base.} =
   result = s.Read() shl 24 or s.Read() shl 16 or s.Read() shl 8 or s.Read()
   
-method ReadULong*(s: FontInputStream): int64 =
+method ReadULong*(s: FontInputStream): int64 {.base.} =
   let val = s.ReadLong()
   return 0xffffffff and int64(cast[uint32](val))
   
-method ReadULongAsInt*(s: FontInputStream): int =
+method ReadULongAsInt*(s: FontInputStream): int {.base.} =
   let ulong = s.ReadULong()
   if (ulong and 0x80000000) == 0x80000000:
     raise newArithErr("Long value too large to fit into an integer.")
   
   result = int(ulong) and not 0x80000000'i32
 
-method ReadFixed*(s: FontInputStream): int =
+method ReadFixed*(s: FontInputStream): int {.base.} =
   result = s.ReadLong()
 
-method ReadDateTimeAsLong*(s: FontInputStream): int64 =
+method ReadDateTimeAsLong*(s: FontInputStream): int64 {.base.} =
   result = s.ReadULong() shl 32 or s.ReadULong()
 
 method Skip*(s: FontInputStream, n: int64): int64 =
@@ -382,34 +382,34 @@ method Write*(s:FontOutputStream, b: char): int =
     result = s.stream.Write(b)
     inc(s.position)
   
-method WriteChar*(s:FontOutputStream, c: char) =
+method WriteChar*(s:FontOutputStream, c: char) {.base.} =
   discard s.Write(c)
   
-method WriteUShort*(s:FontOutputStream, us: int) =
+method WriteUShort*(s:FontOutputStream, us: int) {.base.} =
   discard s.Write(chr((us shr 8) and 0xff))
   discard s.Write(chr(us and 0xff))
   
-method WriteShort*(s:FontOutputStream, sh: int) =
+method WriteShort*(s:FontOutputStream, sh: int) {.base.} =
   s.WriteUShort(sh)
   
-method WriteUInt24*(s:FontOutputStream, ui: int) =
+method WriteUInt24*(s:FontOutputStream, ui: int) {.base.} =
   discard s.Write(chr((ui shr 16) and 0xff))
   discard s.Write(chr((ui shr 8) and 0xff))
   discard s.Write(chr(ui and 0xff))
   
-method WriteULong*(s:FontOutputStream, ul: int64) =
+method WriteULong*(s:FontOutputStream, ul: int64) {.base.} =
   discard s.Write(chr(int((ul shr 24) and 0xff)))
   discard s.Write(chr(int((ul shr 16) and 0xff)))
   discard s.Write(chr(int((ul shr 8) and 0xff)))
   discard s.Write(chr(int(ul and 0xff)))
   
-method WriteLong*(s:FontOutputStream, lg: int64) =
+method WriteLong*(s:FontOutputStream, lg: int64) {.base.} =
   s.WriteULong(lg)
 
-method WriteFixed*(s:FontOutputStream, lg: int) =
+method WriteFixed*(s:FontOutputStream, lg: int) {.base.} =
   s.WriteULong(lg)
 
-method WriteDateTime*(s:FontOutputStream, date: int64) =
+method WriteDateTime*(s:FontOutputStream, date: int64) {.base.} =
   s.WriteULong((date shr 32) and 0xffffffff)
   s.WriteULong(date and 0xffffffff)
   

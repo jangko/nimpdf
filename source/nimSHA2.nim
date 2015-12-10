@@ -23,7 +23,7 @@
 #
 #-------------------------------------
 
-import unsigned, endians, strutils
+import endians, strutils
 
 const
   SHA256_K = [

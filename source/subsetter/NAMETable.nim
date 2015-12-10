@@ -19,25 +19,25 @@ const
   kStringLength = 8
   kStringOffset = 10
 
-  NAME_COPYRIGHT      = 0
-  NAME_NAME         = 1
-  NAME_SUBFAMILY      = 2
-  NAME_SUBFAMILY_ID     = 3
-  NAME_FULL_NAME      = 4
-  NAME_VERSION      = 5
-  NAME_POSTSCRIPT_NAME  = 6
-  NAME_TRADEMARK      = 7
-  NAME_MANUFACTURER     = 8
-  NAME_DESIGNER       = 9
-  NAME_DESCRIPTION    = 10
-  NAME_VENDOR_URL     = 11
-  NAME_DESIGNER_URL     = 12
-  NAME_LICENSE      = 13
-  NAME_LICENSE_URL    = 14
-  NAME_PREFERRE_FAMILY  = 16
+  NAME_COPYRIGHT     = 0
+  NAME_NAME          = 1
+  NAME_SUBFAMILY     = 2
+  NAME_SUBFAMILY_ID  = 3
+  NAME_FULL_NAME          = 4
+  NAME_VERSION            = 5
+  NAME_POSTSCRIPT_NAME    = 6
+  NAME_TRADEMARK          = 7
+  NAME_MANUFACTURER       = 8
+  NAME_DESIGNER           = 9
+  NAME_DESCRIPTION        = 10
+  NAME_VENDOR_URL         = 11
+  NAME_DESIGNER_URL       = 12
+  NAME_LICENSE            = 13
+  NAME_LICENSE_URL        = 14
+  NAME_PREFERRE_FAMILY    = 16
   NAME_PREFERRE_SUBFAMILY = 17
   NAME_COMPAT_FULL_NAME   = 18
-  NAME_SAMPLE_TEXT    = 19
+  NAME_SAMPLE_TEXT        = 19
   
 type
   nameEntry = object

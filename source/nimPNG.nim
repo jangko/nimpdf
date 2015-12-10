@@ -25,10 +25,10 @@
 # part of nimPDF sister projects
 #-------------------------------------
 
-import unsigned, streams, endians, tables, hashes, math, nimz
+import streams, endians, tables, hashes, math, nimz
 
 const
-  NIM_PNG_VERSION = "0.1.1"
+  NIM_PNG_VERSION = "0.1.5"
 
 type
   PNGChunkType = distinct int32
@@ -63,14 +63,14 @@ type
     IM_NONE = 0, IM_INTERLACED = 1
 
   PNGChunk = ref object of RootObj
-    length: range[0..0x7FFFFFFF]
+    length: int #range[0..0x7FFFFFFF]
     chunkType: PNGChunkType
     crc: uint32
     data: string
     pos: int
 
   PNGHeader = ref object of PNGChunk
-    width, height: range[1..0x7FFFFFFF]
+    width, height: int #range[1..0x7FFFFFFF]
     bitDepth: int
     colorType: PNGcolorType
     compressionMethod: int
@@ -92,12 +92,12 @@ type
     idat: string
 
   PNGTime = ref object of PNGChunk
-    year: range[0..65535]
-    month: range[1..12]
-    day: range[1..31]
-    hour: range[0..23]
-    minute: range[0..59]
-    second: range[0..60] #to allow for leap seconds
+    year: int #range[0..65535]
+    month: int #range[1..12]
+    day: int #range[1..31]
+    hour: int #range[0..23]
+    minute: int #range[0..59]
+    second: int #range[0..60] #to allow for leap seconds
 
   PNGPhys = ref object of PNGChunk
     physX, physY: int
@@ -175,12 +175,12 @@ type
     physX*, physY*, physUnit*: int
 
     timeDefined*: bool
-    year*: range[0..65535]
-    month*: range[1..12]
-    day*: range[1..31]
-    hour*: range[0..23]
-    minute*: range[0..59]
-    second*: range[0..60] #to allow for leap seconds
+    year*: int #range[0..65535]
+    month*: int #range[1..12]
+    day*: int #range[1..31]
+    hour*: int #range[0..23]
+    minute*: int #range[0..59]
+    second*: int #range[0..60] #to allow for leap seconds
 
   PNG* = ref object
     settings*: PNGSettings
@@ -354,8 +354,8 @@ proc bitDepthAllowed(colorType: PNGcolorType, bitDepth: int): bool =
   of LCT_PALETTE: result = bitDepth in {1, 2, 4, 8}
   else: result = bitDepth in {8, 16}
 
-method validateChunk(chunk: PNGChunk, png: PNG): bool = true
-method parseChunk(chunk: PNGChunk, png: PNG): bool = true
+method validateChunk(chunk: PNGChunk, png: PNG): bool {.base.} = true
+method parseChunk(chunk: PNGChunk, png: PNG): bool {.base.} = true
 
 method validateChunk(header: PNGHeader, png: PNG): bool =
   if header.width < 1 or header.width > 0x7FFFFFFF:
@@ -1072,7 +1072,7 @@ proc getColorMode(png: PNG): PNGColorMode =
   result = cm
 
 proc getInfo*(png: PNG): PNGInfo =
-  new(result)
+  result = new(PNGInfo)
   result.mode = png.getColorMode()
   var header = PNGHeader(png.getChunk(IHDR))
   result.width = header.width
@@ -1351,8 +1351,8 @@ type
   pixelRGBA8     = proc(p: RGBA8, output: var cstring, px: int, mode: PNGColorMode, ct: ColorTree8)
   pixelRGBA16    = proc(p: RGBA16, output: var cstring, px: int, mode: PNGColorMode)
 
-proc hash*(c: RGBA8): THash =
-  var h: THash = 0
+proc hash*(c: RGBA8): Hash =
+  var h: Hash = 0
   h = h !& ord(c.r)
   h = h !& ord(c.g)
   h = h !& ord(c.b)
@@ -1866,12 +1866,12 @@ type
     physX*, physY*, physUnit*: int
 
     timeDefined*: bool
-    year*: range[0..65535]
-    month*: range[1..12]
-    day*: range[1..31]
-    hour*: range[0..23]
-    minute*: range[0..59]
-    second*: range[0..60] #to allow for leap seconds
+    year*: int   #range[0..65535]
+    month*: int  #range[1..12]
+    day*: int    #range[1..31]
+    hour*: int   #range[0..23]
+    minute*: int #range[0..59]
+    second*: int #range[0..60] #to allow for leap seconds
 
     unknown*: seq[PNGUnknown]
 
@@ -1886,7 +1886,7 @@ type
 
 proc makePNGEncoder*(): PNGEncoder =
   var s: PNGEncoder
-  new(s)
+  s = new(PNGEncoder)
   s.filterPaletteZero = true
   s.filterStrategy = LFS_MINSUM
   s.autoConvert = true
@@ -1923,7 +1923,7 @@ proc addIText*(state: PNGEncoder, keyword, langtag, transkey, text: string) =
   state.itextList.add itext
 
 proc make[T](chunkType: PNGChunkType, estimateSize: int): T =
-  new(result)
+  result = new(T)
   result.chunkType = chunkType
   if estimateSize > 0: result.data = newStringOfCap(estimateSize)
   else: result.data = ""
@@ -1965,7 +1965,7 @@ proc writeInt32BE(s: Stream, value: int) =
   bigEndian32(addr(tmp), addr(val))
   s.write(tmp)
 
-method writeChunk(chunk: PNGChunk, png: PNG): bool = true
+method writeChunk(chunk: PNGChunk, png: PNG): bool {.base.} = true
 
 method writeChunk(chunk: PNGHeader, png: PNG): bool =
   #estimate 13 bytes
@@ -1984,11 +1984,6 @@ method writeChunk(chunk: PNGPalette, png: PNG): bool =
     chunk.writeByte(int(px.r))
     chunk.writeByte(int(px.g))
     chunk.writeByte(int(px.b))
-  result = true
-
-method writeChunk(chunk: PNGData, png: PNG): bool =
-  var nz = nzDeflateInit(chunk.idat)
-  chunk.data = zlib_compress(nz)
   result = true
 
 method writeChunk(chunk: PNGTrans, png: PNG): bool =
@@ -2055,6 +2050,64 @@ method writeChunk(chunk: PNGText, png: PNG): bool =
   chunk.writeString chunk.text
   result = true
 
+method writeChunk(chunk: PNGGamma, png: PNG): bool =
+  #estimate 4 bytes
+  chunk.writeInt32(chunk.gamma)
+  result = true
+
+method writeChunk(chunk: PNGChroma, png: PNG): bool =
+  #estimate 8 * 4 bytes
+  chunk.writeInt32(chunk.whitePointX)
+  chunk.writeInt32(chunk.whitePointY)
+  chunk.writeInt32(chunk.redX)
+  chunk.writeInt32(chunk.redY)
+  chunk.writeInt32(chunk.greenX)
+  chunk.writeInt32(chunk.greenY)
+  chunk.writeInt32(chunk.blueX)
+  chunk.writeInt32(chunk.blueY)
+  result = true
+
+method writeChunk(chunk: PNGStandarRGB, png: PNG): bool =
+  #estimate 1 byte
+  chunk.writeByte(chunk.renderingIntent)
+  result = true
+
+method writeChunk(chunk: PNGSPalette, png: PNG): bool =
+  #estimate chunk.paletteName.len + 2
+  #if sampleDepth == 8: estimate += chunk.palette.len * 6
+  #else: estimate += chunk.palette.len * 10
+  chunk.writeString chunk.paletteName
+  chunk.writeByte 0 #null separator
+  if chunk.sampleDepth notin {8, 16}: raise PNGError("palette sample depth error")
+  chunk.writeByte chunk.sampleDepth
+
+  if chunk.sampleDepth == 8:
+    for p in chunk.palette:
+      chunk.writeByte(p.red)
+      chunk.writeByte(p.green)
+      chunk.writeByte(p.blue)
+      chunk.writeByte(p.alpha)
+      chunk.writeInt16(p.frequency)
+  else: # chunk.sampleDepth == 16:
+    for p in chunk.palette:
+      chunk.writeInt16(p.red)
+      chunk.writeInt16(p.green)
+      chunk.writeInt16(p.blue)
+      chunk.writeInt16(p.alpha)
+      chunk.writeInt16(p.frequency)
+  result = true
+  
+method writeChunk(chunk: PNGHist, png: PNG): bool =
+  #estimate chunk.histogram.len * 2
+  for c in chunk.histogram:
+    chunk.writeInt16 c
+  result = true
+
+method writeChunk(chunk: PNGData, png: PNG): bool =
+  var nz = nzDeflateInit(chunk.idat)
+  chunk.data = zlib_compress(nz)
+  result = true
+
 method writeChunk(chunk: PNGZtxt, png: PNG): bool =
   #estimate chunk.keyword.len + 2
   chunk.writeString chunk.keyword
@@ -2094,28 +2147,6 @@ method writeChunk(chunk: PNGItxt, png: PNG): bool =
   chunk.writeString text
   result = true
 
-method writeChunk(chunk: PNGGamma, png: PNG): bool =
-  #estimate 4 bytes
-  chunk.writeInt32(chunk.gamma)
-  result = true
-
-method writeChunk(chunk: PNGChroma, png: PNG): bool =
-  #estimate 8 * 4 bytes
-  chunk.writeInt32(chunk.whitePointX)
-  chunk.writeInt32(chunk.whitePointY)
-  chunk.writeInt32(chunk.redX)
-  chunk.writeInt32(chunk.redY)
-  chunk.writeInt32(chunk.greenX)
-  chunk.writeInt32(chunk.greenY)
-  chunk.writeInt32(chunk.blueX)
-  chunk.writeInt32(chunk.blueY)
-  result = true
-
-method writeChunk(chunk: PNGStandarRGB, png: PNG): bool =
-  #estimate 1 byte
-  chunk.writeByte(chunk.renderingIntent)
-  result = true
-
 method writeChunk(chunk: PNGICCProfile, png: PNG): bool =
   #estimate chunk.profileName.len + 2
   chunk.writeString chunk.profileName
@@ -2124,38 +2155,7 @@ method writeChunk(chunk: PNGICCProfile, png: PNG): bool =
   var nz = nzDeflateInit(chunk.profile)
   chunk.writeString zlib_compress(nz)
   result = true
-
-method writeChunk(chunk: PNGSPalette, png: PNG): bool =
-  #estimate chunk.paletteName.len + 2
-  #if sampleDepth == 8: estimate += chunk.palette.len * 6
-  #else: estimate += chunk.palette.len * 10
-  chunk.writeString chunk.paletteName
-  chunk.writeByte 0 #null separator
-  if chunk.sampleDepth notin {8, 16}: raise PNGError("palette sample depth error")
-  chunk.writeByte chunk.sampleDepth
-
-  if chunk.sampleDepth == 8:
-    for p in chunk.palette:
-      chunk.writeByte(p.red)
-      chunk.writeByte(p.green)
-      chunk.writeByte(p.blue)
-      chunk.writeByte(p.alpha)
-      chunk.writeInt16(p.frequency)
-  else: # chunk.sampleDepth == 16:
-    for p in chunk.palette:
-      chunk.writeInt16(p.red)
-      chunk.writeInt16(p.green)
-      chunk.writeInt16(p.blue)
-      chunk.writeInt16(p.alpha)
-      chunk.writeInt16(p.frequency)
-  result = true
-
-method writeChunk(chunk: PNGHist, png: PNG): bool =
-  #estimate chunk.histogram.len * 2
-  for c in chunk.histogram:
-    chunk.writeInt16 c
-  result = true
-
+  
 proc isGreyscaleType(mode: PNGColorMode): bool =
   result = mode.colorType in {LCT_GREY, LCT_GREY_ALPHA}
 
@@ -2937,27 +2937,22 @@ proc writeChunks*(png: PNG, s: Stream) =
     s.write chunk.data
     s.writeInt32BE cast[int](chunk.crc)
 
+proc savePNG*(fileName, input: string, colorType: PNGcolorType, bitDepth, w, h: int): bool =
+  try:
+    var png = encodePNG(input, colorType, bitDepth, w, h)
+    var s = newFileStream(fileName, fmWrite)
+    png.writeChunks s
+    s.close()
+    result = true
+  except:
+    debugEcho getCurrentExceptionMsg()
+    result = false
+    
 proc savePNG32*(fileName, input: string, w, h: int): bool =
-  try:
-    var png = encodePNG(input, LCT_RGBA, 8, w, h)
-    var s = newFileStream(fileName, fmWrite)
-    png.writeChunks s
-    s.close()
-    result = true
-  except:
-    debugEcho getCurrentExceptionMsg()
-    result = false
-
+  result = savePNG(fileName, input, LCT_RGBA, 8, w, h)
+  
 proc savePNG24*(fileName, input: string, w, h: int): bool =
-  try:
-    var png = encodePNG(input, LCT_RGB, 8, w, h)
-    var s = newFileStream(fileName, fmWrite)
-    png.writeChunks s
-    s.close()
-    result = true
-  except:
-    debugEcho getCurrentExceptionMsg()
-    result = false
+  result = savePNG(fileName, input, LCT_RGB, 8, w, h)
 
 proc getFilterTypesInterlaced(png: PNG): seq[string] =
   var header = PNGHeader(png.getChunk(IHDR))

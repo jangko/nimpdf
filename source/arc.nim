@@ -192,7 +192,7 @@ proc bezier_arc_endpoints(x0, y0, rrx, rry, angle: float64; large_arc_flag, swee
   #------------------------
   bezier_arc_centre(0.0, 0.0, rx, ry, start_angle, sweep_angle, approx)
 
-  var mtx: TMatrix2d = move(cx, cy)
+  var mtx: Matrix2d = move(cx, cy)
   mtx = mtx & rotate(angle)
 
   var i = 2

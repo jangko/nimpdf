@@ -23,7 +23,7 @@
 #
 #-------------------------------------
 
-import unsigned, strutils
+import strutils
 
 type
   AESTable = object

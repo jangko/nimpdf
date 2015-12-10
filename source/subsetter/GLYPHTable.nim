@@ -164,7 +164,7 @@ proc EncodeGLYPHTable*(t: GLYPHTable, GID2GID: var OrderedTable[int, int]): GLYP
   var olddata = t.GetTableData()
   
   var LocaList : seq[int] = @[]
-  let numGlyphs = Glyphs.len + moreGlyphs.len
+  #let numGlyphs = Glyphs.len + moreGlyphs.len
   
   var loc = 0
   for i in keys(GID2GID):

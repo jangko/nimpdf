@@ -155,7 +155,7 @@ proc addLine*(p: var Path, x1,y1,x2,y2:float64) =
   p.add(x2)
   p.add(y2)
 
-proc addLine*(p: var Path, p1,p2:TPoint2d) =
+proc addLine*(p: var Path, p1,p2:Point2d) =
   p.addLine(p1.x,p1.y,p2.x,p2.y)
 
 proc addRect*(p: var Path, x,y,w,h:float64) =
@@ -174,7 +174,7 @@ proc addQuadraticCurve*(p: var Path, ax,ay,bx,by,cx,cy:float64) =
   p.add(cx)
   p.add(cy)
 
-proc addQuadraticCurve*(p: var Path, a,b,c:TPoint2d) =
+proc addQuadraticCurve*(p: var Path, a,b,c:Point2d) =
   p.addQuadraticCurve(a.x,a.y,b.x,b.y,c.x,c.y)
 
 proc addCubicCurve*(p: var Path, ax,ay,bx,by,cx,cy,dx,dy:float64) =
@@ -188,7 +188,7 @@ proc addCubicCurve*(p: var Path, ax,ay,bx,by,cx,cy,dx,dy:float64) =
   p.add(dx)
   p.add(dy)
 
-proc addCubicCurve*(p: var Path, a,b,c,d:TPoint2d) =
+proc addCubicCurve*(p: var Path, a,b,c,d:Point2d) =
   p.addCubicCurve(a.x,a.y,b.x,b.y,c.x,c.y,d.x,d.y)
 
 proc isClosed*(p: Path) : bool =

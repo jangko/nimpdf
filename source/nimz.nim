@@ -1,4 +1,4 @@
-import streams, sequtils, algorithm, strutils, unsigned
+import streams, sequtils, algorithm, strutils
 
 const
   FIRST_LENGTH_CODE_INDEX = 257
@@ -84,39 +84,39 @@ type
   Coins = seq[Coin]
 
   #Possible inflate modes between inflate() calls
-  inflateMode = enum
-    HEAD,       # i: waiting for magic header
-    FLAGS,      # i: waiting for method and flags (gzip)
-    TIME,       # i: waiting for modification time (gzip)
-    OS,         # i: waiting for extra flags and operating system (gzip)
-    EXLEN,      # i: waiting for extra length (gzip)
-    EXTRA,      # i: waiting for extra bytes (gzip)
-    NAME,       # i: waiting for end of file name (gzip)
-    COMMENT,    # i: waiting for end of comment (gzip)
-    HCRC,       # i: waiting for header crc (gzip)
-    DICTID,     # i: waiting for dictionary check value
-    DICT,       # waiting for inflateSetDictionary() call
-    TYPE,         # i: waiting for type bits, including last-flag bit
-    TYPEDO,       # i: same, but skip check to exit inflate on new block
-    STORED,       # i: waiting for stored size (length and complement)
-    COPY_FIRST,   # i/o: same as COPY below, but only first time in
-    COPY,         # i/o: waiting for input or output to copy stored block
-    TABLE,        # i: waiting for dynamic block table lengths
-    LENLENS,      # i: waiting for code length code lengths
-    CODELENS,     # i: waiting for length/lit and distance code lengths
-    LEN_FIRST,       # i: same as LEN below, but only first time in
-    LEN,             # i: waiting for length/lit/eob code
-    LENEXT,          # i: waiting for length extra bits
-    DIST,            # i: waiting for distance code
-    DISTEXT,         # i: waiting for distance extra bits
-    MATCH,           # o: waiting for output space to copy string
-    LIT,             # o: waiting for output space to write literal
-    CHECK,      # i: waiting for 32-bit check value
-    LENGTH,     # i: waiting for 32-bit length (gzip)
-    DONE,       # finished check, done -- remain here until reset
-    BAD,        # got a data error -- remain here until reset
-    MEM,        # got an inflate() memory error -- remain here until reset
-    SYNC        # looking for synchronization bytes to restart inflate()
+  #inflateMode = enum
+  #  HEAD,       # i: waiting for magic header
+  #  FLAGS,      # i: waiting for method and flags (gzip)
+  #  TIME,       # i: waiting for modification time (gzip)
+  #  OS,         # i: waiting for extra flags and operating system (gzip)
+  #  EXLEN,      # i: waiting for extra length (gzip)
+  #  EXTRA,      # i: waiting for extra bytes (gzip)
+  #  NAME,       # i: waiting for end of file name (gzip)
+  #  COMMENT,    # i: waiting for end of comment (gzip)
+  #  HCRC,       # i: waiting for header crc (gzip)
+  #  DICTID,     # i: waiting for dictionary check value
+  #  DICT,       # waiting for inflateSetDictionary() call
+  #  TYPE,         # i: waiting for type bits, including last-flag bit
+  #  TYPEDO,       # i: same, but skip check to exit inflate on new block
+  #  STORED,       # i: waiting for stored size (length and complement)
+  #  COPY_FIRST,   # i/o: same as COPY below, but only first time in
+  #  COPY,         # i/o: waiting for input or output to copy stored block
+  #  TABLE,        # i: waiting for dynamic block table lengths
+  #  LENLENS,      # i: waiting for code length code lengths
+  #  CODELENS,     # i: waiting for length/lit and distance code lengths
+  #  LEN_FIRST,       # i: same as LEN below, but only first time in
+  #  LEN,             # i: waiting for length/lit/eob code
+  #  LENEXT,          # i: waiting for length extra bits
+  #  DIST,            # i: waiting for distance code
+  #  DISTEXT,         # i: waiting for distance extra bits
+  #  MATCH,           # o: waiting for output space to copy string
+  #  LIT,             # o: waiting for output space to write literal
+  #  CHECK,      # i: waiting for 32-bit check value
+  #  LENGTH,     # i: waiting for 32-bit length (gzip)
+  #  DONE,       # finished check, done -- remain here until reset
+  #  BAD,        # got a data error -- remain here until reset
+  #  MEM,        # got an inflate() memory error -- remain here until reset
+  #  SYNC        # looking for synchronization bytes to restart inflate()
 
   nzStreamMode = enum
     nzsDeflate, nzsInflate
@@ -251,7 +251,7 @@ proc init_coins(c: var Coins, num: int) =
 proc cleanup_coins(c: var Coins, num: int) =
   for i in 0..num-1: c[i].symbols = @[]
 
-proc coin_compare(a, b: Coin): int =
+proc cmpx(a, b: Coin): int =
   var wa = a.weight
   var wb = b.weight
   if wa > wb: result = 1
@@ -266,42 +266,30 @@ proc append_symbol_coins(coins: Coins, start: int, frequencies: openarray[int], 
       coins[j].symbols.add i
       inc j
 
-proc placePivot[T](a: var openArray[T], lo, hi: int, cmp: proc(x, y: T): int): int =
+proc placePivot[T](a: var openArray[T], lo, hi: int): int =
   var pivot = lo #set pivot
   var switch_i = lo + 1
+  let x = lo+1
 
-  for i in lo+1..hi: #run on array
-    if cmp(a[i], a[pivot]) <= 0:        #compare pivot and i
+  for i in x..hi: #run on array
+    if cmpx(a[i], a[pivot]) <= 0:        #compare pivot and i
       swap(a[i], a[switch_i])      #swap i and i to switch
       swap(a[pivot], a[switch_i])  #swap pivot and i to switch
       inc pivot    #set current location of pivot
       inc switch_i #set location for i to switch with pivot
   result = pivot #return pivot location
 
-proc quickSort[T](a: var openArray[T], lo, hi: int, cmp: proc(x, y: T): int) =
+proc quickSort[T](a: var openArray[T], lo, hi: int) =
   if lo >= hi: return #stop condition
   #set pivot location
-  var pivot = placePivot(a, lo, hi, cmp)
-  quickSort(a, lo, pivot-1, cmp) #sort bottom half
-  quickSort(a, pivot+1, hi, cmp) #sort top half
-
-proc quickSort[T](a: var openArray[T], cmp: proc(x, y: T): int, length = -1) =
+  var pivot = placePivot(a, lo, hi)
+  quickSort(a, lo, pivot-1) #sort bottom half
+  quickSort(a, pivot+1, hi) #sort top half
+        
+proc quickSort[T](a: var openArray[T], length = -1) =
   var lo = 0
   var hi = if length < 0: a.high else: length-1
-  quickSort(a, lo, hi, cmp)
-
-type
-  c_coin {.pure, final.} = object
-    w: float
-    idx: int
-
-proc c_coin_cmp(a, b: pointer): int {.exportc, procvar, cdecl.} =
-  var aa = cast[ptr c_coin](a)
-  var bb = cast[ptr c_coin](b)
-
-  if aa[].w > bb[].w: result = 1
-  elif aa[].w < bb[].w: result = -1
-  else: result = 0
+  quickSort(a, lo, hi)
 
 proc huffman_code_lengths(frequencies: openarray[int], numcodes, maxbitlen: int): seq[int] =
   var
@@ -311,7 +299,7 @@ proc huffman_code_lengths(frequencies: openarray[int], numcodes, maxbitlen: int)
     coins: Coins #the coins of the currently calculated row
     prev_row: Coins #the previous row of coins
     coinmem, numcoins: int
-
+  
   if numcodes == 0:
     raise newNZError("a tree of 0 symbols is not supposed to be made")
 
@@ -349,7 +337,7 @@ proc huffman_code_lengths(frequencies: openarray[int], numcodes, maxbitlen: int)
     append_symbol_coins(coins, 0, frequencies, numcodes, sum)
     numcoins = numpresent
 
-    coins.quickSort(coin_compare, numcoins)
+    coins.quickSort(numcoins)
 
     var numprev = 0
     for j in 1..maxbitlen: #each of the remaining rows
@@ -374,8 +362,8 @@ proc huffman_code_lengths(frequencies: openarray[int], numcodes, maxbitlen: int)
       if j < maxbitlen:
         append_symbol_coins(coins, numcoins, frequencies, numcodes, sum)
         inc(numcoins, numpresent)
-
-      coins.quickSort(coin_compare, numcoins)
+      
+      coins.quickSort(numcoins)
 
   #calculate the lengths of each symbol, as the amount of times a coin of each symbol is used
   var i = 0
@@ -1190,7 +1178,7 @@ proc nzDeflate(nz: nzStream) =
   var hash: NZHash
   var blocksize = 0
   var insize = nz.data.len
-
+  
   if   nz.btype  > 2: raise newNZError("invalid block type")
   elif nz.btype == 0:
     nz.deflateNoCompression
@@ -1198,53 +1186,42 @@ proc nzDeflate(nz: nzStream) =
   elif nz.btype == 1: blocksize = insize
   else: blocksize = max(insize div 8 + 8, 65535) #if(nz.btype == 2)
     #if blocksize < 65535: blocksize = 65535
-
+  
   var numdeflateblocks = (insize + blocksize - 1) div blocksize
   if numdeflateblocks == 0: numdeflateblocks = 1
   nimzHashInit(hash, nz.windowsize)
-
+  
   for i in 0..numdeflateblocks-1:
     let final = (i == numdeflateblocks - 1)
     let datapos = i * blocksize
     let dataend = min(datapos + blocksize, insize)
-
+  
     if nz.btype == 1: nz.deflateFixed(hash, datapos, dataend, final)
     elif nz.btype == 2: nz.deflateDynamic(hash, datapos, dataend, final)
 
-let lorem_ipsum = """
-Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec a neque ac ligula pellentesque dictum et ut tortor. Fusce non sem egestas, interdum justo ac, scelerisque augue. Proin vitae massa ut lectus porttitor mattis. Mauris blandit lectus massa, nec iaculis lacus auctor et. Proin aliquet molestie arcu, in finibus ligula mattis sed. Cras ut pulvinar ante, et elementum neque. Praesent tincidunt erat mi, non imperdiet nisi consectetur in. Nam luctus in ex non commodo. Fusce euismod consequat ipsum.
-Vestibulum augue leo, fermentum ut velit laoreet, convallis posuere dui. Suspendisse potenti. Nulla facilisi. Quisque feugiat maximus cursus. Nunc quam massa, interdum quis sodales non, aliquet ut ligula. Ut scelerisque commodo urna, sed cursus ante tincidunt et. Sed vitae quam sed nisl varius porta. Maecenas bibendum feugiat lacus nec tempor. Sed ullamcorper aliquam viverra. Suspendisse vitae sem porta sem finibus facilisis vitae vel nunc. Quisque at nibh eu neque sodales consectetur. Praesent porta maximus leo, ut auctor lorem aliquam non. Quisque fringilla felis id semper laoreet.
-Sed quis vehicula purus. Mauris consectetur sem dui, vitae tincidunt tellus semper at. Cum sociis natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Fusce sed augue eros. Aenean non sagittis ligula. Vestibulum sit amet tincidunt diam. Sed purus ex, egestas id bibendum eu, venenatis vitae eros. Integer lobortis turpis ut risus tempor, nec accumsan urna feugiat. Pellentesque sed nisl ligula. Aenean mattis nisl ut ante sodales efficitur. Suspendisse turpis est, hendrerit at porttitor eget, feugiat vel eros. Etiam sodales a metus at malesuada.
-Mauris id sagittis dolor, ac facilisis risus. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Donec varius sagittis consectetur. Donec quis ex consequat, tempor enim ac, facilisis nisl. Proin interdum nisl vel orci feugiat, sit amet ultricies erat lobortis. Aenean nec semper neque. Duis scelerisque est ac enim gravida semper at vitae sapien. Maecenas eleifend auctor lacinia. Donec venenatis mi eget nibh pretium facilisis. Ut sit amet mauris eu dui maximus imperdiet eu in felis. Ut eu nibh eget orci tincidunt vulputate et vitae eros. Morbi ullamcorper elementum quam, ac tincidunt dolor. Aliquam in pulvinar metus. Suspendisse laoreet neque nisi, quis mollis risus tempor in. Etiam accumsan leo nec metus tristique, a pellentesque nisl fringilla. Sed at est egestas, facilisis mi at, pulvinar magna.
-Mauris tristique, lectus iaculis mattis fringilla, libero ex molestie ex, et finibus neque ante non velit. Nunc mollis consequat ultricies. Nam maximus metus velit, molestie fermentum ex ornare fermentum. Nam quis maximus magna. Aliquam bibendum sem tellus, at commodo lacus rhoncus a. Pellentesque vitae magna vel orci ullamcorper accumsan. Fusce condimentum magna magna, ut pretium odio semper id. Duis vitae arcu ac turpis vehicula interdum et nec risus.
-"""
-
-proc nzInit(nz: nzStream) =
+proc nzInit(): nzStream =
   const DEFAULT_WINDOWSIZE = 2048
 
-  #compress with dynamic huffman tree
-  #(not in the mathematical sense, just not the predefined one)
-  nz.btype = 2
-  nz.use_lz77 = true
-  nz.windowsize = DEFAULT_WINDOWSIZE
-  nz.minmatch = 3
-  nz.nicematch = 128
-  nz.lazymatching = true
+  result = nzStream(
+    #compress with dynamic huffman tree
+    #(not in the mathematical sense, just not the predefined one)
+    btype : 2,
+    use_lz77: true,
+    windowsize: DEFAULT_WINDOWSIZE,
+    minmatch: 3,
+    nicematch: 128,
+    lazymatching: true)
 
 proc nzDeflateInit*(input: string): nzStream =
-  var nz : nzStream
-  new(nz)
-  nz.nzInit
+  var nz = nzInit()
   nz.data = input
   nz.bits.data = ""
   nz.bits.bitpointer = 0
-  nz.mode = nzsDeflate
+  nz.mode = nzsDeflate  
   result = nz
 
 proc nzInflateInit*(input: string): nzStream =
-  var nz : nzStream
-  new(nz)
-  nz.nzInit
+  var nz = nzInit()
   nz.data = ""
   nz.bits.data = input
   nz.bits.bitpointer = 0
@@ -1303,7 +1280,7 @@ proc zlib_compress*(nz: nzStream): string =
   nz.bits.data.add chr(CMFFLG div 256)
   nz.bits.data.add chr(CMFFLG mod 256)
   nz.bits.bitpointer += 16
-
+  
   nz.nzDeflate
   nz.bits.add32bitInt nzAdler32(1, nz.data)
   result = nz.nzGetResult

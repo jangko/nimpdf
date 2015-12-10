@@ -40,9 +40,9 @@ const
 
   #TTC Version 2.0 extensions.
   #Offsets from end of OffsetTable.
-  kulDsigTag = 0
-  kulDsigLength = 4
-  kulDsigOffset = 8
+  #kulDsigTag = 0
+  #kulDsigLength = 4
+  #kulDsigOffset = 8
 
   SFNTVERSION_MAJOR = 1
   SFNTVERSION_MINOR = 0
@@ -355,7 +355,6 @@ proc Subset*(font: FontDef, CH2GID: CH2GIDMAP, newTag: string): FontData =
   var head = HEADTable(font.GetTable(TAG.head))
   var hhea = HHEATable(font.GetTable(TAG.hhea))
   var hmtx = HMTXTable(font.GetTable(TAG.hmtx))
-  var loca = LOCATable(font.GetTable(TAG.loca))
   var name = NAMETable(font.GetTable(TAG.name))
   var post = POSTTable(font.GetTable(TAG.post))
   var os2  = OS2Table(font.GetTable(TAG.OS_2))

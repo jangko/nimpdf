@@ -21,12 +21,12 @@ type
   GrowableMemoryByteArray* = ref object of ByteArray
     b: ByteVector
     
-method internalPut(ba: ByteArray, index: int, b: char) = discard
-method internalPut(ba: ByteArray, index: int, b: string, offset, length: int): int = discard
-method internalGet(ba: ByteArray, index: int): int = discard
-method internalGet(ba: ByteArray, index: int, b: var string, offset, length: int): int = discard
-method Close*(ba: ByteArray) = discard
-method InternalBuffer*(ba: ByteArray): ByteVector = discard
+method internalPut(ba: ByteArray, index: int, b: char) {.base.} = discard
+method internalPut(ba: ByteArray, index: int, b: string, offset, length: int): int {.base.} = discard
+method internalGet(ba: ByteArray, index: int): int {.base.} = discard
+method internalGet(ba: ByteArray, index: int, b: var string, offset, length: int): int {.base.} = discard
+method Close*(ba: ByteArray) {.base.} = discard
+method InternalBuffer*(ba: ByteArray): ByteVector {.base.} = discard
 
 proc SetFilledLength*(ba: ByteArray, filledLength: int) =
   ba.filledLength = min(filledLength, ba.storageLength)
@@ -35,28 +35,28 @@ proc initByteArray*(ba: ByteArray, filledLength, storageLength: int) =
   ba.storageLength = storageLength
   ba.SetFilledLength(filledLength)
 
-method Get*(ba: ByteArray, index: int): int =
+method Get*(ba: ByteArray, index: int): int {.base.} =
   if (index < 0 or index >= ba.filledLength): return -1
   result = ba.internalGet(index) and 0xff
   
-method Get*(ba: ByteArray, index: int, b: var string, offset, length: int): int =
+method Get*(ba: ByteArray, index: int, b: var string, offset, length: int): int {.base.} =
   if index < 0 or index >= ba.filledLength: return -1
   let actualLength = min(length, ba.filledLength - index)
   result = ba.internalGet(index, b, offset, actualLength)
   
-method Get*(ba: ByteArray, index: int, b: var string): int =
+method Get*(ba: ByteArray, index: int, b: var string): int {.base.} =
   result = ba.Get(index, b, 0, b.len)
 
 proc Length*(ba: ByteArray): int = ba.filledLength
 proc Size*(ba: ByteArray): int = ba.storageLength
 
-method Put*(ba: ByteArray, index: int, b: char) = 
+method Put*(ba: ByteArray, index: int, b: char) {.base.}  = 
   if index < 0 or index >= ba.Size():
     raise newIndexError("Attempt to write outside the bounds of the data.")
   ba.internalPut(index, b)
   ba.filledLength = max(ba.filledLength, index + 1)
 
-method Put*(ba: ByteArray, index: int, b:string, offset, length: int): int =
+method Put*(ba: ByteArray, index: int, b:string, offset, length: int): int {.base.} =
   if index < 0 or index >= ba.Size():
     raise newIndexError("Attempt to write outside the bounds of the data.")
   let actualLength = min(length, ba.Size() - index)
@@ -65,10 +65,10 @@ method Put*(ba: ByteArray, index: int, b:string, offset, length: int): int =
   ba.filledLength = max(ba.filledLength, index + bytesWritten)
   result = bytesWritten
  
-method Put*(ba: ByteArray, index: int, b:string): int =
+method Put*(ba: ByteArray, index: int, b:string): int {.base.} =
   result = ba.Put(index, b, 0, b.len)
 
-method CopyTo*(ba: ByteArray, dstOffset: int, target: ByteArray, srcOffset, len: int): int =
+method CopyTo*(ba: ByteArray, dstOffset: int, target: ByteArray, srcOffset, len: int): int {.base.} =
   var b = newString(COPY_BUFFER_SIZE)
   var index = 0
   var length = len
@@ -85,13 +85,13 @@ method CopyTo*(ba: ByteArray, dstOffset: int, target: ByteArray, srcOffset, len:
     
   result = index
    
-method CopyTo*(ba, target: ByteArray, offset, length: int): int =
+method CopyTo*(ba, target: ByteArray, offset, length: int): int {.base.} =
   result = ba.CopyTo(0, target, offset, length) 
    
-method CopyTo*(ba, target: ByteArray): int =
+method CopyTo*(ba, target: ByteArray): int {.base.} =
   result = ba.CopyTo(target, 0, ba.Length())
 
-method CopyTo*(ba: ByteArray, os: OutputStream, offset, length: int) : int =
+method CopyToOS*(ba: ByteArray, offset, length: int, os: OutputStream): int {.base.} =
   var b = newString(COPY_BUFFER_SIZE)
   var index = 0
   var bufferLength = min(b.len, length)
@@ -105,10 +105,10 @@ method CopyTo*(ba: ByteArray, os: OutputStream, offset, length: int) : int =
     bufferLength = min(b.len, length - index)
   result = index
   
-method CopyTo*(ba: ByteArray, os: OutputStream): int =
-  result = ba.CopyTo(os, 0, ba.Length())
+method CopyToOS*(ba: ByteArray, os: OutputStream): int {.base.} =
+  result = ba.CopyToOS(0, ba.Length(), os)
 
-method CopyFrom*(ba: ByteArray, inp: InputStream, len: int) =
+method CopyFrom*(ba: ByteArray, inp: InputStream, len: int) {.base.} =
   var b = newString(COPY_BUFFER_SIZE)
   var index = 0
   var length = len
@@ -124,7 +124,7 @@ method CopyFrom*(ba: ByteArray, inp: InputStream, len: int) =
     length -= bytesRead
     bufferLength = min(b.len, length)
 
-method CopyFrom*(ba: ByteArray, inp: InputStream) =
+method CopyFrom*(ba: ByteArray, inp: InputStream) {.base.} =
   var b = newString(COPY_BUFFER_SIZE)
   var index = 0
   var bufferLength = b.len
@@ -138,7 +138,7 @@ method CopyFrom*(ba: ByteArray, inp: InputStream) =
     index += bytesRead
 
 #----------------------------------------------------------
-method CopyTo*(ba: MemoryByteArray, os: OutputStream, offset, length: int) : int =
+method CopyToOS*(ba: MemoryByteArray, offset, length: int, os: OutputStream) : int =
   result = os.Write(ba.b, offset, length)
 
 method internalPut(ba: MemoryByteArray, index: int, b: char) =
@@ -164,7 +164,7 @@ method InternalBuffer*(ba: MemoryByteArray): ByteVector = ba.b
 proc makeMemoryByteArray*(length: int): MemoryByteArray =
   new(result)
   initByteArray(result, 0, length)
-  result.b = repeatChar(length, chr(0))
+  result.b = repeat(chr(0), length)
 
 proc makeMemoryByteArray*(b: ByteVector, filled_length: int): MemoryByteArray =
   new(result)
@@ -173,19 +173,19 @@ proc makeMemoryByteArray*(b: ByteVector, filled_length: int): MemoryByteArray =
   
 #---------------------------------------------------------
 
-method CopyTo*(ba: GrowableMemoryByteArray, os: OutputStream, offset, length: int) : int =
+method CopyTo*(ba: GrowableMemoryByteArray, offset, length: int, os: OutputStream) : int {.base.} =
   os.Write(ba.b, offset, length)
 
 method internalPut(ba: GrowableMemoryByteArray, index: int, b: char) =
   if index >= ba.b.len:
     let grow = index - ba.b.len
-    ba.b.add(repeatChar(grow + 1, chr(0)))
+    ba.b.add(repeat(chr(0), grow + 1))
   ba.b[index] = b
 
 method internalPut(ba: GrowableMemoryByteArray, index: int, b: string, offset, length: int): int =
   if (index + length) >= ba.b.len:
     let grow = (index + length) - ba.b.len
-    ba.b.add(repeatChar(grow + 1, chr(0)))
+    ba.b.add(repeat(chr(0), grow + 1))
   
   for i in 0..length-1:
     ba.b[index + i] = b[offset + i]

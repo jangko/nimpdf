@@ -110,12 +110,12 @@ proc GetSubsetBuffer*(f: TTFont, subsetTag: string): string =
    let fd   = f.font.Subset(f.CH2GID, subsetTag)
    result = fd.GetInternalBuffer()
 
-method CanWriteVertical*(f: Font): bool = false
+method CanWriteVertical*(f: Font): bool {.base.} = false
 method CanWriteVertical*(f: Base14): bool = false
 method CanWriteVertical*(f: TTFont): bool =
   result = f.vmtx != nil
 
-method EscapeString*(f: Font, text: string): string =
+method EscapeString*(f: Font, text: string): string {.base.} =
   discard
 
 method EscapeString*(f: Base14, text: string): string =
@@ -139,7 +139,7 @@ method EscapeString*(f: TTFont, text: string): string =
     else:
       result.add("0000")
 
-method GetTextWidth*(f: Font, text: string): TextWidth =
+method GetTextWidth*(f: Font, text: string): TextWidth {.base.} =
   discard
 
 method GetTextWidth(f: TTFont, text: string): TextWidth =
@@ -160,7 +160,7 @@ method GetTextWidth(f: TTFont, text: string): TextWidth =
   if not isWhiteSpace(runeAt(text, lastChar)):
     inc(result.numwords)
 
-method GetTextHeight*(f: Font, text: string): TextWidth =
+method GetTextHeight*(f: Font, text: string): TextWidth {.base.} =
   discard
 
 method GetTextHeight*(f: Base14, text: string): TextWidth =

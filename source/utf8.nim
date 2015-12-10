@@ -8,7 +8,7 @@
 # then I realize actually nim also have unicode module
 # anyway, I keep it here 
 
-import unicode, strutils, streams, unsigned
+import unicode, strutils, streams
 
 const
   #Unicode constants
