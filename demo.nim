@@ -919,7 +919,7 @@ proc makeCanvas(doc: Document): Canvas =
 
   result = res
 
-proc Transform(cnv: Canvas, p: TPoint2d): TPoint2d =
+proc Transform(cnv: Canvas, p: Point2d): Point2d =
   result = point2d(cnv.XTransform.Val(p.x), cnv.YTransform.Val(p.y))
 
 proc drawBBox(doc:Document, p: Path): bound =

@@ -14,7 +14,7 @@ import basic2d, math, path
 type
   FuncType* = proc (v: float64): float64
 
-  TPoints* = seq[TPoint2d]
+  TPoints* = seq[Point2d]
 
   TFunction* = ref object of RootObj
     mF, mDF: FuncType
