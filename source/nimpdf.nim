@@ -10,16 +10,8 @@ import strutils, streams, sequtils, times, math, basic2d, algorithm, tables
 import image, utf8, "subsetter/font", arc, gstate, path, fontmanager, unicode
 import objects, resources, encryptdict, encrypt, os
 
-export fontmanager.Font, fontmanager.FontStyle, fontmanager.FontStyles
-export fontmanager.EncodingType, encryptdict.DocInfo, encrypt.encryptMode
-export gstate.PageUnitType, gstate.LineCap, gstate.LineJoin, gstate.DashMode
-export gstate.TextRenderingMode, gstate.RGBColor, gstate.CMYKColor, gstate.BlendMode
-export gstate.makeRGB, gstate.makeCMYK, gstate.makeLinearGradient, gstate.setUnit
-export gstate.fromMM, gstate.fromCM, gstate.fromIN, gstate.fromPT, gstate.fromUser
-export gstate.toUser, gstate.makeCoord, gstate.makeRadialGradient
-export gstate.toMM, gstate.toCM, gstate.toIN, gstate.toPT, gstate.SizeUnit
-export image.Image, image.loadImage, arc.drawArc, arc.arcTo, arc.degree_to_radian
-export path.Path, path.calculateBounds, path.bound
+export encryptdict.DocInfo, encrypt.encryptMode
+export path, gstate, image, arc, fontmanager
 
 const
   nimPDFVersion = "0.2.7"
@@ -67,13 +59,13 @@ type
   PageSize* = object
     width*, height*: SizeUnit
 
-  Rectangle= object
+  Rectangle* = object
     x,y,w,h: float64
 
   AnnotType = enum
     ANNOT_LINK, ANNOT_TEXT, ANNOT_WIDGET
 
-  Annot = ref object
+  Annot* = ref object
     rect: Rectangle
     case annotType: AnnotType
     of ANNOT_LINK:
@@ -83,7 +75,7 @@ type
     of ANNOT_WIDGET:
       annot: dictObj
 
-  Page = ref object
+  Page* = ref object
     content: string
     size: PageSize
     annots: seq[Annot]
@@ -103,7 +95,7 @@ type
   DestStyle* = enum
     DS_XYZ, DS_FIT, DS_FITH, DS_FITV, DS_FITR, DS_FITB, DS_FITBH, DS_FITBV
 
-  Destination = ref object
+  Destination* = ref object
     style: DestStyle
     a,b,c,d: float64
     page: Page
@@ -1269,7 +1261,7 @@ proc makeOutline*(ot: Outline, title: string, dest: Destination): Outline =
   result.title = title
   result.objID = 0
 
-proc initRect*(x,y,w,h: float64): Rectangle =
+proc initRect(x,y,w,h: float64): Rectangle =
   result.x = x
   result.y = y
   result.w = w
