@@ -8,8 +8,6 @@
 # using Bezier cubic curve
 # this module export arcTo, drawArc, and degree_to_radian
 
-import math, basic2d
-
 const 
   bezier_arc_angle_epsilon = 0.01
 
@@ -218,10 +216,7 @@ proc draw_arc_approximation[T](doc: T, a: arc_approx) =
       doc.bezierCurveTo(a.vertices[i], a.vertices[i+1], a.vertices[i+2], a.vertices[i+3], a.vertices[i+4], a.vertices[i+5])
       inc(i, 6)
 
-proc degree_to_radian*(x: float): float =
-  result = (x * math.PI) / 180.0
-  
-proc drawArc*[T](doc: T; cx, cy, rx, ry, start_angle, sweep_angle: float64) =
+proc drawArc*(doc: Document; cx, cy, rx, ry, start_angle, sweep_angle: float64) =
   var approx : arc_approx
   approx.num_vertices = 0
 
@@ -232,7 +227,7 @@ proc drawArc*[T](doc: T; cx, cy, rx, ry, start_angle, sweep_angle: float64) =
   doc.draw_arc_approximation(approx)
 
 
-proc arcTo*[T](doc: T; x, y, rx, ry, angle: float64; large_arc_flag, sweep_flag: bool) =
+proc arcTo*(doc: Document; x, y, rx, ry, angle: float64; large_arc_flag, sweep_flag: bool) =
   var approx : arc_approx
   approx.num_vertices = 0
 

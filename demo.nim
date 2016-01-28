@@ -1076,6 +1076,14 @@ proc draw_demo_12(doc: Document) =
   doc.setFont("Calligrapher", {FS_REGULAR}, 4)
   doc.drawText(15, 90, SAMP_TEXT)
 
+proc draw_demo_13(doc: Document) =
+  let size = getSizeFromName("A1")
+  doc.addPage(size, PGO_LANDSCAPE)
+  doc.setUnit(PGU_MM)
+  doc.setCoordinateMode(BOTTOM_UP)
+  let img = doc.loadImage("abc.png")
+  doc.drawImage(0,0, img)
+  
 proc createPDF(doc: Document) =
   draw_demo_1(doc)
   draw_demo_2(doc)
@@ -1089,6 +1097,7 @@ proc createPDF(doc: Document) =
   draw_demo_10(doc)
   draw_demo_11(doc)
   draw_demo_12(doc)
+  draw_demo_13(doc)
 
   doc.setInfo(DI_TITLE, "nimPDF Demo")
   doc.setInfo(DI_AUTHOR, "Andri Lim")

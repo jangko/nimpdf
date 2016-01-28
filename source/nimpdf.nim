@@ -7,14 +7,14 @@
 # the main module for nimPDF, import this one from your project
 
 import strutils, streams, sequtils, times, math, basic2d, algorithm, tables
-import image, utf8, "subsetter/font", arc, gstate, path, fontmanager, unicode
+import image, utf8, "subsetter/font", gstate, path, fontmanager, unicode
 import objects, resources, encryptdict, encrypt, os
 
 export encryptdict.DocInfo, encrypt.encryptMode
-export path, gstate, image, arc, fontmanager
+export path, gstate, image, fontmanager
 
 const
-  nimPDFVersion = "0.2.7"
+  nimPDFVersion = "0.2.8"
   defaultFont = "Times"
   PageNames = [
     #my paper size
@@ -695,6 +695,9 @@ proc moveToNextLine*(doc: Document) =
 proc endText*(doc: Document) =
   doc.put("ET")
 
+proc degree_to_radian*(x: float): float =
+  result = (x * math.PI) / 180.0
+  
 proc setCharSpace*(doc: Document; val: float64) =
   doc.put(f2s(val)," Tc")
   doc.gstate.char_space = val
@@ -1347,3 +1350,5 @@ proc textField*(doc: Document, rect: Rectangle, src: Page): Annot =
   result.rect = initRect(xx,yy,ww,hh)
   src.annots.add(result)
   acro.fields.add(result)
+  
+include arc

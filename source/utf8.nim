@@ -143,19 +143,19 @@ proc validate_next[T](se: T, it: var int): utf_error {.inline.} =
 
 proc unchecked_append(res: var string, cp: uint32) =
   if cp < 0x80:    # one octet
-    res.add(cast[char](cp))
+    res.add(chr(cp))
   elif cp < 0x800:  # two octets
-    res.add(cast[char]((cp shr 6)      or 0xc0))
-    res.add(cast[char]((cp and 0x3f)     or 0x80))
+    res.add(chr((cp shr 6)      or 0xc0))
+    res.add(chr((cp and 0x3f)     or 0x80))
   elif cp < 0x10000: # three octets
-    res.add(cast[char]((cp shr 12)       or 0xe0))
-    res.add(cast[char](((cp shr 6) and 0x3f) or 0x80))
-    res.add(cast[char]((cp and 0x3f)     or 0x80))
+    res.add(chr((cp shr 12)       or 0xe0))
+    res.add(chr(((cp shr 6) and 0x3f) or 0x80))
+    res.add(chr((cp and 0x3f)     or 0x80))
   else:        # four octets
-    res.add(cast[char]((cp shr 18)       or 0xf0))
-    res.add(cast[char](((cp shr 12) and 0x3f)or 0x80))
-    res.add(cast[char](((cp shr 6) and 0x3f) or 0x80))
-    res.add(cast[char]((cp and 0x3f)     or 0x80))
+    res.add(chr((cp shr 18)       or 0xf0))
+    res.add(chr(((cp shr 12) and 0x3f)or 0x80))
+    res.add(chr(((cp shr 6) and 0x3f) or 0x80))
+    res.add(chr((cp and 0x3f)     or 0x80))
   
 proc unchecked_next[T](se: T, it: var int): uint32 =
   var cp: uint32 = mask8(se[it])
