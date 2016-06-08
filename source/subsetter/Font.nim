@@ -441,16 +441,16 @@ proc makeDescriptor*(font: FontDef, CH2GID: CH2GIDMAP): FontDescriptor =
     familyClass = os2.SFamilyClass() shr 8
 
   let scaleFactor = 1000 / head.UnitsPerEm()
-  fd.BBox[0] = math.round(float(head.XMin()) * scaleFactor)
-  fd.BBox[1] = math.round(float(head.YMin()) * scaleFactor)
-  fd.BBox[2] = math.round(float(head.XMax()) * scaleFactor)
-  fd.BBox[3] = math.round(float(head.YMax()) * scaleFactor)
+  fd.BBox[0] = math.round(float(head.XMin()) * scaleFactor).int
+  fd.BBox[1] = math.round(float(head.YMin()) * scaleFactor).int
+  fd.BBox[2] = math.round(float(head.XMax()) * scaleFactor).int
+  fd.BBox[3] = math.round(float(head.YMax()) * scaleFactor).int
   
-  fd.missingWidth = math.round(float(hmtx.AdvanceWidth(0)) * scaleFactor)
+  fd.missingWidth = math.round(float(hmtx.AdvanceWidth(0)) * scaleFactor).int
   fd.stemV = 50 + int(math.pow(float(usWeightClass) / 65.0, 2))
   
-  fd.Ascent = math.round(float(Ascent) * scaleFactor)
-  fd.Descent = math.round(float(Descent) * scaleFactor)
+  fd.Ascent = math.round(float(Ascent) * scaleFactor).int
+  fd.Descent = math.round(float(Descent) * scaleFactor).int
     
   let isSerif  = familyClass in {1,2,3,4,5,7}
   let isScript = familyClass == 10

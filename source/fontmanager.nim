@@ -69,10 +69,10 @@ type
     TTCList: StringTableRef
 
 proc GetCharWidth*(f: TTFont, gid: int): int =
-  result = math.round(float(f.hmtx.AdvanceWidth(gid)) * f.scaleFactor)
+  result = math.round(float(f.hmtx.AdvanceWidth(gid)) * f.scaleFactor).int
 
 proc GetCharHeight*(f: TTFont, gid: int): int =
-  result = math.round(float(f.vmtx.AdvanceHeight(gid)) * f.scaleFactor)
+  result = math.round(float(f.vmtx.AdvanceHeight(gid)) * f.scaleFactor).int
 
 proc GenerateWidths*(f: TTFont): string =
   f.CH2GID.sort(proc(x,y: tuple[key: int, val: TONGID]):int = cmp(x.val.newGID, y.val.newGID) )

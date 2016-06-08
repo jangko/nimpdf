@@ -14,7 +14,7 @@ export encryptdict.DocInfo, encrypt.encryptMode
 export path, gstate, image, fontmanager
 
 const
-  nimPDFVersion = "0.2.8"
+  nimPDFVersion = "0.2.9"
   defaultFont = "Times"
   PageNames = [
     #my paper size
@@ -921,7 +921,7 @@ proc roundRect*(doc: Document; x, y, w, h: float64; r:float64 = 0.0) =
 
 proc drawEllipse*(doc: Document; x, y, r1, r2 : float64) =
   # based on http://stackoverflow.com/questions/2172798/how-to-draw-an-oval-in-html5-canvas/2173084#2173084
-  let KAPPA = 4.0 * ((math.sqrt(2) - 1.0) / 3.0)
+  let KAPPA = 4.0 * ((math.sqrt(2.0) - 1.0) / 3.0)
   let xx = x - r1
   let yy = y - r2
   let ox = r1 * KAPPA

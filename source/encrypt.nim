@@ -1,4 +1,4 @@
-import md5, strutils, nimSHA2, nimAES, math
+import md5, strutils, nimSHA2, nimAES, math, random
 
 const
   PDF_ID_LEN            =  16
@@ -101,9 +101,9 @@ proc createRandom16(input: string): string =
   ctx.initSHA()
   ctx.update(input)
   let digest = ctx.final()
-  math.randomize()
+  random.randomize()
   result = newString(16)
-  let r = math.random(255)
+  let r = random.random(255)
   for i in 0..15:
     result[i] = chr(ord(digest[i]) xor ord(digest[i+15]))
     result[i] = chr(r xor ord(result[i]))
