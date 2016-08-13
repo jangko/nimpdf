@@ -71,7 +71,7 @@ proc computeTable*(): AESTable =
   let (pow, log) = computePowLog()
   result.RCON = computeRoundConstant()
 
-  template srl(x, y: expr, s: stmt): stmt =
+  template srl(x, y: typed, s: untyped): untyped =
     y = ((y shl 1) or (y shr 7)) and 0xFF
     s
 
@@ -232,7 +232,7 @@ proc setDecodeKey*(ctx: var AESContext, key: string): bool =
   ctx.buf[RK+3] = cty.buf[SK+3]
   result = true
 
-template AES_FROUND(X0,X1,X2,X3,Y0,Y1,Y2,Y3: expr): stmt =
+template AES_FROUND(X0,X1,X2,X3,Y0,Y1,Y2,Y3: typed): untyped =
   X0 = ctx.buf[RK] xor SBOX.FT0[int(Y0 and 0xFF)] xor
     SBOX.FT1[int((Y1 shr 8) and 0xFF)] xor
     SBOX.FT2[int((Y2 shr 16) and 0xFF)] xor
@@ -257,7 +257,7 @@ template AES_FROUND(X0,X1,X2,X3,Y0,Y1,Y2,Y3: expr): stmt =
     SBOX.FT3[int((Y2 shr 24) and 0xFF)]
   inc RK
 
-template AES_RROUND(X0,X1,X2,X3,Y0,Y1,Y2,Y3: expr): stmt =
+template AES_RROUND(X0,X1,X2,X3,Y0,Y1,Y2,Y3: typed): untyped =
   X0 = ctx.buf[RK] xor SBOX.RT0[int(Y0 and 0xFF)] xor
     SBOX.RT1[int((Y3 shr 8) and 0xFF)] xor
     SBOX.RT2[int((Y2 shr 16) and 0xFF)] xor

@@ -197,7 +197,7 @@ proc collectTTF*(dir:string, t: StringTableRef) =
     let path = splitFile(fileName)
     if path.ext.len() == 0: continue
 
-    let ext = toLower(path.ext)
+    let ext = toLowerAscii(path.ext)
     if ext != ".ttf": continue
 
     if parseTTF(fileName, key):
@@ -210,7 +210,7 @@ proc collectTTC*(dir:string, t: StringTableRef) =
     let path = splitFile(fileName)
     if path.ext.len() == 0: continue
 
-    let ext = toLower(path.ext)
+    let ext = toLowerAscii(path.ext)
     if ext != ".ttc": continue
     parseTTC(fileName, t)
 

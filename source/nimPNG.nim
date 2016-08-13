@@ -1,6 +1,6 @@
 # Portable Network Graphics Encoder and Decoder written in Nim
 #
-# Copyright (c) 2015 Andri Lim
+# Copyright (c) 2015-2016 Andri Lim
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -26,6 +26,8 @@
 #-------------------------------------
 
 import streams, endians, tables, hashes, math, nimz
+
+import private.buffer
 
 const
   NIM_PNG_VERSION = "0.1.5"
@@ -192,6 +194,8 @@ type
     height*: int
     data*: string
 
+  DataBuf = Buffer[string]
+
 proc makePNGDecoder*(): PNGDecoder =
   var s: PNGDecoder
   new(s)
@@ -207,7 +211,7 @@ proc signatureMaker(): string {. compiletime .} =
   for c in signatureBytes: result.add chr(c)
 
 proc makeChunkType*(val: string): PNGChunkType =
-  assert (val.len == 4)
+  assert(val.len == 4)
   result = PNGChunkType((ord(val[0]) shl 24) or (ord(val[1]) shl 16) or (ord(val[2]) shl 8) or ord(val[3]))
 
 proc `$`*(tag: PNGChunkType): string =
@@ -326,9 +330,22 @@ proc readInt16(s: PNGChunk): int =
   result = result + ord(s.data[s.pos + 1])
   inc(s.pos, 2)
 
+when defined(js):
+  {.emit: """
+  var gEndianConverterFrom = new Uint32Array(1);
+  var gEndianConverter = new DataView(gEndianConverterFrom.buffer);
+  """.}
+  proc bigEndian32(dst, src: ptr int32) =
+    {.emit: """
+    gEndianConverterFrom[0] = `src`[`src`_Idx];
+    `dst`[`dst`_Idx] = gEndianConverter.getInt32(0);
+    """.}
+
 proc readInt32BE(s: Stream): int =
   var val = s.readInt32()
-  bigEndian32(addr(result), addr(val))
+  var tmp : int32
+  bigEndian32(addr(tmp), addr(val))
+  result = tmp
 
 proc readByte(s: PNGChunk): int =
   if s.pos + 1 > s.data.len: raise PNGError("index out of bound 1")
@@ -807,11 +824,11 @@ proc paethPredictor(a, b, c: int): int =
   elif pb < pa: return b
   result = a
 
-proc readBitFromReversedStream(bitptr: var int, bitstream: cstring): int =
+proc readBitFromReversedStream(bitptr: var int, bitstream: DataBuf): int =
   result = ((ord(bitstream[bitptr shr 3]) shr (7 - (bitptr and 0x7))) and 1)
   inc bitptr
 
-proc readBitsFromReversedStream(bitptr: var int, bitstream: cstring, nbits: int): int =
+proc readBitsFromReversedStream(bitptr: var int, bitstream: DataBuf, nbits: int): int =
   result = 0
   var i = nbits - 1
   while i > -1:
@@ -824,21 +841,21 @@ proc `&=`(a: var char, b: char) =
 proc `|=`(a: var char, b: char) =
   a = chr(ord(a) or ord(b))
 
-proc setBitOfReversedStream0(bitptr: var int, bitstream: var cstring, bit: int) =
+proc setBitOfReversedStream0(bitptr: var int, bitstream: var DataBuf, bit: int) =
   # the current bit in bitstream must be 0 for this to work
   if bit != 0:
     # earlier bit of huffman code is in a lesser significant bit of an earlier byte
     bitstream[bitptr shr 3] |= cast[char](bit shl (7 - (bitptr and 0x7)))
   inc bitptr
 
-proc setBitOfReversedStream(bitptr: var int, bitstream: var cstring, bit: int) =
+proc setBitOfReversedStream(bitptr: var int, bitstream: var DataBuf, bit: int) =
   #the current bit in bitstream may be 0 or 1 for this to work
   if bit == 0: bitstream[bitptr shr 3] &= cast[char](not (1 shl (7 - (bitptr and 0x7))))
   else: bitstream[bitptr shr 3] |= cast[char](1 shl (7 - (bitptr and 0x7)))
   inc bitptr
 
 # index: bitgroup index, bits: bitgroup size(1, 2 or 4), in: bitgroup value, out: octet array to add bits to
-proc addColorBits(output: var cstring, index, bits, input: int) =
+proc addColorBits(output: var DataBuf, index, bits, input: int) =
   var m = 1
   if bits == 1: m = 7
   elif bits == 2: m = 3
@@ -851,7 +868,7 @@ proc addColorBits(output: var cstring, index, bits, input: int) =
   if p == 0: output[idx] = chr(val)
   else: output[idx] = chr(ord(output[idx]) or val)
 
-proc unfilterScanLine(recon: var cstring, scanLine, precon: cstring, byteWidth, len: int, filterType: PNGFilter0) =
+proc unfilterScanLine(recon: var DataBuf, scanLine, precon: DataBuf, byteWidth, len: int, filterType: PNGFilter0) =
   # For PNG filter method 0
   # unfilter a PNG image scanLine by scanLine. when the pixels are smaller than 1 byte,
   # the filter works byte per byte (byteWidth = 1)
@@ -866,12 +883,12 @@ proc unfilterScanLine(recon: var cstring, scanLine, precon: cstring, byteWidth, 
     for i in 0..byteWidth-1: recon[i] = scanLine[i]
     for i in byteWidth..len-1: recon[i] = chr((ord(scanLine[i]) + ord(recon[i - byteWidth])) mod 256)
   of FLT_UP:
-    if precon != nil:
+    if not precon.isNil:
       for i in 0..len-1: recon[i] = chr((ord(scanLine[i]) + ord(precon[i])) mod 256)
     else:
       for i in 0..len-1: recon[i] = scanLine[i]
   of FLT_AVERAGE:
-    if precon != nil:
+    if not precon.isNil:
       for i in 0..byteWidth-1:
         recon[i] = chr((ord(scanLine[i]) + ord(precon[i]) div 2) mod 256)
       for i in byteWidth..len-1:
@@ -881,7 +898,7 @@ proc unfilterScanLine(recon: var cstring, scanLine, precon: cstring, byteWidth, 
       for i in byteWidth..len-1:
         recon[i] = chr((ord(scanLine[i]) + ord(recon[i - byteWidth]) div 2) mod 256)
   of FLT_PAETH:
-    if precon != nil:
+    if not precon.isNil:
       for i in 0..byteWidth-1:
         recon[i] = chr((ord(scanLine[i]) + ord(precon[i])) mod 256) #paethPredictor(0, precon[i], 0) is always precon[i]
       for i in byteWidth..len-1:
@@ -892,15 +909,14 @@ proc unfilterScanLine(recon: var cstring, scanLine, precon: cstring, byteWidth, 
         # paethPredictor(recon[i - byteWidth], 0, 0) is always recon[i - byteWidth]
         recon[i] = chr((ord(scanLine[i]) + ord(recon[i - byteWidth])) mod 256)
 
-proc unfilter(output: var cstring, input: cstring, w, h, bpp: int) =
+proc unfilter(output: var DataBuf, input: DataBuf, w, h, bpp: int) =
   # For PNG filter method 0
   # this function unfilters a single image (e.g. without interlacing this is called once, with Adam7 seven times)
   # output must have enough bytes allocated already, input must have the scanLines + 1 filtertype byte per scanLine
   # w and h are image dimensions or dimensions of reduced image, bpp is bits per pixel
   # input and output are allowed to be the same memory address (but aren't the same size since in has the extra filter bytes)
 
-  var prevLine = cstring(nil)
-  var inp = input
+  var prevLine : DataBuf
 
   # byteWidth is used for filtering, is 1 when bpp < 8, number of bytes per pixel otherwise
   let byteWidth = (bpp + 7) div 8
@@ -910,12 +926,12 @@ proc unfilter(output: var cstring, input: cstring, w, h, bpp: int) =
     let outIndex = lineBytes * y
     let inIndex = (1 + lineBytes) * y # the extra filterbyte added to each row
     let filterType = PNGFilter0(input[inindex])
-    let scanLine: cstring = addr(inp[inIndex + 1])
-    var outp: cstring = addr(output[outIndex])
+    let scanLine = input.subbuffer(inIndex + 1)
+    var outp = output.subbuffer(outIndex)
     unfilterScanLine(outp, scanLine, prevLine, byteWidth, lineBytes, filterType)
-    prevLine = addr(output[outIndex])
+    prevLine = output.subbuffer(outIndex)
 
-proc removePaddingBits(output: var cstring, input: cstring, olinebits, ilinebits, h: int) =
+proc removePaddingBits(output: var DataBuf, input: DataBuf, olinebits, ilinebits, h: int) =
   # After filtering there are still padding bits if scanLines have non multiple of 8 bit amounts. They need
   # to be removed (except at last scanLine of (Adam7-reduced) image) before working with pure image buffers
   # for the Adam7 code, the color convert code and the output to the user.
@@ -981,7 +997,7 @@ proc Adam7PassValues(pass: var PNGPass, w, h, bpp: int) =
 # (because that's likely a little bit faster)
 # NOTE: comments about padding bits are only relevant if bpp < 8
 
-proc Adam7Deinterlace(output: var cstring, input: cstring, w, h, bpp: int) =
+proc Adam7Deinterlace(output: var DataBuf, input: DataBuf, w, h, bpp: int) =
   var pass: PNGPass
   Adam7PassValues(pass, w, h, bpp)
 
@@ -1023,9 +1039,9 @@ proc postProcessscanLines(png: PNG) =
   let bitsPerPaddedLine = ((w * bpp + 7) div 8) * 8
   var idat = PNGData(png.getChunk(IDAT))
   png.pixels = newString(idatRawSize(header.width, header.height, header))
-  var input = cstring(idat.idat)
-  var output = cstring(png.pixels)
-  zeroMem(output, png.pixels.len)
+  var input = initBuffer(idat.idat)
+  var output = initBuffer(png.pixels)
+  zeroMem(output)
 
   if header.interlaceMethod == IM_NONE:
     if(bpp < 8) and (bitsPerLine != bitsPerPaddedLine):
@@ -1038,8 +1054,8 @@ proc postProcessscanLines(png: PNG) =
     Adam7PassValues(pass, w, h, bpp)
 
     for i in 0..6:
-      var outp: cstring = addr(input[pass.paddedStart[i]])
-      var inp: cstring = addr(input[pass.filterStart[i]])
+      var outp = input.subbuffer(pass.paddedStart[i])
+      var inp = input.subbuffer(pass.filterStart[i])
       unfilter(outp, inp, pass.w[i], pass.h[i], bpp)
 
       # TODO: possible efficiency improvement:
@@ -1048,8 +1064,8 @@ proc postProcessscanLines(png: PNG) =
       if bpp < 8:
         # remove padding bits in scanLines; after this there still may be padding
         # bits between the different reduced images: each reduced image still starts nicely at a byte
-        outp = addr(input[pass.start[i]])
-        inp = addr(input[pass.paddedStart[i]])
+        outp = input.subbuffer(pass.start[i])
+        inp = input.subbuffer(pass.paddedStart[i])
         removePaddingBits(outp, inp, pass.w[i] * bpp, ((pass.w[i] * bpp + 7) div 8) * 8, pass.h[i])
 
     Adam7Deinterlace(output, input, w, h, bpp)
@@ -1108,18 +1124,18 @@ proc getChunkNames*(png: PNG): string =
   result = ""
   var i = 0
   for c in png.chunks:
-    result.add ($c.chunkType)
+    result.add($c.chunkType)
     if i < png.chunks.high: result.add ' '
     inc i
 
-proc RGBFromGrey8(output: var cstring, input: cstring, numPixels: int, mode: PNGColorMode) =
+proc RGBFromGrey8(output: var DataBuf, input: DataBuf, numPixels: int, mode: PNGColorMode) =
   for i in 0..numPixels-1:
     let x = i * 3
     output[x]   = input[i]
     output[x+1] = input[i]
     output[x+2] = input[i]
 
-proc RGBFromGrey16(output: var cstring, input: cstring, numPixels: int, mode: PNGColorMode) =
+proc RGBFromGrey16(output: var DataBuf, input: DataBuf, numPixels: int, mode: PNGColorMode) =
   for i in 0..numPixels-1:
     let x = i * 3
     let y = i * 2
@@ -1127,7 +1143,7 @@ proc RGBFromGrey16(output: var cstring, input: cstring, numPixels: int, mode: PN
     output[x+1] = input[y]
     output[x+2] = input[y]
 
-proc RGBFromGrey124(output: var cstring, input: cstring, numPixels: int, mode: PNGColorMode) =
+proc RGBFromGrey124(output: var DataBuf, input: DataBuf, numPixels: int, mode: PNGColorMode) =
   var highest = ((1 shl mode.bitDepth) - 1) #highest possible value for this bit depth
   var obp = 0
   for i in 0..numPixels-1:
@@ -1137,14 +1153,14 @@ proc RGBFromGrey124(output: var cstring, input: cstring, numPixels: int, mode: P
     output[x+1] = val
     output[x+2] = val
 
-proc RGBFromRGB8(output: var cstring, input: cstring, numPixels: int, mode: PNGColorMode) =
+proc RGBFromRGB8(output: var DataBuf, input: DataBuf, numPixels: int, mode: PNGColorMode) =
   for i in 0..numPixels-1:
     let x = i * 3
     output[x]   = input[x]
     output[x+1] = input[x+1]
     output[x+2] = input[x+2]
 
-proc RGBFromRGB16(output: var cstring, input: cstring, numPixels: int, mode: PNGColorMode) =
+proc RGBFromRGB16(output: var DataBuf, input: DataBuf, numPixels: int, mode: PNGColorMode) =
   for i in 0..numPixels-1:
     let x = i * 3
     let y = i * 6
@@ -1152,7 +1168,7 @@ proc RGBFromRGB16(output: var cstring, input: cstring, numPixels: int, mode: PNG
     output[x+1] = input[y+2]
     output[x+2] = input[y+4]
 
-proc RGBFromPalette8(output: var cstring, input: cstring, numPixels: int, mode: PNGColorMode) =
+proc RGBFromPalette8(output: var DataBuf, input: DataBuf, numPixels: int, mode: PNGColorMode) =
   for i in 0..numPixels-1:
     let x = i * 3
     let index = ord(input[i])
@@ -1167,7 +1183,7 @@ proc RGBFromPalette8(output: var cstring, input: cstring, numPixels: int, mode: 
       output[x+1] = mode.palette[index].g
       output[x+2] = mode.palette[index].b
 
-proc RGBFromPalette124(output: var cstring, input: cstring, numPixels: int, mode: PNGColorMode) =
+proc RGBFromPalette124(output: var DataBuf, input: DataBuf, numPixels: int, mode: PNGColorMode) =
   var obp = 0
   for i in 0..numPixels-1:
     let x = i * 3
@@ -1183,7 +1199,7 @@ proc RGBFromPalette124(output: var cstring, input: cstring, numPixels: int, mode
       output[x+1] = mode.palette[index].g
       output[x+2] = mode.palette[index].b
 
-proc RGBFromGreyAlpha8(output: var cstring, input: cstring, numPixels: int, mode: PNGColorMode) =
+proc RGBFromGreyAlpha8(output: var DataBuf, input: DataBuf, numPixels: int, mode: PNGColorMode) =
   for i in 0..numPixels-1:
     let x = i * 3
     let val = input[i * 2]
@@ -1191,7 +1207,7 @@ proc RGBFromGreyAlpha8(output: var cstring, input: cstring, numPixels: int, mode
     output[x+1] = val
     output[x+2] = val
 
-proc RGBFromGreyAlpha16(output: var cstring, input: cstring, numPixels: int, mode: PNGColorMode) =
+proc RGBFromGreyAlpha16(output: var DataBuf, input: DataBuf, numPixels: int, mode: PNGColorMode) =
   for i in 0..numPixels-1:
     let x = i * 3
     let val = input[i * 4]
@@ -1199,7 +1215,7 @@ proc RGBFromGreyAlpha16(output: var cstring, input: cstring, numPixels: int, mod
     output[x+1] = val
     output[x+2] = val
 
-proc RGBFromRGBA8(output: var cstring, input: cstring, numPixels: int, mode: PNGColorMode) =
+proc RGBFromRGBA8(output: var DataBuf, input: DataBuf, numPixels: int, mode: PNGColorMode) =
   for i in 0..numPixels-1:
     let x = i * 3
     let y = i * 4
@@ -1207,7 +1223,7 @@ proc RGBFromRGBA8(output: var cstring, input: cstring, numPixels: int, mode: PNG
     output[x+1] = input[y+1]
     output[x+2] = input[y+2]
 
-proc RGBFromRGBA16(output: var cstring, input: cstring, numPixels: int, mode: PNGColorMode) =
+proc RGBFromRGBA16(output: var DataBuf, input: DataBuf, numPixels: int, mode: PNGColorMode) =
   for i in 0..numPixels-1:
     let x = i * 3
     let y = i * 8
@@ -1215,7 +1231,7 @@ proc RGBFromRGBA16(output: var cstring, input: cstring, numPixels: int, mode: PN
     output[x+1] = input[y+2]
     output[x+2] = input[y+4]
 
-proc RGBAFromGrey8(output: var cstring, input: cstring, numPixels: int, mode: PNGColorMode) =
+proc RGBAFromGrey8(output: var DataBuf, input: DataBuf, numPixels: int, mode: PNGColorMode) =
   for i in 0..numPixels-1:
     let x = i * 4
     output[x]   = input[i]
@@ -1224,7 +1240,7 @@ proc RGBAFromGrey8(output: var cstring, input: cstring, numPixels: int, mode: PN
     if mode.keyDefined and (ord(input[i]) == mode.keyR): output[x+3] = chr(0)
     else: output[x+3] = chr(255)
 
-proc RGBAFromGrey16(output: var cstring, input: cstring, numPixels: int, mode: PNGColorMode) =
+proc RGBAFromGrey16(output: var DataBuf, input: DataBuf, numPixels: int, mode: PNGColorMode) =
   for i in 0..numPixels-1:
     let x = i * 4
     let y = i * 2
@@ -1235,7 +1251,7 @@ proc RGBAFromGrey16(output: var cstring, input: cstring, numPixels: int, mode: P
     if mode.keyDefined and (keyR == mode.keyR): output[x+3] = chr(0)
     else: output[x+3] = chr(255)
 
-proc RGBAFromGrey124(output: var cstring, input: cstring, numPixels: int, mode: PNGColorMode) =
+proc RGBAFromGrey124(output: var DataBuf, input: DataBuf, numPixels: int, mode: PNGColorMode) =
   var highest = ((1 shl mode.bitDepth) - 1) #highest possible value for this bit depth
   var obp = 0
   for i in 0..numPixels-1:
@@ -1248,7 +1264,7 @@ proc RGBAFromGrey124(output: var cstring, input: cstring, numPixels: int, mode: 
     if mode.keyDefined and (ord(val) == mode.keyR): output[x+3] = chr(0)
     else: output[x+3] = chr(255)
 
-proc RGBAFromRGB8(output: var cstring, input: cstring, numPixels: int, mode: PNGColorMode) =
+proc RGBAFromRGB8(output: var DataBuf, input: DataBuf, numPixels: int, mode: PNGColorMode) =
   for i in 0..numPixels-1:
     let x = i * 4
     let y = i * 3
@@ -1259,7 +1275,7 @@ proc RGBAFromRGB8(output: var cstring, input: cstring, numPixels: int, mode: PNG
       (mode.keyG == ord(input[y+1])) and (mode.keyB == ord(input[y+2])): output[x+3] = chr(0)
     else: output[x+3] = chr(255)
 
-proc RGBAFromRGB16(output: var cstring, input: cstring, numPixels: int, mode: PNGColorMode) =
+proc RGBAFromRGB16(output: var DataBuf, input: DataBuf, numPixels: int, mode: PNGColorMode) =
   for i in 0..numPixels-1:
     let x = i * 4
     let y = i * 6
@@ -1273,7 +1289,7 @@ proc RGBAFromRGB16(output: var cstring, input: cstring, numPixels: int, mode: PN
       (mode.keyG == keyG) and (mode.keyB == keyB): output[x+3] = chr(0)
     else: output[x+3] = chr(255)
 
-proc RGBAFromPalette8(output: var cstring, input: cstring, numPixels: int, mode: PNGColorMode) =
+proc RGBAFromPalette8(output: var DataBuf, input: DataBuf, numPixels: int, mode: PNGColorMode) =
   for i in 0..numPixels-1:
     let x = i * 4
     let index = ord(input[i])
@@ -1290,7 +1306,7 @@ proc RGBAFromPalette8(output: var cstring, input: cstring, numPixels: int, mode:
       output[x+2] = mode.palette[index].b
       output[x+3] = mode.palette[index].a
 
-proc RGBAFromPalette124(output: var cstring, input: cstring, numPixels: int, mode: PNGColorMode) =
+proc RGBAFromPalette124(output: var DataBuf, input: DataBuf, numPixels: int, mode: PNGColorMode) =
   var obp = 0
   for i in 0..numPixels-1:
     let x = i * 4
@@ -1308,7 +1324,7 @@ proc RGBAFromPalette124(output: var cstring, input: cstring, numPixels: int, mod
       output[x+2] = mode.palette[index].b
       output[x+3] = mode.palette[index].a
 
-proc RGBAFromGreyAlpha8(output: var cstring, input: cstring, numPixels: int, mode: PNGColorMode) =
+proc RGBAFromGreyAlpha8(output: var DataBuf, input: DataBuf, numPixels: int, mode: PNGColorMode) =
   for i in 0..numPixels-1:
     let x = i * 4
     let val = input[i * 2]
@@ -1317,7 +1333,7 @@ proc RGBAFromGreyAlpha8(output: var cstring, input: cstring, numPixels: int, mod
     output[x+2] = val
     output[x+3] = input[i * 2 + 1]
 
-proc RGBAFromGreyAlpha16(output: var cstring, input: cstring, numPixels: int, mode: PNGColorMode) =
+proc RGBAFromGreyAlpha16(output: var DataBuf, input: DataBuf, numPixels: int, mode: PNGColorMode) =
   for i in 0..numPixels-1:
     let x = i * 4
     let val = input[i * 4]
@@ -1326,7 +1342,7 @@ proc RGBAFromGreyAlpha16(output: var cstring, input: cstring, numPixels: int, mo
     output[x+2] = val
     output[x+3] = input[i * 4 + 2]
 
-proc RGBAFromRGBA8(output: var cstring, input: cstring, numPixels: int, mode: PNGColorMode) =
+proc RGBAFromRGBA8(output: var DataBuf, input: DataBuf, numPixels: int, mode: PNGColorMode) =
   for i in 0..numPixels-1:
     let x = i * 4
     let y = i * 4
@@ -1335,7 +1351,7 @@ proc RGBAFromRGBA8(output: var cstring, input: cstring, numPixels: int, mode: PN
     output[x+2] = input[y+2]
     output[x+3] = input[y+3]
 
-proc RGBAFromRGBA16(output: var cstring, input: cstring, numPixels: int, mode: PNGColorMode) =
+proc RGBAFromRGBA16(output: var DataBuf, input: DataBuf, numPixels: int, mode: PNGColorMode) =
   for i in 0..numPixels-1:
     let x = i * 4
     let y = i * 8
@@ -1345,11 +1361,11 @@ proc RGBAFromRGBA16(output: var cstring, input: cstring, numPixels: int, mode: P
     output[x+3] = input[y+6]
 
 type
-  convertRGBA    = proc(output: var cstring, input: cstring, numPixels: int, mode: PNGColorMode)
-  convertRGBA8   = proc(p: var RGBA8, input: cstring, px: int, mode: PNGColorMode)
-  convertRGBA16  = proc(p: var RGBA16, input: cstring, px: int, mode: PNGColorMode)
-  pixelRGBA8     = proc(p: RGBA8, output: var cstring, px: int, mode: PNGColorMode, ct: ColorTree8)
-  pixelRGBA16    = proc(p: RGBA16, output: var cstring, px: int, mode: PNGColorMode)
+  convertRGBA    = proc(output: var DataBuf, input: DataBuf, numPixels: int, mode: PNGColorMode)
+  convertRGBA8   = proc(p: var RGBA8, input: DataBuf, px: int, mode: PNGColorMode)
+  convertRGBA16  = proc(p: var RGBA16, input: DataBuf, px: int, mode: PNGColorMode)
+  pixelRGBA8     = proc(p: RGBA8, output: var DataBuf, px: int, mode: PNGColorMode, ct: ColorTree8)
+  pixelRGBA16    = proc(p: RGBA16, output: var DataBuf, px: int, mode: PNGColorMode)
 
 proc hash*(c: RGBA8): Hash =
   var h: Hash = 0
@@ -1358,14 +1374,14 @@ proc hash*(c: RGBA8): Hash =
   h = h !& ord(c.b)
   h = h !& ord(c.a)
 
-proc RGBA8FromGrey8(p: var RGBA8, input: cstring, px: int, mode: PNGColorMode) =
+proc RGBA8FromGrey8(p: var RGBA8, input: DataBuf, px: int, mode: PNGColorMode) =
   p.r = input[px]
   p.g = input[px]
   p.b = input[px]
   if mode.keyDefined and (ord(p.r) == mode.keyR): p.a = chr(0)
   else: p.a = chr(255)
 
-proc RGBA8FromGrey16(p: var RGBA8, input: cstring, px: int, mode: PNGColorMode) =
+proc RGBA8FromGrey16(p: var RGBA8, input: DataBuf, px: int, mode: PNGColorMode) =
   let i = px * 2
   let keyR = 256 * ord(input[i]) + ord(input[i + 1])
   p.r = input[i]
@@ -1374,7 +1390,7 @@ proc RGBA8FromGrey16(p: var RGBA8, input: cstring, px: int, mode: PNGColorMode) 
   if mode.keyDefined and (keyR == mode.keyR): p.a = chr(0)
   else: p.a = chr(255)
 
-proc RGBA8FromGrey124(p: var RGBA8, input: cstring, px: int, mode: PNGColorMode) =
+proc RGBA8FromGrey124(p: var RGBA8, input: DataBuf, px: int, mode: PNGColorMode) =
   let highest = ((1 shl mode.bitDepth) - 1) #highest possible value for this bit depth
   var obp = px * mode.bitDepth
   let val = readBitsFromReversedStream(obp, input, mode.bitDepth)
@@ -1385,7 +1401,7 @@ proc RGBA8FromGrey124(p: var RGBA8, input: cstring, px: int, mode: PNGColorMode)
   if mode.keyDefined and (ord(val) == mode.keyR): p.a = chr(0)
   else: p.a = chr(255)
 
-proc RGBA8FromRGB8(p: var RGBA8, input: cstring, px: int, mode: PNGColorMode) =
+proc RGBA8FromRGB8(p: var RGBA8, input: DataBuf, px: int, mode: PNGColorMode) =
   let y = px * 3
   p.r = input[y]
   p.g = input[y+1]
@@ -1394,7 +1410,7 @@ proc RGBA8FromRGB8(p: var RGBA8, input: cstring, px: int, mode: PNGColorMode) =
     (mode.keyG == ord(input[y+1])) and (mode.keyB == ord(input[y+2])): p.a = chr(0)
   else: p.a = chr(255)
 
-proc RGBA8FromRGB16(p: var RGBA8, input: cstring, px: int, mode: PNGColorMode) =
+proc RGBA8FromRGB16(p: var RGBA8, input: DataBuf, px: int, mode: PNGColorMode) =
   let y = px * 6
   p.r = input[y]
   p.g = input[y+2]
@@ -1406,7 +1422,7 @@ proc RGBA8FromRGB16(p: var RGBA8, input: cstring, px: int, mode: PNGColorMode) =
     (mode.keyG == keyG) and (mode.keyB == keyB): p.a = chr(0)
   else: p.a = chr(255)
 
-proc RGBA8FromPalette8(p: var RGBA8, input: cstring, px: int, mode: PNGColorMode) =
+proc RGBA8FromPalette8(p: var RGBA8, input: DataBuf, px: int, mode: PNGColorMode) =
   let index = ord(input[px])
   if index >= mode.paletteSize:
     # This is an error according to the PNG spec,
@@ -1422,7 +1438,7 @@ proc RGBA8FromPalette8(p: var RGBA8, input: cstring, px: int, mode: PNGColorMode
     p.b = mode.palette[index].b
     p.a = mode.palette[index].a
 
-proc RGBA8FromPalette124(p: var RGBA8, input: cstring, px: int, mode: PNGColorMode) =
+proc RGBA8FromPalette124(p: var RGBA8, input: DataBuf, px: int, mode: PNGColorMode) =
   var obp = px * mode.bitDepth
   let index = readBitsFromReversedStream(obp, input, mode.bitDepth)
   if index >= mode.paletteSize:
@@ -1439,7 +1455,7 @@ proc RGBA8FromPalette124(p: var RGBA8, input: cstring, px: int, mode: PNGColorMo
     p.b = mode.palette[index].b
     p.a = mode.palette[index].a
 
-proc RGBA8FromGreyAlpha8(p: var RGBA8, input: cstring, px: int, mode: PNGColorMode) =
+proc RGBA8FromGreyAlpha8(p: var RGBA8, input: DataBuf, px: int, mode: PNGColorMode) =
   let i = px * 2
   let val = input[i]
   p.r = val
@@ -1447,7 +1463,7 @@ proc RGBA8FromGreyAlpha8(p: var RGBA8, input: cstring, px: int, mode: PNGColorMo
   p.b = val
   p.a = input[i+1]
 
-proc RGBA8FromGreyAlpha16(p: var RGBA8, input: cstring, px: int, mode: PNGColorMode) =
+proc RGBA8FromGreyAlpha16(p: var RGBA8, input: DataBuf, px: int, mode: PNGColorMode) =
   let i = px * 4
   let val = input[i]
   p.r = val
@@ -1455,21 +1471,21 @@ proc RGBA8FromGreyAlpha16(p: var RGBA8, input: cstring, px: int, mode: PNGColorM
   p.b = val
   p.a = input[i+2]
 
-proc RGBA8FromRGBA8(p: var RGBA8, input: cstring, px: int, mode: PNGColorMode) =
+proc RGBA8FromRGBA8(p: var RGBA8, input: DataBuf, px: int, mode: PNGColorMode) =
   let i = px * 4
   p.r = input[i]
   p.g = input[i+1]
   p.b = input[i+2]
   p.a = input[i+3]
 
-proc RGBA8FromRGBA16(p: var RGBA8, input: cstring, px: int, mode: PNGColorMode) =
+proc RGBA8FromRGBA16(p: var RGBA8, input: DataBuf, px: int, mode: PNGColorMode) =
   let i = px * 8
   p.r = input[i]
   p.g = input[i+2]
   p.b = input[i+4]
   p.a = input[i+6]
 
-proc RGBA16FromGrey(p: var RGBA16, input: cstring, px: int, mode: PNGColorMode) =
+proc RGBA16FromGrey(p: var RGBA16, input: DataBuf, px: int, mode: PNGColorMode) =
   let i = px * 2
   let val = 256 * ord(input[i]) + ord(input[i + 1])
   p.r = val
@@ -1478,7 +1494,7 @@ proc RGBA16FromGrey(p: var RGBA16, input: cstring, px: int, mode: PNGColorMode) 
   if mode.keyDefined and (val == mode.keyR): p.a = 0
   else: p.a = 65535
 
-proc RGBA16FromRGB(p: var RGBA16, input: cstring, px: int, mode: PNGColorMode) =
+proc RGBA16FromRGB(p: var RGBA16, input: DataBuf, px: int, mode: PNGColorMode) =
   let i = px * 6
   p.r = 256 * ord(input[i]) + ord(input[i+1])
   p.g = 256 * ord(input[i+2]) + ord(input[i+3])
@@ -1487,7 +1503,7 @@ proc RGBA16FromRGB(p: var RGBA16, input: cstring, px: int, mode: PNGColorMode) =
     (int(p.g) == mode.keyG) and (int(p.b) == mode.keyB): p.a = 0
   else: p.a = 65535
 
-proc RGBA16FromGreyAlpha(p: var RGBA16, input: cstring, px: int, mode: PNGColorMode) =
+proc RGBA16FromGreyAlpha(p: var RGBA16, input: DataBuf, px: int, mode: PNGColorMode) =
   let i = px * 4
   let val = 256 * ord(input[i]) + ord(input[i + 1])
   p.r = val
@@ -1495,33 +1511,33 @@ proc RGBA16FromGreyAlpha(p: var RGBA16, input: cstring, px: int, mode: PNGColorM
   p.b = val
   p.a = 256 * ord(input[i + 2]) + ord(input[i + 3])
 
-proc RGBA16FromRGBA(p: var RGBA16, input: cstring, px: int, mode: PNGColorMode) =
+proc RGBA16FromRGBA(p: var RGBA16, input: DataBuf, px: int, mode: PNGColorMode) =
   let i = px * 8
   p.r = 256 * ord(input[i]) + ord(input[i+1])
   p.g = 256 * ord(input[i+2]) + ord(input[i+3])
   p.b = 256 * ord(input[i+4]) + ord(input[i+5])
   p.a = 256 * ord(input[i+6]) + ord(input[i+7])
 
-proc RGBA8ToGrey8(p: RGBA8, output: var cstring, px: int, mode: PNGColorMode, ct: ColorTree8) =
+proc RGBA8ToGrey8(p: RGBA8, output: var DataBuf, px: int, mode: PNGColorMode, ct: ColorTree8) =
   output[px] = p.r
 
-proc RGBA8ToGrey16(p: RGBA8, output: var cstring, px: int, mode: PNGColorMode, ct: ColorTree8) =
+proc RGBA8ToGrey16(p: RGBA8, output: var DataBuf, px: int, mode: PNGColorMode, ct: ColorTree8) =
   let i = px * 2
   output[i] = p.r
   output[i+1] = p.r
 
-proc RGBA8ToGrey124(p: RGBA8, output: var cstring, px: int, mode: PNGColorMode, ct: ColorTree8) =
+proc RGBA8ToGrey124(p: RGBA8, output: var DataBuf, px: int, mode: PNGColorMode, ct: ColorTree8) =
   # take the most significant bits of grey
   let grey = (ord(p.r) shr (8 - mode.bitDepth)) and ((1 shl mode.bitDepth) - 1)
   addColorBits(output, px, mode.bitDepth, grey)
 
-proc RGBA8ToRGB8(p: RGBA8, output: var cstring, px: int, mode: PNGColorMode, ct: ColorTree8) =
+proc RGBA8ToRGB8(p: RGBA8, output: var DataBuf, px: int, mode: PNGColorMode, ct: ColorTree8) =
   let i = px * 3
   output[i]   = p.r
   output[i+1] = p.g
   output[i+2] = p.b
 
-proc RGBA8ToRGB16(p: RGBA8, output: var cstring, px: int, mode: PNGColorMode, ct: ColorTree8) =
+proc RGBA8ToRGB16(p: RGBA8, output: var DataBuf, px: int, mode: PNGColorMode, ct: ColorTree8) =
   let i = px * 6
   output[i]   = p.r
   output[i+2] = p.g
@@ -1530,32 +1546,32 @@ proc RGBA8ToRGB16(p: RGBA8, output: var cstring, px: int, mode: PNGColorMode, ct
   output[i+3] = p.g
   output[i+5] = p.b
 
-proc RGBA8ToPalette8(p: RGBA8, output: var cstring, px: int, mode: PNGColorMode, ct: ColorTree8) =
+proc RGBA8ToPalette8(p: RGBA8, output: var DataBuf, px: int, mode: PNGColorMode, ct: ColorTree8) =
   output[px] = chr(ct[p])
 
-proc RGBA8ToPalette124(p: RGBA8, output: var cstring, px: int, mode: PNGColorMode, ct: ColorTree8) =
+proc RGBA8ToPalette124(p: RGBA8, output: var DataBuf, px: int, mode: PNGColorMode, ct: ColorTree8) =
   addColorBits(output, px, mode.bitDepth, ct[p])
 
-proc RGBA8ToGreyAlpha8(p: RGBA8, output: var cstring, px: int, mode: PNGColorMode, ct: ColorTree8) =
+proc RGBA8ToGreyAlpha8(p: RGBA8, output: var DataBuf, px: int, mode: PNGColorMode, ct: ColorTree8) =
   let i = px * 2
   output[i] = p.r
   output[i+1] = p.a
 
-proc RGBA8ToGreyAlpha16(p: RGBA8, output: var cstring, px: int, mode: PNGColorMode, ct: ColorTree8) =
+proc RGBA8ToGreyAlpha16(p: RGBA8, output: var DataBuf, px: int, mode: PNGColorMode, ct: ColorTree8) =
   let i = px * 4
   output[i] = p.r
   output[i+1] = p.r
   output[i+2] = p.a
   output[i+3] = p.a
 
-proc RGBA8ToRGBA8(p: RGBA8, output: var cstring, px: int, mode: PNGColorMode, ct: ColorTree8) =
+proc RGBA8ToRGBA8(p: RGBA8, output: var DataBuf, px: int, mode: PNGColorMode, ct: ColorTree8) =
   let i = px * 4
   output[i] = p.r
   output[i+1] = p.g
   output[i+2] = p.b
   output[i+3] = p.a
 
-proc RGBA8ToRGBA16(p: RGBA8, output: var cstring, px: int, mode: PNGColorMode, ct: ColorTree8) =
+proc RGBA8ToRGBA16(p: RGBA8, output: var DataBuf, px: int, mode: PNGColorMode, ct: ColorTree8) =
   let i = px * 8
   output[i] = p.r
   output[i+2] = p.g
@@ -1566,37 +1582,37 @@ proc RGBA8ToRGBA16(p: RGBA8, output: var cstring, px: int, mode: PNGColorMode, c
   output[i+5] = p.b
   output[i+7] = p.a
 
-proc RGBA16ToGrey(p: RGBA16, output: var cstring, px: int, mode: PNGColorMode) =
+proc RGBA16ToGrey(p: RGBA16, output: var DataBuf, px: int, mode: PNGColorMode) =
   let i = px * 2
-  output[i] = chr((ord(p.r) shr 8) and 255)
-  output[i+1] = chr(ord(p.r) and 255)
+  output[i] = char((p.r shr 8) and 255)
+  output[i+1] = char(p.r and 255)
 
-proc RGBA16ToRGB(p: RGBA16, output: var cstring, px: int, mode: PNGColorMode) =
+proc RGBA16ToRGB(p: RGBA16, output: var DataBuf, px: int, mode: PNGColorMode) =
   let i = px * 6
-  output[i]   = chr((ord(p.r) shr 8) and 255)
-  output[i+1] = chr(ord(p.r) and 255)
-  output[i+2] = chr((ord(p.g) shr 8) and 255)
-  output[i+3] = chr(ord(p.g) and 255)
-  output[i+4] = chr((ord(p.b) shr 8) and 255)
-  output[i+5] = chr(ord(p.b) and 255)
+  output[i]   = char((p.r shr 8) and 255)
+  output[i+1] = char(p.r and 255)
+  output[i+2] = char((p.g shr 8) and 255)
+  output[i+3] = char(p.g and 255)
+  output[i+4] = char((p.b shr 8) and 255)
+  output[i+5] = char(p.b and 255)
 
-proc RGBA16ToGreyAlpha(p: RGBA16, output: var cstring, px: int, mode: PNGColorMode) =
+proc RGBA16ToGreyAlpha(p: RGBA16, output: var DataBuf, px: int, mode: PNGColorMode) =
   let i = px * 4
-  output[i]   = chr((ord(p.r) shr 8) and 255)
-  output[i+1] = chr(ord(p.r) and 255)
-  output[i+2] = chr((ord(p.a) shr 8) and 255)
-  output[i+3] = chr(ord(p.a) and 255)
+  output[i]   = char((p.r shr 8) and 255)
+  output[i+1] = char(p.r and 255)
+  output[i+2] = char((p.a shr 8) and 255)
+  output[i+3] = char(p.a and 255)
 
-proc RGBA16ToRGBA(p: RGBA16, output: var cstring, px: int, mode: PNGColorMode) =
+proc RGBA16ToRGBA(p: RGBA16, output: var DataBuf, px: int, mode: PNGColorMode) =
   let i = px * 8
-  output[i]   = chr((ord(p.r) shr 8) and 255)
-  output[i+1] = chr(ord(p.r) and 255)
-  output[i+2] = chr((ord(p.g) shr 8) and 255)
-  output[i+3] = chr(ord(p.g) and 255)
-  output[i+4] = chr((ord(p.b) shr 8) and 255)
-  output[i+5] = chr(ord(p.b) and 255)
-  output[i+6] = chr((ord(p.a) shr 8) and 255)
-  output[i+7] = chr(ord(p.a) and 255)
+  output[i]   = char((p.r shr 8) and 255)
+  output[i+1] = char(p.r and 255)
+  output[i+2] = char((p.g shr 8) and 255)
+  output[i+3] = char(p.g and 255)
+  output[i+4] = char((p.b shr 8) and 255)
+  output[i+5] = char(p.b and 255)
+  output[i+6] = char((p.a shr 8) and 255)
+  output[i+7] = char(p.a and 255)
 
 proc getColorRGBA16(mode: PNGColorMode): convertRGBA16 =
   if mode.colorType == LCT_GREY: return RGBA16FromGrey
@@ -1688,7 +1704,7 @@ proc getConverterRGBA(mode: PNGColorMode): convertRGBA =
     else: return RGBAFromRGBA16
   else: raise PNGError("unsupported RGBA converter")
 
-proc convert*(output: var cstring, input: cstring, modeOut, modeIn: PNGColorMode, numPixels: int) =
+proc convert*(output: var DataBuf, input: DataBuf, modeOut, modeIn: PNGColorMode, numPixels: int) =
   var tree: ColorTree8
   if modeOut.colorType == LCT_PALETTE:
     let palSize = min(1 shl modeOut.bitDepth, modeOut.paletteSize)
@@ -1728,16 +1744,16 @@ proc convert*(png: PNG, colorType: PNGcolorType, bitDepth: int): PNGResult =
   let modeOut = newColorMode(colorType, bitDepth)
   let size = getRawSize(header.width, header.height, modeOut)
   let numPixels = header.width * header.height
-  let input = cstring(png.pixels)
+  let input = initBuffer(png.pixels)
 
   new(result)
   result.width  = header.width
   result.height = header.height
   result.data   = newString(size)
-  var output = cstring(result.data)
+  var output = initBuffer(result.data)
 
   if modeOut == modeIn:
-    copyMem(output, input, size)
+    output.copyElements(input, size)
     return result
 
   convert(output, input, modeOut, modeIn, numPixels)
@@ -1762,21 +1778,22 @@ proc decodePNG*(s: Stream, settings = PNGDecoder(nil)): PNG =
   png.postProcessscanLines()
   result = png
 
-proc loadPNG*(fileName: string, colorType: PNGcolorType, bitDepth: int, settings: PNGDecoder): PNGResult =
-  try:
-    var s = newFileStream(fileName, fmRead)
-    if s == nil: return nil
-    result = s.decodePNG(colorType, bitDepth, settings)
-    s.close()
-  except:
-    debugEcho getCurrentExceptionMsg()
-    result = nil
+when not defined(js):
+  proc loadPNG*(fileName: string, colorType: PNGcolorType, bitDepth: int, settings: PNGDecoder): PNGResult =
+    try:
+      var s = newFileStream(fileName, fmRead)
+      if s == nil: return nil
+      result = s.decodePNG(colorType, bitDepth, settings)
+      s.close()
+    except:
+      debugEcho getCurrentExceptionMsg()
+      result = nil
 
-proc loadPNG32*(fileName: string, settings = PNGDecoder(nil)): PNGResult =
-  result = loadPNG(fileName, LCT_RGBA, 8, settings)
+  proc loadPNG32*(fileName: string, settings = PNGDecoder(nil)): PNGResult =
+    result = loadPNG(fileName, LCT_RGBA, 8, settings)
 
-proc loadPNG24*(fileName: string, settings = PNGDecoder(nil)): PNGResult =
-  result = loadPNG(fileName, LCT_RGB, 8, settings)
+  proc loadPNG24*(fileName: string, settings = PNGDecoder(nil)): PNGResult =
+    result = loadPNG(fileName, LCT_RGB, 8, settings)
 
 proc decodePNG32*(input: string, settings = PNGDecoder(nil)): PNGResult =
   try:
@@ -2096,7 +2113,7 @@ method writeChunk(chunk: PNGSPalette, png: PNG): bool =
       chunk.writeInt16(p.alpha)
       chunk.writeInt16(p.frequency)
   result = true
-  
+
 method writeChunk(chunk: PNGHist, png: PNG): bool =
   #estimate chunk.histogram.len * 2
   for c in chunk.histogram:
@@ -2155,7 +2172,7 @@ method writeChunk(chunk: PNGICCProfile, png: PNG): bool =
   var nz = nzDeflateInit(chunk.profile)
   chunk.writeString zlib_compress(nz)
   result = true
-  
+
 proc isGreyscaleType(mode: PNGColorMode): bool =
   result = mode.colorType in {LCT_GREY, LCT_GREY_ALPHA}
 
@@ -2212,13 +2229,14 @@ proc getColorProfile(input: string, w, h: int, mode: PNGColorMode): PNGColorProf
     of 4: maxNumColors = 16
     else: maxNumColors = 256
 
+  var inbuf = initBuffer(input)
+
   #Check if the 16-bit input is truly 16-bit
   if mode.bitDepth == 16:
     let cvt = getColorRGBA16(mode)
     var p = RGBA16(r:0, g:0, b:0, a:0)
-
     for px in 0..numPixels-1:
-      cvt(p, cstring(input), px, mode)
+      cvt(p, inbuf, px, mode)
       if p.differ():
         sixteen = true
         break
@@ -2232,7 +2250,7 @@ proc getColorProfile(input: string, w, h: int, mode: PNGColorMode): PNGColorProf
     numColorsDone = true
 
     for px in 0..numPixels-1:
-      cvt(p, cstring(input), px, mode)
+      cvt(p, inbuf, px, mode)
       if not coloredDone and ((p.r != p.g) or (p.r != p.b)):
         prof.colored = true
         coloredDone = true
@@ -2260,7 +2278,7 @@ proc getColorProfile(input: string, w, h: int, mode: PNGColorMode): PNGColorProf
     let cvt = getColorRGBA8(mode)
     for px in 0..numPixels-1:
       var p = RGBA8(r:chr(0), g:chr(0), b:chr(0), a:chr(0))
-      cvt(p, cstring(input), px, mode)
+      cvt(p, inbuf, px, mode)
       if (not bitsDone) and (prof.bits < 8):
         #only r is checked, < 8 bits is only relevant for greyscale
         let bits = getValueRequiredBits(int(p.r))
@@ -2360,7 +2378,7 @@ proc autoChooseColor(modeOut: PNGColorMode, input: string, w, h: int, modeIn: PN
       modeOut.keyB = prof.keyB and mask
       modeOut.keyDefined = true
 
-proc addPaddingBits(output: var cstring, input: cstring, olinebits, ilinebits, h: int) =
+proc addPaddingBits(output: var DataBuf, input: DataBuf, olinebits, ilinebits, h: int) =
   #The opposite of the removePaddingBits function
   #olinebits must be >= ilinebits
 
@@ -2375,64 +2393,62 @@ proc addPaddingBits(output: var cstring, input: cstring, olinebits, ilinebits, h
       setBitOfReversedStream(obp, output, bit)
     for x in 0..diff-1: setBitOfReversedStream(obp, output, 0)
 
-proc filterScanLine(output: var cstring, scanLine, prevLine: cstring, len, byteWidth: int, filterType: PNGFilter0) =
-
+proc filterScanLine(output: var DataBuf, scanLine, prevLine: DataBuf, len, byteWidth: int, filterType: PNGFilter0) =
   case filterType
   of FLT_NONE:
     for i in 0..len-1: output[i] = scanLine[i]
   of FLT_SUB:
     for i in 0..byteWidth-1: output[i] = scanLine[i]
     for i in byteWidth..len-1:
-      output[i] = chr(scanLine[i].uint8 - scanLine[i - byteWidth].uint8)
+      output[i] = chr(scanLine[i].uint - scanLine[i - byteWidth].uint)
   of FLT_UP:
-    if prevLine != nil:
+    if not prevLine.isNil:
       for i in 0..len-1:
-        output[i] = chr(scanLine[i].uint8 - prevLine[i].uint8)
+        output[i] = chr(scanLine[i].uint - prevLine[i].uint)
     else:
       for i in 0..len-1: output[i] = scanLine[i]
   of FLT_AVERAGE:
-    if prevLine != nil:
+    if not prevLine.isNil:
       for i in 0..byteWidth-1:
-        output[i] = chr(scanLine[i].uint8 - (prevLine[i].uint8 div 2))
+        output[i] = chr(scanLine[i].uint - (prevLine[i].uint div 2))
       for i in byteWidth..len-1:
-        output[i] = chr(scanLine[i].uint8 - ((scanLine[i - byteWidth].uint8 + prevLine[i].uint8) div 2))
+        output[i] = chr(scanLine[i].uint - ((scanLine[i - byteWidth].uint + prevLine[i].uint) div 2))
     else:
       for i in 0..byteWidth-1: output[i] = scanLine[i]
       for i in byteWidth..len-1:
-        output[i] = chr(scanLine[i].uint8 - (scanLine[i - byteWidth].uint8 div 2))
+        output[i] = chr(scanLine[i].uint - (scanLine[i - byteWidth].uint div 2))
   of FLT_PAETH:
-    if prevLine != nil:
+    if not prevLine.isNil:
       #paethPredictor(0, prevLine[i], 0) is always prevLine[i]
       for i in 0..byteWidth-1:
-        output[i] = chr(scanLine[i].uint8 - prevLine[i].uint8)
+        output[i] = chr(scanLine[i].uint - prevLine[i].uint)
       for i in byteWidth..len-1:
-        output[i] = chr(scanLine[i].uint8 - paethPredictor(ord(scanLine[i - byteWidth]), ord(prevLine[i]), ord(prevLine[i - byteWidth])).uint8)
+        output[i] = chr(scanLine[i].uint - paethPredictor(ord(scanLine[i - byteWidth]), ord(prevLine[i]), ord(prevLine[i - byteWidth])).uint)
     else:
       for i in 0..byteWidth-1: output[i] = scanLine[i]
       #paethPredictor(scanLine[i - byteWidth], 0, 0) is always scanLine[i - byteWidth]
       for i in byteWidth..len-1:
-        output[i] = chr(scanLine[i].uint8 - scanLine[i - byteWidth].uint8)
+        output[i] = chr(scanLine[i].uint - scanLine[i - byteWidth].uint)
   else:
-    raise PNGError("unsupported fitler type")
+    raise PNGError("unsupported filter type")
 
-proc filterZero(output: var cstring, input: cstring, w, h, bpp: int) =
+proc filterZero(output: var DataBuf, input: DataBuf, w, h, bpp: int) =
   #the width of a scanline in bytes, not including the filter type
   let lineBytes = (w * bpp + 7) div 8
   #byteWidth is used for filtering, is 1 when bpp < 8, number of bytes per pixel otherwise
   let byteWidth = (bpp + 7) div 8
-  var prevLine: cstring = nil
-  var inp = input
+  var prevLine: DataBuf
 
   for y in 0..h-1:
     let outindex = (1 + lineBytes) * y #the extra filterbyte added to each row
     let inindex = lineBytes * y
     output[outindex] = chr(int(FLT_NONE)) #filter type byte
-    var outp: cstring = addr(output[outindex + 1])
-    let scanLine: cstring = addr(inp[inindex])
+    var outp = output.subbuffer(outindex + 1)
+    let scanLine = input.subbuffer(inindex)
     filterScanLine(outp, scanLine, prevLine, lineBytes, byteWidth, FLT_NONE)
-    prevLine = addr(inp[inindex])
+    prevLine = input.subbuffer(inindex)
 
-proc filterMinsum(output: var cstring, input: cstring, w, h, bpp: int) =
+proc filterMinsum(output: var DataBuf, input: DataBuf, w, h, bpp: int) =
   let lineBytes = (w * bpp + 7) div 8
   let byteWidth = (bpp + 7) div 8
 
@@ -2443,8 +2459,7 @@ proc filterMinsum(output: var cstring, input: cstring, w, h, bpp: int) =
   #five filtering attempts, one for each filter type
   var attempt: array[0..4, string]
   var bestType = 0
-  var inp = input
-  var prevLine: cstring = nil
+  var prevLine: DataBuf
 
   for i in 0..attempt.high:
     attempt[i] = newString(lineBytes)
@@ -2452,8 +2467,8 @@ proc filterMinsum(output: var cstring, input: cstring, w, h, bpp: int) =
   for y in 0..h-1:
     #try the 5 filter types
     for fType in 0..4:
-      var outp = cstring(attempt[fType])
-      filterScanLine(outp, addr(inp[y * lineBytes]), prevLine, lineBytes, byteWidth, PNGFilter0(fType))
+      var outp = initBuffer(attempt[fType])
+      filterScanLine(outp, input.subbuffer(y * lineBytes), prevLine, lineBytes, byteWidth, PNGFilter0(fType))
       #calculate the sum of the result
       sum[fType] = 0
       if fType == 0:
@@ -2473,18 +2488,17 @@ proc filterMinsum(output: var cstring, input: cstring, w, h, bpp: int) =
         bestType = fType
         smallest = sum[fType]
 
-    prevLine = addr(inp[y * lineBytes])
+    prevLine = input.subbuffer(y * lineBytes)
     #now fill the out values
     #the first byte of a scanline will be the filter type
     output[y * (lineBytes + 1)] = chr(bestType)
     for x in 0..lineBytes-1:
       output[y * (lineBytes + 1) + 1 + x] = attempt[bestType][x]
 
-proc filterEntropy(output: var cstring, input: cstring, w, h, bpp: int) =
+proc filterEntropy(output: var DataBuf, input: DataBuf, w, h, bpp: int) =
   let lineBytes = (w * bpp + 7) div 8
   let byteWidth = (bpp + 7) div 8
-  var inp = input
-  var prevLine: cstring = nil
+  var prevLine: DataBuf
 
   var sum: array[0..4, float]
   var smallest = 0.0
@@ -2498,8 +2512,8 @@ proc filterEntropy(output: var cstring, input: cstring, w, h, bpp: int) =
   for y in 0..h-1:
     #try the 5 filter types
     for fType in 0..4:
-      var outp = cstring(attempt[fType])
-      filterScanLine(outp, addr(inp[y * lineBytes]), prevLine, lineBytes, byteWidth, PNGFilter0(fType))
+      var outp = initBuffer(attempt[fType])
+      filterScanLine(outp, input.subbuffer(y * lineBytes), prevLine, lineBytes, byteWidth, PNGFilter0(fType))
       for x in 0..255: count[x] = 0
       for x in 0..lineBytes-1:
         inc count[ord(attempt[fType][x])]
@@ -2514,33 +2528,31 @@ proc filterEntropy(output: var cstring, input: cstring, w, h, bpp: int) =
         bestType = fType
         smallest = sum[fType]
 
-    prevLine = addr(inp[y * lineBytes])
+    prevLine = input.subbuffer(y * lineBytes)
     #now fill the out values*/
     #the first byte of a scanline will be the filter type
     output[y * (lineBytes + 1)] = chr(bestType)
     for x in 0..lineBytes-1:
       output[y * (lineBytes + 1) + 1 + x] = attempt[bestType][x]
 
-proc filterPredefined(output: var cstring, input: cstring, w, h, bpp: int, state: PNGEncoder) =
+proc filterPredefined(output: var DataBuf, input: DataBuf, w, h, bpp: int, state: PNGEncoder) =
   let lineBytes = (w * bpp + 7) div 8
   let byteWidth = (bpp + 7) div 8
-  var inp = input
-  var prevLine: cstring = nil
+  var prevLine: DataBuf
 
   for y in 0..h-1:
     let outindex = (1 + lineBytes) * y #the extra filterbyte added to each row
     let inindex = lineBytes * y
     let fType = ord(state.predefinedFilters[y])
     output[outindex] = chr(fType) #filter type byte
-    var outp: cstring = addr(output[outindex + 1])
-    filterScanLine(outp, addr(inp[inindex]), prevLine, lineBytes, byteWidth, PNGFilter0(fType))
-    prevLine = addr(inp[inindex])
+    var outp = output.subbuffer(outindex + 1)
+    filterScanLine(outp, input.subbuffer(inindex), prevLine, lineBytes, byteWidth, PNGFilter0(fType))
+    prevLine = input.subbuffer(inindex)
 
-proc filterBruteForce(output: var cstring, input: cstring, w, h, bpp: int) =
+proc filterBruteForce(output: var DataBuf, input: DataBuf, w, h, bpp: int) =
   let lineBytes = (w * bpp + 7) div 8
   let byteWidth = (bpp + 7) div 8
-  var inp = input
-  var prevLine: cstring = nil
+  var prevLine: DataBuf
 
   #brute force filter chooser.
   #deflate the scanline after every filter attempt to see which one deflates best.
@@ -2563,8 +2575,8 @@ proc filterBruteForce(output: var cstring, input: cstring, w, h, bpp: int) =
     #try the 5 filter types
     for fType in 0..4:
       #let testSize = attempt[fType].len
-      var outp = cstring(attempt[fType])
-      filterScanline(outp, addr(inp[y * lineBytes]), prevLine, lineBytes, byteWidth, PNGFilter0(fType))
+      var outp = initBuffer(attempt[fType])
+      filterScanline(outp, input.subbuffer(y * lineBytes), prevLine, lineBytes, byteWidth, PNGFilter0(fType))
       size[fType] = 0
 
       var nz = nzDeflateInit(attempt[fType])
@@ -2576,12 +2588,12 @@ proc filterBruteForce(output: var cstring, input: cstring, w, h, bpp: int) =
         bestType = fType
         smallest = size[fType]
 
-    prevLine = addr(inp[y * lineBytes])
+    prevLine = input.subbuffer(y * lineBytes)
     output[y * (lineBytes + 1)] = chr(bestType) #the first byte of a scanline will be the filter type
     for x in 0..lineBytes-1:
       output[y * (lineBytes + 1) + 1 + x] = attempt[bestType][x]
 
-proc filter(output: var cstring, input: cstring, w, h: int, modeOut: PNGColorMode, state: PNGEncoder) =
+proc filter(output: var DataBuf, input: DataBuf, w, h: int, modeOut: PNGColorMode, state: PNGEncoder) =
   #For PNG filter method 0
   #out must be a buffer with as size: h + (w * h * bpp + 7) / 8, because there are
   #the scanlines with 1 extra byte per scanline
@@ -2622,7 +2634,7 @@ proc filter(output: var cstring, input: cstring, w, h: int, modeOut: PNGColorMod
 #in has the following size in bits: w * h * bpp.
 #output is possibly bigger due to padding bits between reduced images
 #NOTE: comments about padding bits are only relevant if bpp < 8
-proc Adam7Interlace(output: var cstring, input: cstring, w, h, bpp: int) =
+proc Adam7Interlace(output: var DataBuf, input: DataBuf, w, h, bpp: int) =
   var pass: PNGPass
   Adam7PassValues(pass, w, h, bpp)
 
@@ -2648,7 +2660,7 @@ proc Adam7Interlace(output: var cstring, input: cstring, w, h, bpp: int) =
             let bit = readBitFromReversedStream(ibp, input)
             setBitOfReversedStream(obp, output, bit)
 
-proc preProcessScanLines(png: PNG, input: cstring, w, h: int, modeOut: PNGColorMode, state: PNGEncoder) =
+proc preProcessScanLines(png: PNG, input: DataBuf, w, h: int, modeOut: PNGColorMode, state: PNGEncoder) =
   #This function converts the pure 2D image with the PNG's colorType, into filtered-padded-interlaced data. Steps:
   # if no Adam7: 1) add padding bits (= posible extra bits per scanLine if bpp < 8) 2) filter
   # if adam7: 1) Adam7_interlace 2) 7x add padding bits 3) 7x filter
@@ -2659,14 +2671,13 @@ proc preProcessScanLines(png: PNG, input: cstring, w, h: int, modeOut: PNGColorM
     let scanLen = (w * bpp + 7) div 8
     let outSize = h + (h * scanLen)
     png.pixels = newString(outSize)
-    var output = cstring(png.pixels)
+    var output = initBuffer(png.pixels)
     #non multiple of 8 bits per scanLine, padding bits needed per scanLine
     if(bpp < 8) and ((w * bpp) != (scanLen * 8)):
-      var padded = newString(h * scanLen)
-      var padding = cstring(padded)
-      addPaddingBits(padding, input, scanLen * 8, w * bpp, h)
+      var padded = initBuffer(newString(h * scanLen))
+      addPaddingBits(padded, input, scanLen * 8, w * bpp, h)
 
-      filter(output, padding, w, h, modeOut, state)
+      filter(output, padded, w, h, modeOut, state)
     else:
       #we can immediatly filter into the out buffer, no other steps needed
       filter(output, input, w, h, modeOut, state)
@@ -2676,21 +2687,19 @@ proc preProcessScanLines(png: PNG, input: cstring, w, h: int, modeOut: PNGColorM
     Adam7PassValues(pass, w, h, bpp)
     let outSize = pass.filterStart[7]
     png.pixels = newString(outSize)
-    var adam7buf = newString(pass.start[7])
-    var adam7 = cstring(adam7buf)
-    var output = cstring(png.pixels)
+    var adam7 = initBuffer(newString(pass.start[7]))
+    var output = initBuffer(png.pixels)
 
     Adam7Interlace(adam7, input, w, h, bpp)
     for i in 0..6:
       if bpp < 8:
-        var padded = newString(pass.paddedStart[i + 1] - pass.paddedStart[i])
-        var padding = cstring(padded)
-        addPaddingBits(padding, addr(adam7[pass.start[i]]), ((pass.w[i] * bpp + 7) div 8) * 8, pass.w[i] * bpp, pass.h[i])
-        var outp:cstring = addr(output[pass.filterStart[i]])
+        var padding = initBuffer(newString(pass.paddedStart[i + 1] - pass.paddedStart[i]))
+        addPaddingBits(padding, adam7.subbuffer(pass.start[i]), ((pass.w[i] * bpp + 7) div 8) * 8, pass.w[i] * bpp, pass.h[i])
+        var outp = output.subbuffer(pass.filterStart[i])
         filter(outp, padding, pass.w[i], pass.h[i], modeOut, state)
       else:
-        var outp:cstring = addr(output[pass.filterStart[i]])
-        filter(outp, addr(adam7[pass.paddedStart[i]]), pass.w[i], pass.h[i], modeOut, state)
+        var outp = output.subbuffer(pass.filterStart[i])
+        filter(outp, adam7.subbuffer(pass.paddedStart[i]), pass.w[i], pass.h[i], modeOut, state)
 
 #palette must have 4 * palettesize bytes allocated, and given in format RGBARGBARGBARGBA...
 #returns 0 if the palette is opaque,
@@ -2852,11 +2861,11 @@ proc encodePNG*(input: string, w, h: int, settings = PNGEncoder(nil)): PNG =
     let numPixels = w * h
 
     var converted = newString(size)
-    var output = cstring(converted)
-    convert(output, cstring(input), modeOut, modeIn, numPixels)
-    preProcessScanLines(png, cstring(converted), w, h, modeOut, state)
+    var output = initBuffer(converted)
+    convert(output, initBuffer(input), modeOut, modeIn, numPixels)
+    preProcessScanLines(png, initBuffer(converted), w, h, modeOut, state)
   else:
-    preProcessScanLines(png, cstring(input), w, h, modeOut, state)
+    preProcessScanLines(png, initBuffer(input), w, h, modeOut, state)
 
   png.addChunkIHDR(w, h, modeOut, state)
   #unknown chunks between IHDR and PLTE
@@ -2937,22 +2946,23 @@ proc writeChunks*(png: PNG, s: Stream) =
     s.write chunk.data
     s.writeInt32BE cast[int](chunk.crc)
 
-proc savePNG*(fileName, input: string, colorType: PNGcolorType, bitDepth, w, h: int): bool =
-  try:
-    var png = encodePNG(input, colorType, bitDepth, w, h)
-    var s = newFileStream(fileName, fmWrite)
-    png.writeChunks s
-    s.close()
-    result = true
-  except:
-    debugEcho getCurrentExceptionMsg()
-    result = false
-    
-proc savePNG32*(fileName, input: string, w, h: int): bool =
-  result = savePNG(fileName, input, LCT_RGBA, 8, w, h)
-  
-proc savePNG24*(fileName, input: string, w, h: int): bool =
-  result = savePNG(fileName, input, LCT_RGB, 8, w, h)
+when not defined(js):
+  proc savePNG*(fileName, input: string, colorType: PNGcolorType, bitDepth, w, h: int): bool =
+    try:
+      var png = encodePNG(input, colorType, bitDepth, w, h)
+      var s = newFileStream(fileName, fmWrite)
+      png.writeChunks s
+      s.close()
+      result = true
+    except:
+      debugEcho getCurrentExceptionMsg()
+      result = false
+
+  proc savePNG32*(fileName, input: string, w, h: int): bool =
+    result = savePNG(fileName, input, LCT_RGBA, 8, w, h)
+
+  proc savePNG24*(fileName, input: string, w, h: int): bool =
+    result = savePNG(fileName, input, LCT_RGB, 8, w, h)
 
 proc getFilterTypesInterlaced(png: PNG): seq[string] =
   var header = PNGHeader(png.getChunk(IHDR))

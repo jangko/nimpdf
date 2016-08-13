@@ -199,15 +199,14 @@ proc HuffmanTree_make2DTree(tree: var HuffmanTree) =
       tree.tree2d[branch] = n #put the current code in it
       treepos = 0 #start from root again
 
-  for it in mitems(tree.tree2d):
-    if it == 32767: it = 0 #remove possible remaining 32767's
+  tree.tree2d.applyIt(if it == 32767: 0 else: it) #remove possible remaining 32767's
 
 #Second step for the ...makeFromLengths and ...makeFromFrequencies functions.
 #numcodes, lengths and maxbitlen must already be filled in correctly.
 proc HuffmanTree_makeFromLengths2(tree: var HuffmanTree) =
   tree.tree1d = newSeq[int](tree.numcodes)
-  var blcount = newSeqWith(tree.maxbitlen + 1, 0)
-  var nextcode = newSeqWith(tree.maxbitlen + 1, 0)
+  var blcount = newSeq[int](tree.maxbitlen + 1)
+  var nextcode = newSeq[int](tree.maxbitlen + 1)
 
   #step 1: count number of instances of each code length
   for len in tree.lengths: inc blcount[len]
@@ -285,7 +284,7 @@ proc quickSort[T](a: var openArray[T], lo, hi: int) =
   var pivot = placePivot(a, lo, hi)
   quickSort(a, lo, pivot-1) #sort bottom half
   quickSort(a, pivot+1, hi) #sort top half
-        
+
 proc quickSort[T](a: var openArray[T], length = -1) =
   var lo = 0
   var hi = if length < 0: a.high else: length-1
@@ -293,13 +292,13 @@ proc quickSort[T](a: var openArray[T], length = -1) =
 
 proc huffman_code_lengths(frequencies: openarray[int], numcodes, maxbitlen: int): seq[int] =
   var
-    lengths = newSeqWith(numcodes, 0)
+    lengths = newSeq[int](numcodes)
     sum = 0
     numpresent = 0
     coins: Coins #the coins of the currently calculated row
     prev_row: Coins #the previous row of coins
     coinmem, numcoins: int
-  
+
   if numcodes == 0:
     raise newNZError("a tree of 0 symbols is not supposed to be made")
 
@@ -362,7 +361,7 @@ proc huffman_code_lengths(frequencies: openarray[int], numcodes, maxbitlen: int)
       if j < maxbitlen:
         append_symbol_coins(coins, numcoins, frequencies, numcodes, sum)
         inc(numcoins, numpresent)
-      
+
       coins.quickSort(numcoins)
 
   #calculate the lengths of each symbol, as the amount of times a coin of each symbol is used
@@ -482,8 +481,8 @@ proc getTreeInflateDynamic(s: var BitStream, tree_ll, tree_d: var HuffmanTree) =
 
   #see comments in deflateDynamic for explanation
   #of the context and these variables, it is analogous
-  var bitlen_ll = newSeqWith(NUM_DEFLATE_CODE_SYMBOLS, 0) #lit,len code lengths
-  var bitlen_d = newSeqWith(NUM_DISTANCE_SYMBOLS, 0) #dist code lengths
+  var bitlen_ll = newSeq[int](NUM_DEFLATE_CODE_SYMBOLS) #lit,len code lengths
+  var bitlen_d = newSeq[int](NUM_DISTANCE_SYMBOLS) #dist code lengths
 
   #code length code lengths ("clcl"),
   #the bit lengths of the huffman tree
@@ -711,11 +710,11 @@ proc addBitToStream(s: var BitStream, bit: int) =
 
 proc addBitsToStream(s: var BitStream, value: int, nbits: int) =
   for i in 0..nbits-1:
-    s.addBitToStream ((value shr i) and 1)
+    s.addBitToStream((value shr i) and 1)
 
 proc addBitsToStreamReversed(s: var BitStream, value: int, nbits: int) =
   for i in 0..nbits-1:
-    s.addBitToStream ((value shr (nbits - 1 - i)) and 1)
+    s.addBitToStream((value shr (nbits - 1 - i)) and 1)
 
 proc HuffmanTree_getCode(tree: HuffmanTree, index: int): int =
   result = tree.tree1d[index]
@@ -1034,8 +1033,8 @@ proc deflateDynamic(nz: nzStream, hash: var NZHash, datapos, dataend: int, final
     lz77 = newSeq[int](datasize)
     for i in datapos..dataend-1: lz77[i] = ord(nz.data[i])
 
-  var frequencies_ll = newSeqWith(286, 0) #frequency of lit,len codes
-  var frequencies_d = newSeqWith(30, 0) #frequency of dist codes
+  var frequencies_ll = newSeq[int](286) #frequency of lit,len codes
+  var frequencies_d = newSeq[int](30) #frequency of dist codes
 
   #Count the frequencies of lit, len and dist codes
   var i = 0
@@ -1099,7 +1098,7 @@ proc deflateDynamic(nz: nzStream, hash: var NZHash, datapos, dataend: int, final
     inc i
 
   #generate tree_cl, the huffmantree of huffmantrees
-  frequencies_cl = newSeqWith(NUM_CODE_LENGTH_CODES, 0)
+  frequencies_cl = newSeq[int](NUM_CODE_LENGTH_CODES)
   i = 0
   while i < bitlen_lld_e.len:
     inc frequencies_cl[bitlen_lld_e[i]]
@@ -1178,7 +1177,7 @@ proc nzDeflate(nz: nzStream) =
   var hash: NZHash
   var blocksize = 0
   var insize = nz.data.len
-  
+
   if   nz.btype  > 2: raise newNZError("invalid block type")
   elif nz.btype == 0:
     nz.deflateNoCompression
@@ -1186,16 +1185,16 @@ proc nzDeflate(nz: nzStream) =
   elif nz.btype == 1: blocksize = insize
   else: blocksize = max(insize div 8 + 8, 65535) #if(nz.btype == 2)
     #if blocksize < 65535: blocksize = 65535
-  
+
   var numdeflateblocks = (insize + blocksize - 1) div blocksize
   if numdeflateblocks == 0: numdeflateblocks = 1
   nimzHashInit(hash, nz.windowsize)
-  
+
   for i in 0..numdeflateblocks-1:
     let final = (i == numdeflateblocks - 1)
     let datapos = i * blocksize
     let dataend = min(datapos + blocksize, insize)
-  
+
     if nz.btype == 1: nz.deflateFixed(hash, datapos, dataend, final)
     elif nz.btype == 2: nz.deflateDynamic(hash, datapos, dataend, final)
 
@@ -1217,13 +1216,13 @@ proc nzDeflateInit*(input: string): nzStream =
   nz.data = input
   nz.bits.data = ""
   nz.bits.bitpointer = 0
-  nz.mode = nzsDeflate  
+  nz.mode = nzsDeflate
   result = nz
 
 proc nzInflateInit*(input: string): nzStream =
   var nz = nzInit()
-  nz.data = ""
-  nz.bits.data = input
+  nz.data = newStringOfCap(1024 * 1024 * 5) # Allocate 5MB in advance
+  shallowCopy(nz.bits.data, input)
   nz.bits.bitpointer = 0
   nz.bits.databitlen = input.len * 8
   nz.mode = nzsInflate
@@ -1246,15 +1245,15 @@ proc nzAdler32(adler: uint32, data: string): uint32 =
     var amount = min(len, 5550)
     dec(len, amount)
     while amount > 0:
-      s1 += cast[uint32](ord(data[i]))
+      s1 += cast[uint32](ord(data[i]) or 0)
       s2 += s1
       dec(amount)
       inc(i)
 
-    s1 = s1 mod 65521'u32
-    s2 = s2 mod 65521'u32
+    s1 = s1 mod 65521.uint32
+    s2 = s2 mod 65521.uint32
 
-  result = (s2 shl 16'u32) or s1
+  result = (s2 shl 16.uint32) or s1
 
 proc add32bitInt(s: var BitStream, val: uint32) =
   s.data.add chr(cast[int](val shr 24) and 0xff)
@@ -1280,7 +1279,7 @@ proc zlib_compress*(nz: nzStream): string =
   nz.bits.data.add chr(CMFFLG div 256)
   nz.bits.data.add chr(CMFFLG mod 256)
   nz.bits.bitpointer += 16
-  
+
   nz.nzDeflate
   nz.bits.add32bitInt nzAdler32(1, nz.data)
   result = nz.nzGetResult
@@ -1293,7 +1292,7 @@ proc readInt32(input: string): uint32 =
   result += cast[uint32](ord(input[3]))
 
 proc zlib_decompress*(nz: nzStream): string =
-  var insize = nz.bits.data.len
+  let insize = nz.bits.data.len
 
   if insize < 2: raise newNZError("size of zlib data too small")
 
@@ -1319,7 +1318,7 @@ proc zlib_decompress*(nz: nzStream): string =
     #"The additional flags shall not specify a preset dictionary."*/
     #return 26;
 
-  let checksum = nz.bits.data.substr(insize-4, insize).readInt32
+  let checksum = nz.bits.data.substr(insize-4, insize-1).readInt32
   nz.bits.data.setLen(insize-4)
 
   nz.nzInflate

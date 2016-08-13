@@ -185,7 +185,7 @@ proc put(doc: Document, text: varargs[string]) =
   let p = doc.pages.high()
   doc.pages[p].put(text)
 
-template f2s(a: expr): expr =
+template f2s(a: typed): untyped =
   formatFloat(a,ffDecimal,4)
 
 proc f2sn(a: float64): string =

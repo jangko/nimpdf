@@ -302,7 +302,7 @@ method write(obj: arrayObj, s: Stream, enc: pdfEncrypt) =
   s.write ']'
 
 proc add*(obj: arrayObj, val: pdfObj) =
-  assert ((val.objID and OTYPE_DIRECT) == 0)
+  assert((val.objID and OTYPE_DIRECT) == 0)
   if (val.objID and OTYPE_INDIRECT) != 0:
     var proxy = proxyObjNew(val)
     proxy.objID = proxy.objID or OTYPE_DIRECT
@@ -353,10 +353,10 @@ proc getItem*(obj: arrayObj, index: int, class: objectClass): pdfObj =
   if result.class == CLASS_PROXY:
     result = proxyObj(result).value
 
-  assert result.class == class
+  assert(result.class == class)
 
 proc insert[T](dest: var seq[T], obj: T, pos: int) =
-  assert ((pos >= 0) and (pos <= dest.len))
+  assert((pos >= 0) and (pos <= dest.len))
   if pos == dest.len:
     dest.add obj
     return
@@ -371,7 +371,7 @@ proc insert[T](dest: var seq[T], obj: T, pos: int) =
 
 proc insert*(arr: arrayObj, target, val: pdfObj): bool =
   var obj = val
-  assert ((obj.objID and OTYPE_DIRECT) == 0)
+  assert((obj.objID and OTYPE_DIRECT) == 0)
   if (obj.objID and OTYPE_INDIRECT) != 0:
     var proxy = proxyObjNew(val)
     proxy.objID = proxy.objID or OTYPE_DIRECT
@@ -553,8 +553,8 @@ proc xrefNew*(offset: int = 0): pdfXref =
     result.entries.add en
 
 proc add*(x: pdfXref, obj: pdfObj) =
-  assert ((obj.objID and OTYPE_DIRECT) == 0)
-  assert ((obj.objID and OTYPE_INDIRECT) == 0)
+  assert((obj.objID and OTYPE_DIRECT) == 0)
+  assert((obj.objID and OTYPE_INDIRECT) == 0)
 
   var en: xrefEntry
   new(en)
@@ -575,7 +575,7 @@ proc numEntries*(x: pdfXref): int = x.entries.len
 proc getEntryObjectById*(x: pdfXref, objID: int): xrefEntry =
   var tmp = x
   while tmp != nil:
-    assert ((tmp.entries.len + tmp.start_offset) <= objID)
+    assert((tmp.entries.len + tmp.start_offset) <= objID)
     if tmp.start_offset < objID:
       tmp = tmp.prev
       continue

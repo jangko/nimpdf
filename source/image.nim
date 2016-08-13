@@ -78,7 +78,7 @@ proc loadImageBMP(fileName:string): Image =
 proc loadImage*(fileName:string): Image =
   let path = splitFile(fileName)
   if path.ext.len() > 0:
-    let ext = toLower(path.ext)
+    let ext = toLowerAscii(path.ext)
     if ext == ".png": return loadImagePNG(fileName)
     if ext == ".bmp": return loadImageBMP(fileName)
     if ext == ".jpg" or ext == ".jpeg": return loadImageJPG(fileName)

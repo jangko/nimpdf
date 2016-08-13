@@ -100,21 +100,6 @@ const
   RLE_ENDOFBITMAP = 1
   RLE_DELTA       = 2
 
-proc toHex*(input: string) =
-  var i = 0
-  for x in 0..input.high:
-    write(stdout, toHex(ord(input[x]), 2))
-    inc i
-    if i == 40:
-      write(stdout, "\n")
-      i = 0
-  if i < 40:
-    write(stdout, "\n")
-
-proc show*[T](mode: T) =
-  for k, v in fieldPairs(mode):
-    echo k, " ", $v
-
 proc BMPError(msg: string): ref Exception =
   new(result)
   result.msg = msg
@@ -302,7 +287,7 @@ proc readPixels16(bmp: BMP, s: Stream, bytesToSkip: int) =
   let BShift = makeShift(BMask)
   let RShift = makeShift(RMask)
 
-  template read16bitRow(): stmt =
+  template read16bitRow(): untyped =
     for i in 0.. <bmp.width:
       var val = s.readWORD()
       let px = row * bmp.width + i
@@ -366,8 +351,8 @@ proc readPixelsRLE4(bmp: BMP, s: Stream) =
         let deltaY = s.readChar.ord
 
         #apply them
-        inc (bits, deltaX)
-        inc (scanLine, deltaY)
+        inc(bits, deltaX)
+        inc(scanLine, deltaY)
       else:
         #Absolute mode
         let count = min(statusByte, bmp.width - bits)
@@ -415,8 +400,8 @@ proc readPixelsRLE8(bmp: BMP, s: Stream) =
         let deltaY = s.readChar.ord
 
         #apply them
-        inc (bits, deltaX)
-        inc (scanLine, deltaY)
+        inc(bits, deltaX)
+        inc(scanLine, deltaY)
       else:
         if scanLine >= bmp.height: return
         let count = min(statusByte, bmp.width - bits)
@@ -463,7 +448,7 @@ proc readPixels32(bmp: BMP, s: Stream, bytesToSkip: int) =
   let maxG = GMask shr GShift
   let maxB = BMask shr BShift
 
-  template read32bitMasked(): stmt =
+  template read32bitMasked(): untyped =
     for i in 0.. <bmp.width:
       var val = s.readDWORD()
       let px = row * bmp.width + i

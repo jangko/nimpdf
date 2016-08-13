@@ -174,21 +174,21 @@ proc PUT_UINT64_BE(n: uint64, b: var cstring, i: int) =
   var val = n
   bigEndian64(addr(b[i]), addr(val))
 
-template a(i:int):expr = T[(0 - i) and 7]
-template b(i:int):expr = T[(1 - i) and 7]
-template c(i:int):expr = T[(2 - i) and 7]
-template d(i:int):expr = T[(3 - i) and 7]
-template e(i:int):expr = T[(4 - i) and 7]
-template f(i:int):expr = T[(5 - i) and 7]
-template g(i:int):expr = T[(6 - i) and 7]
-template h(i:int):expr = T[(7 - i) and 7]
+template a(i:int):untyped = T[(0 - i) and 7]
+template b(i:int):untyped = T[(1 - i) and 7]
+template c(i:int):untyped = T[(2 - i) and 7]
+template d(i:int):untyped = T[(3 - i) and 7]
+template e(i:int):untyped = T[(4 - i) and 7]
+template f(i:int):untyped = T[(5 - i) and 7]
+template g(i:int):untyped = T[(6 - i) and 7]
+template h(i:int):untyped = T[(7 - i) and 7]
 
 proc Ch[T: uint32|uint64](x, y, z: T): T {.inline.} = (z xor (x and (y xor z)))
 proc Maj[T: uint32|uint64](x, y, z: T): T {.inline.} = ((x and y) or (z and (x or y)))
 proc rotr[T: uint32|uint64](num: T, amount: int): T {.inline.} =
   result = (num shr T(amount)) or (num shl T(8 * sizeof(num) - amount))
 
-template R(i: int): stmt =
+template R(i: int): untyped =
   h(i) += S1(e(i)) + Ch(e(i), f(i), g(i)) + K[i + j]
 
   if j != 0:
@@ -394,7 +394,12 @@ proc `$`*(sha: SHA256Digest): string = toString(sha)
 proc `$`*(sha: SHA384Digest): string = toString(sha)
 proc `$`*(sha: SHA512Digest): string = toString(sha)  
 
-proc toHex*[T: SHA224Digest|SHA256Digest|SHA384Digest|SHA512Digest](input: T): string =
+proc toHexImpl[T](input: T): string =
   result = ""
   for c in input:
     result.add toHex(ord(c), 2)
+    
+proc hex*(sha: SHA224Digest): string = toHexImpl(sha)
+proc hex*(sha: SHA256Digest): string = toHexImpl(sha)
+proc hex*(sha: SHA384Digest): string = toHexImpl(sha)
+proc hex*(sha: SHA512Digest): string = toHexImpl(sha)  

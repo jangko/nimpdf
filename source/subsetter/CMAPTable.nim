@@ -172,23 +172,23 @@ proc makeCMAP4(data: FontData): CMAP4 =
   result.data = data
 
 proc SubHeaderKey(t: CMAP2, idx: int): int =
-  assert (idx >= 0 and idx <= 256)
+  assert(idx >= 0 and idx <= 256)
   result = t.data.ReadUShort(kSubHeaderKeyStart + Datasize.kUSHORT * idx) div 8
 
 proc FirstCode(t: CMAP2, idx: int): int =
-  assert (idx >= 0 and idx <= t.numSubHeaders)
+  assert(idx >= 0 and idx <= t.numSubHeaders)
   result = t.data.ReadUShort(kSubHeaderStart + kSubHeaderSize * idx + kFirstCode)
 
 proc EntryCount(t: CMAP2, idx: int): int =
-  assert (idx >= 0 and idx <= t.numSubHeaders)
+  assert(idx >= 0 and idx <= t.numSubHeaders)
   result = t.data.ReadUShort(kSubHeaderStart + kSubHeaderSize * idx + kEntryCount)
 
 proc IdDelta(t: CMAP2, idx: int): int =
-  assert (idx >= 0 and idx <= t.numSubHeaders)
+  assert(idx >= 0 and idx <= t.numSubHeaders)
   result = t.data.ReadShort(kSubHeaderStart + kSubHeaderSize * idx + kIdDelta)
 
 proc IdRangeOffset(t: CMAP2, idx: int): int =
-  assert (idx >= 0 and idx <= t.numSubHeaders)
+  assert(idx >= 0 and idx <= t.numSubHeaders)
   result = t.data.ReadUShort(kSubHeaderStart + kSubHeaderSize * idx + kIdRangeOffset)
   
 proc GlyphIdArrayLength(t: CMAP2): int =
