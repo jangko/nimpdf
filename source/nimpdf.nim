@@ -1264,7 +1264,7 @@ proc makeOutline*(ot: Outline, title: string, dest: Destination): Outline =
   result.title = title
   result.objID = 0
 
-proc initRect(x,y,w,h: float64): Rectangle =
+proc initRect*(x,y,w,h: float64): Rectangle =
   result.x = x
   result.y = y
   result.w = w

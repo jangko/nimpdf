@@ -76,4 +76,5 @@ The documentation provided may not be complete, please help to improve it
 
 #Installation and build instructions
 
-see documentation
+* build general demo: `nim c demo`
+* build specific demo: goto nimPDF/demo folder, type `nim e build.nims`

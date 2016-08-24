@@ -3,10 +3,10 @@
 <</Type/Catalog/Pages 5 0 R>>
 endobj
 2 0 obj
-<</Type/Font/Subtype/Type1/Encoding/StandardEncoding/BaseFont/Helvetica-Bold>>
+<</Type/Font/Subtype/Type1/BaseFont/Helvetica-Bold/Encoding/StandardEncoding>>
 endobj
 3 0 obj
-<</Type/Font/Subtype/Type1/Encoding/StandardEncoding/BaseFont/Times-Roman>>
+<</Type/Font/Subtype/Type1/BaseFont/Times-Roman/Encoding/StandardEncoding>>
 endobj
 4 0 obj
 <</Font<</F1 2 0 R/F2 3 0 R>>>>
@@ -15,7 +15,7 @@ endobj
 <</Kids[8 0 R]/Type/Pages/Count 1>>
 endobj
 6 0 obj
-<</Filter[/FlateDecode]/Length 7 0 R>>
+<</Length 7 0 R/Filter[/FlateDecode]>>
 stream
 x‘ÍKÃ@Åïù+Æ›ÜîÎÇîæZš(¢FëŠ¹ˆõ£	Ô¯¿ÞIÚT1æíÎäý“q‚QéÀ±q#±gñ>‡tEÊ¬±úÀ×ÒÍ3ý
 ÑBT!LiÛiz^@º<) ¬ŽLŠ£jÒý¯^Ó½£Qª@Ès5´„¢‘ˆvCpÆ"yèšì¬‡ŽJ„ÕüsG´ÉªmF#.¬5N‚‘j©CÂª©Fv5R¯Y+Öè-¬ÚÄõêK¼	ÿw¶g2:â×lVÛ |¶ªû*ÃyuoãUk6Ô{÷\o¢XpûÍbÑÂEÛ-f[ß¬œ3DQ×êu©^t§?¬$z£Í°ú‘·œ.ï®`Üµ¯OP¶op°||†ê¥é ï^}¼Ã¤o@Ÿ‹{†
@@ -25,10 +25,10 @@ endobj
 305
 endobj
 8 0 obj
-<</Type/Page/Resources 4 0 R/Parent 5 0 R/Contents 6 0 R/MediaBox[0.0000 0.0000 595.2756 841.8898]>>
+<</Type/Page/MediaBox[0.0000 0.0000 595.2756 841.8898]/Parent 5 0 R/Contents 6 0 R/Resources 4 0 R>>
 endobj
 9 0 obj
-<</CreationDate(D:20151017163726)/Author(Andri\040Lim)/Subject(TTF\040Font\040Demo)/Producer(nimPDF)/Title(TTF\040DEMO)>>
+<</CreationDate(D:20160824102509)/Producer(nimPDF)/Title(TTF\040DEMO)/Subject(TTF\040Font\040Demo)/Author(Andri\040Lim)>>
 endobj
 xref
 0 10
