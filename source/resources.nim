@@ -1,4 +1,4 @@
-import gstate, objects, fontmanager, image
+import gstate, objects, fontmanager, image, "subsetter/Font"
 
 proc putGradients*(xref: pdfXref, gradients: seq[Gradient]): dictObj =
   if gradients.len > 0: result = dictObjNew()

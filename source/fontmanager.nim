@@ -25,20 +25,11 @@ type
 
   FontStyles* = set[FontStyle]
 
-  FontType* = enum
-    FT_BASE14, FT_TRUETYPE
-
   EncodingType* = enum
     ENC_STANDARD, ENC_MACROMAN, ENC_WINANSI, ENC_UTF8
 
   BBox = object
     x1,y1,x2,y2 : int
-
-  Font* = ref object of RootObj
-    ID*: int
-    objID*: int
-    subType*: FontType
-    searchName*: string
 
   TTFont* = ref object of Font
     font*: FontDef

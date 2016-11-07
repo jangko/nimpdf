@@ -7,7 +7,7 @@
 # the main module for nimPDF, import this one from your project
 
 import strutils, streams, sequtils, times, math, basic2d, algorithm, tables
-import image, wtf8, "subsetter/font", gstate, path, fontmanager, unicode
+import image, wtf8, "subsetter/Font", gstate, path, fontmanager, unicode
 import objects, resources, encryptdict, encrypt, os
 
 export encryptdict.DocInfo, encrypt.encryptMode

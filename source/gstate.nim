@@ -6,7 +6,7 @@
 #-----------------------------------------
 # graphic state
 
-import math, basic2d, fontmanager, image
+import math, basic2d, fontmanager, image, "subsetter/Font"
 
 const
   PGU_K_MM = 72/25.4
@@ -55,7 +55,7 @@ type
     PGU_PT, PGU_MM, PGU_CM, PGU_IN
 
   SizeUnit* = distinct float64
-  
+
   PageUnit* = object
     unitType*: PageUnitType
     k*: float64
