@@ -1,6 +1,6 @@
 # Copyright (c) 2015 Andri Lim
 #
-# Distributed under the MIT license 
+# Distributed under the MIT license
 # (See accompanying file LICENSE.txt)
 #
 #-----------------------------------------
@@ -10,17 +10,17 @@ const
   kTableVersion = 0
   kNumberOfEncodingTables = 2
   kHeaderSize = 4
-  
+
   kSubtableEntryStart = 4
   kPlatformID = 0
   kEncodingID = 2
   kSubtableOffset = 4
   kSubtableEntrySize = 8
-  
+
   kFormat = 0
   kLength = 2
   kVersion = 4
-  
+
   kSegCountX2 = 6
   kSearchRange = 8
   kEntrySelector = 10
@@ -34,35 +34,35 @@ const
   kEntryCount = 2
   kIdDelta = 4
   kIdRangeOffset = 6
-  
+
   knGroups = 12
   kGroupStart = 16
   kGroupSize = 12
   kStartCode = 0
   kEndCode = 4
   kStartGlyphCode = 8
-  
+
   kLength32 = 4
   kVersion32 = 8
 type
   TONGID* = tuple[oldGID, newGID: int]
   CH2GIDMAP* = OrderedTable[int, TONGID]
   RANGES* = OrderedTable[int, seq[int]]
-  
+
   CMAP* = ref object of RootObj
     data: FontData
-  
+
   CMAP0* = ref object of CMAP
   CMAP2* = ref object of CMAP
     numSubHeaders: int
-    
+
   CMAP4* = ref object of CMAP
   CMAP6* = ref object of CMAP
   CMAP12* = ref object of CMAP
-  
+
   CMAPTable* = ref object of FontTable
     encodingcmap: CMAP
-  
+
 proc Format*(t: CMAP): int =
   result = t.data.ReadUShort(kFormat)
 
@@ -77,21 +77,21 @@ method Length(t: CMAP12): int =
 
 method Version(t: CMAP12): int =
   result = t.data.ReadULongAsInt(kVersion32)
-  
-method GlyphIndex*(t: CMAP, charCode: int): int {.base.} = 
+
+method GlyphIndex*(t: CMAP, charCode: int): int {.base.} =
   discard
 
-method GlyphIndex*(t: CMAP0, charCode: int): int = 
+method GlyphIndex*(t: CMAP0, charCode: int): int =
   if charCode < 0 or charCode > 255: return 0
   result = t.data.ReadUByte(6 + charCode)
 
 proc makeCMAP0(data: FontData): CMAP0 =
   new(result)
   result.data = data
-  
+
 proc SegCount(t: CMAP4): int =
   result = int(t.data.ReadUShort(kSegCountX2) div 2)
-  
+
 proc EndCode(t: CMAP4, index: int): int =
   result = t.data.ReadUShort(kSegmentStart + index * Datasize.kUSHORT)
 
@@ -118,8 +118,8 @@ proc GlyphIdArrayLength(t: CMAP4): int =
   let segcount = t.SegCount() * 4
   let offset = kSegmentStart + segcount * DataSize.kUSHORT + Datasize.kUSHORT
   result = int((t.Length() - offset) div 2)
-  
-proc GlyphIndex1*(t: CMAP4, charCode: int): int = 
+
+proc GlyphIndex1*(t: CMAP4, charCode: int): int =
   let segCount = t.SegCount()
   if segCount == 0: return 0 #no glyph
 
@@ -127,22 +127,22 @@ proc GlyphIndex1*(t: CMAP4, charCode: int): int =
   while i < segCount:
     if charCode <= t.EndCode(i): break
     inc(i)
-  
+
   let startCode = t.StartCode(i)
   let idDelta = t.idDelta(i)
   let idRangeOffset = t.idRangeOffset(i)
-  
+
   if startCode > charCode: return 0 #missing glyph
   if idRangeOffset == 0: return (charCode + idDelta) and 0xFFFF
-  
+
   let idx = int(idRangeOffset div 2) + (charCode - startCode) - (segCount - i)
   if idx >= t.GlyphIdArrayLength(): return 0
-  
+
   let GlyphId = t.GlyphIdArray(idx)
   if GlyphId == 0: return 0
   result = (GlyphId + idDelta) and 0xFFFF
 
-method GlyphIndex*(t: CMAP4, charCode: int): int = 
+method GlyphIndex*(t: CMAP4, charCode: int): int =
   let segCount = t.SegCount()
   if segCount == 0: return 0 #no glyph
 
@@ -150,19 +150,19 @@ method GlyphIndex*(t: CMAP4, charCode: int): int =
   while i < segCount:
     if charCode <= t.EndCode(i): break
     inc(i)
-  
+
   let startCode = t.StartCode(i)
   let IdDelta = t.idDelta(i)
   let IdRangeOffsetOffset = idRangeOffsetOffset(segCount, i)
   let IdRangeOffset = t.data.ReadUShort(IdRangeOffsetOffset)
-  
+
   if startCode > charCode: return 0 #missing glyph
   if IdRangeOffset == 0: return (charCode + IdDelta) and 0xFFFF
-  
+
   #(idRangeOffset[i] / 2) + (charCode - StartCode) + &idRangeOffset[i]
   let offset = IdRangeOffset + Datasize.kUSHORT * (charCode - startCode) + IdRangeOffsetOffset
   if offset > (t.Length() - Datasize.kUSHORT): return 0
-  
+
   let GlyphId = t.data.ReadUShort(offset)
   if GlyphId == 0: return 0
   result = (GlyphId + IdDelta) and 0xFFFF
@@ -190,7 +190,7 @@ proc IdDelta(t: CMAP2, idx: int): int =
 proc IdRangeOffset(t: CMAP2, idx: int): int =
   assert(idx >= 0 and idx <= t.numSubHeaders)
   result = t.data.ReadUShort(kSubHeaderStart + kSubHeaderSize * idx + kIdRangeOffset)
-  
+
 proc GlyphIdArrayLength(t: CMAP2): int =
   result = (t.Length() - 518 - t.numSubHeaders * 8) div 2
 
@@ -205,54 +205,54 @@ proc GetSubHeader(t: CMAP2, charCode: int): int =
     if charHi == 0:
       # an 8-bit character code -- we use subHeader 0 in this case
       # to test whether the character code is in the charmap
-        
+
       # check that the sub-header for this byte is 0, which
       # indicates that it is really a valid one-byte value
       if t.SubHeaderKey(charLo) == 0: result = 0
     else:
       # a 16-bit character code
       let i = t.SubHeaderKey(charLo)
-        
+
       # check that the high byte isn't a valid one-byte value
       if i != 0: result = i
-      
+
 method GlyphIndex*(t: CMAP2, charCode: int): int =
   proc idRangeOffsetOffset(idx: int): int {.inline.} =
     result = kSubHeaderStart + kSubHeaderSize * idx + kIdRangeOffset
-    
+
   result = 0
   let subheader = t.GetSubHeader(charCode)
   if subheader >= 0:
     var idx = charCode and 0xFF
-  
+
     let firstCode     = t.FirstCode(subheader)
     let entryCount    = t.EntryCount(subheader)
     let idDelta       = t.IdDelta(subheader)
     var idRangeOffset = t.IdRangeOffset(subheader)
-  
+
     idx -= firstCode
     if (idx < entryCount) and (idRangeOffset != 0):
       let offset = idRangeOffset + Datasize.kUSHORT * idx + idRangeOffsetOffset(subheader)
       if offset > (t.Length() - Datasize.kUSHORT): return 0
       idx = t.data.ReadUShort(offset)
       if idx != 0: result = (idx + idDelta) and 0xFFFF
-      
+
 proc makeCMAP2(data: FontData): CMAP2 =
   new(result)
   result.data = data
   result.numSubHeaders = 0
   for i in 0..255:
     result.numSubHeaders = max(result.numSubHeaders, result.SubHeaderKey(i))
-  
+
   #the number of subHeaders is one plus the max of subHeaderKeys
   inc result.numSubHeaders
-  
+
 proc FirstCode(t: CMAP6): int =
   result = t.data.ReadUShort(6 + kFirstCode)
-  
+
 proc EntryCount(t: CMAP6): int =
   result = t.data.ReadUShort(6 + kEntryCount)
-  
+
 proc GlyphIndexArray(t: CMAP6, idx: int): int =
   result = t.data.ReadUShort(10 + idx * Datasize.kUSHORT)
 
@@ -261,32 +261,33 @@ method GlyphIndex*(t: CMAP6, charCode: int): int =
   let idx = charCode - t.FirstCode()
   if idx < t.EntryCount():
     result = t.GlyphIndexArray(idx)
-    
+
 proc makeCMAP6(data: FontData): CMAP6 =
   new(result)
   result.data = data
 
-proc nGroups(t: CMAP12): int = 
+proc nGroups(t: CMAP12): int =
   result = t.data.ReadULongAsInt(knGroups)
 
-proc StartCode(t: CMAP12, idx: int): int = 
+proc StartCode(t: CMAP12, idx: int): int =
   result = t.data.ReadULongAsInt(kGroupStart + idx * kGroupSize + kStartCode)
-  
-proc EndCode(t: CMAP12, idx: int): int = 
+
+proc EndCode(t: CMAP12, idx: int): int =
   result = t.data.ReadULongAsInt(kGroupStart + idx * kGroupSize + kEndCode)
 
-proc StartGlyphCode(t: CMAP12, idx: int): int = 
+proc StartGlyphCode(t: CMAP12, idx: int): int =
   result = t.data.ReadULongAsInt(kGroupStart + idx * kGroupSize + kStartGlyphCode)
 
 method GlyphIndex*(t: CMAP12, charCode: int): int =
   result = 0
   var i = t.nGroups() - 1
   while (i >= 0) and (charCode <= t.EndCode(i)):
-    let startCode = t.StartCode(i) 
+    let startCode = t.StartCode(i)
     if charCode >= startCode:
       result = charCode - startCode + t.StartGlyphCode(i)
       break
-    
+    dec i
+
 proc makeCMAP12(data: FontData): CMAP12 =
   new(result)
   result.data = data
@@ -315,7 +316,7 @@ proc FindEncodingCMap(t: CMAPTable, filter: proc(platformID, encodingID, format:
     let offsetx = t.SubtableOffset(i)
     let format = t.data.ReadUShort(offsetx + kFormat)
     let length = if format in {0, 2, 4, 6}: t.data.ReadUShort(offsetx + kLength) else: t.data.ReadULongAsInt(offsetx + 4)
-    
+
     if filter(platformID, encodingID, format):
       if format == 12: result = makeCMAP12(t.data.Slice(offsetx, length))
       if format == 4: result = makeCMAP4(t.data.Slice(offsetx, length))
@@ -326,18 +327,18 @@ proc FindEncodingCMap(t: CMAPTable, filter: proc(platformID, encodingID, format:
 
 proc CMAPAvailable*(t: CMAPTable, filter: proc(platformID, encodingID, format: int): bool): bool =
   let numberOfEncodingTables = t.NumberOfEncodingTables()
-  
+
   for i in 0..numberOfEncodingTables-1:
     let platformID = t.PlatformID(i)
     let encodingID = t.EncodingID(i)
     let offsetx = t.SubtableOffset(i)
     let format = t.data.ReadUShort(offsetx + kFormat)
-    
+
     if filter(platformID, encodingID, format):
       return true
-      
+
   return false
-  
+
 proc makeCMAPTable*(header: Header, data: FontData): CMAPTable =
   new(result)
   initFontTable(result, header, data)
@@ -345,22 +346,22 @@ proc makeCMAPTable*(header: Header, data: FontData): CMAPTable =
 
 proc GetEncodingCMAP*(t: CMAPTable): CMAP =
   if t.encodingcmap != nil: return t.encodingcmap
-  
+
   t.encodingcmap = t.FindEncodingCMap(
     proc(platformID, encodingID, format: int): bool =
       result = (platformID == 3) and (encodingID == 10) and (format == 12))
   if t.encodingcmap != nil: return t.encodingcmap
-  
+
   t.encodingcmap = t.FindEncodingCMap(
     proc(platformID, encodingID, format: int): bool =
       result = (platformID == 0) and (encodingID == 4) and (format == 12))
   if t.encodingcmap != nil: return t.encodingcmap
-  
+
   t.encodingcmap = t.FindEncodingCMap(
     proc(platformID, encodingID, format: int): bool =
       result = (platformID == 3) and (encodingID == 1) and (format == 4) )
   if t.encodingcmap != nil: return t.encodingcmap
-  
+
   t.encodingcmap = t.FindEncodingCMap(
     proc(platformID, encodingID, format: int): bool =
       result = (platformID == 0) and (format == 4) )
@@ -370,9 +371,9 @@ proc GetEncodingCMAP*(t: CMAPTable): CMAP =
     proc(platformID, encodingID, format: int): bool =
       result = (platformID == 1) and (format == 0) )
   if t.encodingcmap != nil: return t.encodingcmap
-  
+
   result = nil
-  
+
 proc EncodeCMAP0(CH2GID: CH2GIDMAP): FontData =
   let size = 6 + 256
   var fd = makeFontData(size)
@@ -380,7 +381,7 @@ proc EncodeCMAP0(CH2GID: CH2GIDMAP): FontData =
   discard fd.WriteUShort(kLength, size)
   discard fd.WriteUShort(kVersion, 0)
   for i in 0..255:
-    if CH2GID.hasKey(i): 
+    if CH2GID.hasKey(i):
       let id = CH2GID[i].newGID
       if id >= 0 and id <= 255: discard fd.WriteByte(6 + i, chr(id))
       else: discard fd.WriteByte(6 + i, chr(0))
@@ -408,10 +409,10 @@ proc makeRanges*(CH2GID: CH2GIDMAP): RANGES =
 
   ranger.sort(proc(x,y: tuple[key: int, val: seq[int]] ):int = cmp(x.key,y.key) )
   result = ranger
-  
+
 proc EncodeCMAP4(CH2GID: CH2GIDMAP): FontData =
   let ranger = makeRanges(CH2GID)
-  
+
   var segCount = ranger.len + 1
   var endCode, startCode, idDelta, idRangeOffsets: seq[int]
   newSeq(endCode, segCount)
@@ -419,12 +420,12 @@ proc EncodeCMAP4(CH2GID: CH2GIDMAP): FontData =
   newSeq(idDelta, segCount)
   newSeq(idRangeOffsets, segCount)
   var glyphIDs: seq[int] = @[]
-  
+
   var i = 0
   for start, subrange in ranger:
     startCode[i] = start
     endCode[i] = start + (len(subrange)-1)
-    
+
     let startGlyph = subrange[0]
     if start - startGlyph >= 0x8000:
       idDelta[i] = 0
@@ -433,9 +434,9 @@ proc EncodeCMAP4(CH2GID: CH2GIDMAP): FontData =
     else:
       idDelta[i] = -(start-subrange[0])
       idRangeOffsets[i] = 0
-      
+
     inc(i)
-  
+
   startCode[i] = 0xFFFF
   endCode[i] = 0xFFFF
   idDelta[i] = 1
@@ -446,13 +447,13 @@ proc EncodeCMAP4(CH2GID: CH2GIDMAP): FontData =
   while (searchRange * 2 <= segCount ):
     searchRange = searchRange * 2
     entrySelector = entrySelector + 1
-    
+
   searchRange = searchRange * 2
   var rangeShift = segCount * 2 - searchRange
-    
+
   var size = 16 + (8 * segCount) + glyphIDs.len * 2
   var fd = makeFontData(size)
-  
+
   discard fd.WriteUShort(kFormat, 4)
   discard fd.WriteUShort(kLength, size)
   discard fd.WriteUShort(kVersion, 0)
@@ -460,78 +461,78 @@ proc EncodeCMAP4(CH2GID: CH2GIDMAP): FontData =
   discard fd.WriteUShort(kSearchRange, searchRange)
   discard fd.WriteUShort(kEntrySelector, entrySelector)
   discard fd.WriteUShort(kRangeShift, rangeShift)
-  
+
   var offset = kSegmentStart
-  for i in endCode: 
+  for i in endCode:
     discard fd.WriteUShort(offset, i)
     inc(offset, DataSize.kUSHORT)
-  
+
   #reserved pad
   discard fd.WriteUShort(offset, 0)
   inc(offset, DataSize.kUSHORT)
-  
-  for i in startCode: 
+
+  for i in startCode:
     discard fd.WriteUShort(offset, i)
     inc(offset, DataSize.kUSHORT)
-  
-  for i in idDelta: 
+
+  for i in idDelta:
     discard fd.WriteUShort(offset, i)
     inc(offset, DataSize.kUSHORT)
-  
-  for i in idRangeOffsets: 
+
+  for i in idRangeOffsets:
     discard fd.WriteUShort(offset, i)
     inc(offset, DataSize.kUSHORT)
-  
-  for i in glyphIDs: 
+
+  for i in glyphIDs:
     discard fd.WriteUShort(offset, i)
     inc(offset, DataSize.kUSHORT)
-  
+
   result = fd
 
 proc EncodeCMAP12(CH2GID: CH2GIDMAP): FontData =
   let ranger = makeRanges(CH2GID)
-  
+
   var nGroups = ranger.len
   var endCode, startCode, startGlyph: seq[int]
   newSeq(endCode, nGroups)
   newSeq(startCode, nGroups)
   newSeq(startGlyph, nGroups)
-  
+
   var i = 0
   for start, subrange in ranger:
     startCode[i] = start
     endCode[i] = start + subrange.high
     startGlyph[i] = subrange[0]
     inc i
-  
+
   let size = 16 + kGroupSize * nGroups
   var fd = makeFontData(size)
   discard fd.WriteUShort(kFormat, 12)
   discard fd.WriteULong(kLength32, size)
   discard fd.WriteULong(kVersion32, 0)
   discard fd.WriteULong(knGroups, nGroups)
-    
+
   for i in 0.. <nGroups:
     discard fd.WriteULong(kGroupStart + kGroupSize * i + kStartCode, startCode[i])
     discard fd.WriteULong(kGroupStart + kGroupSize * i + kEndCode, endCode[i])
     discard fd.WriteULong(kGroupStart + kGroupSize * i + kStartGlyphCode, startGlyph[i])
-  
+
 proc EncodeCMAPTable*(CH2GID: CH2GIDMAP, isSymbol: bool): CMAPTable =
   var tables = [EncodeCMAP0(CH2GID), EncodeCMAP4(CH2GID)]
   let tableStart = kHeaderSize + kSubtableEntrySize * tables.len
   var encID = 1
   if isSymbol: encID = 0
-  
+
   let platformID = [1, 3]
   let encodingID = [0, encID]
 
   var size = tableStart
   for t in tables: size += t.Length()
   var fd = makeFontData(size)
-  
+
   discard fd.WriteUShort(kTableVersion, 0)
   discard fd.WriteUShort(kNumberOfEncodingTables, tables.len)
-  
+
   var subTableOffset = tableStart
   var offset = kHeaderSize
   var i = 0
@@ -543,5 +544,5 @@ proc EncodeCMAPTable*(CH2GID: CH2GIDMAP, isSymbol: bool): CMAPTable =
     inc(i)
     inc(subTableOffset, t.Length())
     inc(offset, kSubtableEntrySize)
-  
+
   result = makeCMAPTable(makeHeader(TAG.cmap, checksum(fd, fd.Length()), 0, fd.Length()), fd)

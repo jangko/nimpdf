@@ -107,7 +107,7 @@ proc GetDescriptor*(f: TTFont): FontDescriptor =
    result = f.font.makeDescriptor(f.CH2GID)
 
 proc GetSubsetBuffer*(f: TTFont, subsetTag: string): string =
-   let fd   = f.font.Subset(f.CH2GID, subsetTag)
+   let fd = f.font.Subset(f.CH2GID, subsetTag)
    result = fd.GetInternalBuffer()
 
 method CanWriteVertical*(f: Font): bool {.base.} = false
@@ -248,7 +248,7 @@ proc init*(ff: var FontManager, fontDirs: seq[string]) =
 
   #echo ff.TTFontList
   #echo ff.TTCList
-    
+
   newSeq(ff.BaseFont, 14)
 
   for i in 0..high(BUILTIN_FONTS):
