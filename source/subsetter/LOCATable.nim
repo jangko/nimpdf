@@ -44,7 +44,7 @@ proc makeLOCATable*(header: Header, data: FontData): LOCATable =
   result.version = 0
   result.num_glyphs = 0
 
-iterator items(t: LOCATable): int =
+iterator items*(t: LOCATable): int =
   var i = 0
   while i < t.num_glyphs:
     yield t.Loca(i)

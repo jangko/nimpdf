@@ -1076,6 +1076,9 @@ proc draw_demo_12(doc: Document) =
   doc.setFont("Calligrapher", {FS_REGULAR}, 4)
   doc.drawText(15, 90, SAMP_TEXT)
 
+  doc.setFont("FreeMono", {FS_REGULAR}, 5'f64, ENC_UTF8)
+  doc.drawText(15, 110, "Обычный текст в кодировке UTF-8")
+
 proc draw_demo_13(doc: Document) =
   let size = getSizeFromName("A1")
   doc.addPage(size, PGO_LANDSCAPE)
