@@ -42,13 +42,13 @@ type
 
   Base14* = ref object of Font
     baseFont* : string
-    get_width : proc(cp: int): int
+    getWidth : proc(cp: int): int {.locks:0.}
     is_font_specific : bool
     ascent, descent, x_height, cap_height : int
     bbox : BBox
-    missing_width: int
+    missingWidth: int
     encoding*: EncodingType
-    encode: proc(val: int): int
+    encode: proc(val: int): int {.locks:0.}
 
   TextWidth* = object
     numchars*, width*, numspace*, numwords*: int
@@ -184,8 +184,8 @@ method GetTextWidth(f: Base14, text: string): TextWidth =
   for i in 0..text.len-1:
     b = ord(text[i])
     inc(result.numchars)
-    var ww = f.get_width(f.encode(b))
-    if ww == 0: ww = f.missing_width
+    var ww = f.getWidth(f.encode(b))
+    if ww == 0: ww = f.missingWidth
     result.width += ww
     if chr(b) in Whitespace:
       inc(result.numspace)
@@ -246,9 +246,9 @@ proc init*(ff: var FontManager, fontDirs: seq[string]) =
     new(ff.BaseFont[i])
     ff.BaseFont[i].baseFont   = BUILTIN_FONTS[i][0]
     ff.BaseFont[i].searchName = BUILTIN_FONTS[i][1]
-    ff.BaseFont[i].get_width  = BUILTIN_FONTS[i][2]
+    ff.BaseFont[i].getWidth   = BUILTIN_FONTS[i][2]
     ff.BaseFont[i].subType    = FT_BASE14
-    ff.BaseFont[i].missing_width = ff.BaseFont[i].get_width(0x20)
+    ff.BaseFont[i].missingWidth = ff.BaseFont[i].getWidth(0x20)
 
 proc makeTTFont(font: FontDef, searchName: string): TTFont =
   var cmap = CMAPTable(font.GetTable(TAG.cmap))
@@ -309,14 +309,14 @@ proc clone(src: Base14): Base14 =
   result.subType = src.subType
   result.searchName = src.searchName
   result.baseFont = src.baseFont
-  result.get_width = src.get_width
+  result.getWidth = src.getWidth
   result.is_font_specific = src.is_font_specific
   result.ascent = src.ascent
   result.descent = src.descent
   result.x_height = src.x_height
   result.cap_height = src.cap_height
   result.bbox = src.bbox
-  result.missing_width = src.missing_width
+  result.missingWidth = src.missingWidth
   result.encoding = src.encoding
   result.encode = src.encode
 

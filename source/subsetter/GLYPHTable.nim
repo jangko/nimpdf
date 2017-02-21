@@ -17,12 +17,12 @@ const
   kFlags = 0
   kGlyphIndex = 2
   
-  ARG_1_AND_2_ARE_WORDS  = 0x0001
-  WE_HAVE_A_SCALE      = 0x0008
-  MORE_COMPONENTS      = 0x0020
+  ARG_1_AND_2_ARE_WORDS    = 0x0001
+  WE_HAVE_A_SCALE          = 0x0008
+  MORE_COMPONENTS          = 0x0020
   WE_HAVE_AN_X_AND_Y_SCALE = 0x0040
-  WE_HAVE_A_TWO_BY_TWO   = 0x0080
-  WE_HAVE_INSTRUCTIONS   = 0x0100
+  WE_HAVE_A_TWO_BY_TWO     = 0x0080
+  #WE_HAVE_INSTRUCTIONS     = 0x0100
   
 type
   GLYPHTable* = ref object of FontTable

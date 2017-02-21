@@ -919,8 +919,8 @@ proc makeCanvas(doc: Document): Canvas =
 
   result = res
 
-proc Transform(cnv: Canvas, p: Point2d): Point2d =
-  result = point2d(cnv.XTransform.Val(p.x), cnv.YTransform.Val(p.y))
+#proc Transform(cnv: Canvas, p: Point2d): Point2d =
+#  result = point2d(cnv.XTransform.Val(p.x), cnv.YTransform.Val(p.y))
 
 proc drawBBox(doc:Document, p: Path): bound =
   let bounds = p.calculateBounds()
@@ -931,12 +931,12 @@ proc drawBBox(doc:Document, p: Path): bound =
   doc.setDash([], 0)
   result = bounds
 
-proc addCurve(cnv: Canvas, curve: Curve, fstart, fend: float64, segments: int): bound =
-  let tf = TransformedCurve(curve, cnv.XTransform, cnv.YTransform)
-  var path = CubicBezierGeometry(tf, fstart, fend, segments)
-  cnv.doc.executePath(path)
-  cnv.doc.stroke()
-  result = cnv.doc.drawBBox(path)
+#proc addCurve(cnv: Canvas, curve: Curve, fstart, fend: float64, segments: int): bound =
+#  let tf = TransformedCurve(curve, cnv.XTransform, cnv.YTransform)
+#  var path = CubicBezierGeometry(tf, fstart, fend, segments)
+#  cnv.doc.executePath(path)
+#  cnv.doc.stroke()
+#  result = cnv.doc.drawBBox(path)
 
 proc addCyclicCurve(cnv: Canvas, curve: CyclicCurve, segments:int): bound =
   let tf = TransformedCurve(curve, cnv.XTransform, cnv.YTransform)

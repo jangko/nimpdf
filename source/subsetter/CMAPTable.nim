@@ -191,11 +191,11 @@ proc IdRangeOffset(t: CMAP2, idx: int): int =
   assert(idx >= 0 and idx <= t.numSubHeaders)
   result = t.data.ReadUShort(kSubHeaderStart + kSubHeaderSize * idx + kIdRangeOffset)
 
-proc GlyphIdArrayLength(t: CMAP2): int =
-  result = (t.Length() - 518 - t.numSubHeaders * 8) div 2
+#proc GlyphIdArrayLength(t: CMAP2): int =
+#  result = (t.Length() - 518 - t.numSubHeaders * 8) div 2
 
-proc GlyphIndexArray(t: CMAP2, idx: int): int =
-  result = t.data.ReadUShort(kSubHeaderStart + kSubHeaderSize * t.numSubHeaders + Datasize.kUSHORT * idx)
+#proc GlyphIndexArray(t: CMAP2, idx: int): int =
+#  result = t.data.ReadUShort(kSubHeaderStart + kSubHeaderSize * t.numSubHeaders + Datasize.kUSHORT * idx)
 
 proc GetSubHeader(t: CMAP2, charCode: int): int =
   result = -1
@@ -292,8 +292,8 @@ proc makeCMAP12(data: FontData): CMAP12 =
   new(result)
   result.data = data
 
-proc TableVersion(t: CMAPTable): int =
-  result = t.data.ReadUShort(kTableVersion)
+#proc TableVersion(t: CMAPTable): int =
+#  result = t.data.ReadUShort(kTableVersion)
 
 proc NumberOfEncodingTables(t: CMAPTable): int =
   result = t.data.ReadUShort(kNumberOfEncodingTables)
@@ -488,7 +488,7 @@ proc EncodeCMAP4(CH2GID: CH2GIDMAP): FontData =
     inc(offset, DataSize.kUSHORT)
 
   result = fd
-
+#[
 proc EncodeCMAP12(CH2GID: CH2GIDMAP): FontData =
   let ranger = makeRanges(CH2GID)
 
@@ -516,7 +516,7 @@ proc EncodeCMAP12(CH2GID: CH2GIDMAP): FontData =
     discard fd.WriteULong(kGroupStart + kGroupSize * i + kStartCode, startCode[i])
     discard fd.WriteULong(kGroupStart + kGroupSize * i + kEndCode, endCode[i])
     discard fd.WriteULong(kGroupStart + kGroupSize * i + kStartGlyphCode, startGlyph[i])
-
+]#
 proc EncodeCMAPTable*(CH2GID: CH2GIDMAP, isSymbol: bool): CMAPTable =
   var tables = [EncodeCMAP0(CH2GID), EncodeCMAP4(CH2GID)]
   let tableStart = kHeaderSize + kSubtableEntrySize * tables.len

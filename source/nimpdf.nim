@@ -14,7 +14,7 @@ export encryptdict.DocInfo, encrypt.encryptMode
 export path, gstate, image, fontmanager
 
 const
-  nimPDFVersion = "0.2.9"
+  nimPDFVersion = "0.3.0"
   defaultFont = "Times"
   PageNames = [
     #my paper size

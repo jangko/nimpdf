@@ -1,0 +1,6 @@
+push button
+check box
+radio button
+
+combo box
+list box

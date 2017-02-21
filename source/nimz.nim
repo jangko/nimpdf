@@ -250,7 +250,7 @@ proc init_coins(c: var Coins, num: int) =
 proc cleanup_coins(c: var Coins, num: int) =
   for i in 0..num-1: c[i].symbols = @[]
 
-proc cmpx(a, b: Coin): int =
+proc cmpx(a, b: Coin): int {.locks:0.} =
   var wa = a.weight
   var wb = b.weight
   if wa > wb: result = 1
@@ -265,7 +265,7 @@ proc append_symbol_coins(coins: Coins, start: int, frequencies: openarray[int], 
       coins[j].symbols.add i
       inc j
 
-proc placePivot[T](a: var openArray[T], lo, hi: int): int =
+proc placePivot[T](a: var openArray[T], lo, hi: int): int {.locks:0.} =
   var pivot = lo #set pivot
   var switch_i = lo + 1
   let x = lo+1
@@ -278,14 +278,14 @@ proc placePivot[T](a: var openArray[T], lo, hi: int): int =
       inc switch_i #set location for i to switch with pivot
   result = pivot #return pivot location
 
-proc quickSort[T](a: var openArray[T], lo, hi: int) =
+proc quickSort[T](a: var openArray[T], lo, hi: int) {.locks:0.} =
   if lo >= hi: return #stop condition
   #set pivot location
   var pivot = placePivot(a, lo, hi)
   quickSort(a, lo, pivot-1) #sort bottom half
   quickSort(a, pivot+1, hi) #sort top half
 
-proc quickSort[T](a: var openArray[T], length = -1) =
+proc quickSort[T](a: var openArray[T], length = -1) {.locks:0.} =
   var lo = 0
   var hi = if length < 0: a.high else: length-1
   quickSort(a, lo, hi)
