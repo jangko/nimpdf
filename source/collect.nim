@@ -81,6 +81,7 @@ proc parseName(tt:TableRec, s:Stream, fontFamily: var string): bool =
     echo "invalid 'name' table"
     return false
 
+  echo count
   for i in 1..count:
     if not s.Read(ne): return false
     let platformID = swap16(ne.platformID)
@@ -92,6 +93,12 @@ proc parseName(tt:TableRec, s:Stream, fontFamily: var string): bool =
     if (stringOffset < storage_start) or ((stringOffset + stringLength) > storage_limit):
       #echo "invalid entry"
       continue
+      
+    echo "plat: ", platformID
+    echo "encoding: ", encodingID
+    echo "lang: ", languageID
+    echo "name: ", nameID
+    
     if stringLength == 0: continue
     if platformID == 1 and encodingID == 0 and languageID == 0 and nameID == 1:
       s.setPosition(stringOffset)
@@ -104,6 +111,7 @@ proc parseName(tt:TableRec, s:Stream, fontFamily: var string): bool =
       fontFamily = fromUnicode(s.readStr(stringLength))
       result = true
       break
+  echo result
 
 proc parseTTF(s:Stream, fontFamily: var string): bool =
   result = false
@@ -139,6 +147,7 @@ proc parseTTF(s:Stream, fontFamily: var string): bool =
       break
 
 proc parseTTF(fileName: string, res: var string): bool =
+  echo fileName
   result = true
   var file = newFileStream(fileName, fmRead)
   if file == nil:
