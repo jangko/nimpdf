@@ -13,7 +13,7 @@
 # TTF: 'font family' + style -> TTF file name
 # TTC: 'font family' + style -> TTC file name + font index number
 
-import macros, strutils, streams, os, strtabs
+import macros, strutils, streams, os, strtabs, endians
 
 macro fourcc(ccx: string): int =
   let cc = ccx.strVal
@@ -40,7 +40,10 @@ proc swap32(v:int32):int32=
   res[1] = val[2]
   res[0] = val[3]
 
-proc swap16(num:int16): int32 {.inline.} = (num shr 8) or (num shl 8)
+proc swap16(num:int16): int {.inline.} =
+  var output: int16
+  bigEndian16(output.addr, num.unsafeAddr)
+  result = output
 
 proc fromUnicode(s:string): string =
   let len = s.len shr 1
@@ -69,36 +72,33 @@ proc parseName(tt:TableRec, s:Stream, fontFamily: var string): bool =
   s.setPosition(tt.offset)
 
   discard s.readInt16() #format
-  let count  = swap16(s.readInt16())
-  let offset = swap16(s.readInt16())
+  let 
+    count  = swap16(s.readInt16())
+    offset = swap16(s.readInt16())
+    storageStart = tt.offset + 6 + 12*count
+    storageLimit = tt.offset + tt.length
+    
   var ne: nameEntry
   result = false
 
-  let storage_start = tt.offset + 6 + 12*count;
-  let storage_limit = tt.offset + tt.length;
-
-  if storage_start > storage_limit:
+  if storageStart > storageLimit:
     echo "invalid 'name' table"
     return false
 
-  echo count
   for i in 1..count:
     if not s.Read(ne): return false
-    let platformID = swap16(ne.platformID)
-    let encodingID = swap16(ne.encodingID)
-    let languageID = swap16(ne.languageID)
-    let nameID = swap16(ne.nameID)
-    let stringOffset = swap16(ne.offset) + tt.offset + offset
-    let stringLength = swap16(ne.length)
-    if (stringOffset < storage_start) or ((stringOffset + stringLength) > storage_limit):
+    let
+      platformID = swap16(ne.platformID)
+      encodingID = swap16(ne.encodingID)
+      languageID = swap16(ne.languageID)
+      nameID     = swap16(ne.nameID)
+      stringOffset = swap16(ne.offset) + tt.offset + offset
+      stringLength = swap16(ne.length)
+
+    if (stringOffset < storageStart) or ((stringOffset + stringLength) > storageLimit):
       #echo "invalid entry"
       continue
-      
-    echo "plat: ", platformID
-    echo "encoding: ", encodingID
-    echo "lang: ", languageID
-    echo "name: ", nameID
-    
+
     if stringLength == 0: continue
     if platformID == 1 and encodingID == 0 and languageID == 0 and nameID == 1:
       s.setPosition(stringOffset)
@@ -111,7 +111,6 @@ proc parseName(tt:TableRec, s:Stream, fontFamily: var string): bool =
       fontFamily = fromUnicode(s.readStr(stringLength))
       result = true
       break
-  echo result
 
 proc parseTTF(s:Stream, fontFamily: var string): bool =
   result = false
@@ -147,7 +146,6 @@ proc parseTTF(s:Stream, fontFamily: var string): bool =
       break
 
 proc parseTTF(fileName: string, res: var string): bool =
-  echo fileName
   result = true
   var file = newFileStream(fileName, fmRead)
   if file == nil:
