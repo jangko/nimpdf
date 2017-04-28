@@ -1,4 +1,4 @@
-#nimPDF
+# nimPDF
 
 nimPDF is a free PDF writer library, written mostly in nim programming language
 
@@ -69,12 +69,12 @@ nimPDF implements the following features(see [demo.pdf](https://github.com/jangk
   - ~~document outline~~
   - permission
 
-#Documentation
+# Documentation
 The documentation is generated using docutils
 
 The documentation provided may not be complete, please help to improve it
 
-#Installation and build instructions
+# Installation and build instructions
 
 * build general demo: `nim c demo`
 * build specific demo: goto nimPDF/demo folder, type `nim e build.nims`
