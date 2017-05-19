@@ -8,7 +8,7 @@ proc addSwitch(sw: string) =
   switches.add " --"
   switches.add sw
 
-addSwitch("path:.." & DirSep & "source")
+addSwitch("path:.." & DirSep & "nimPDF")
 addSwitch("define:release")
 
 let files = [
