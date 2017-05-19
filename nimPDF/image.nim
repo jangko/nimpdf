@@ -10,7 +10,7 @@
 # currently, identify file format only by it's file name extension
 # eg: .png, .jpg, .jpeg, .bmp
 
-import nimBMP, os, strutils, nimPNG, nimz
+import nimBMP, os, strutils, nimPNG, private.nimz
 
 #{.deadCodeElim: on.}
 #{.passC: "-D LODEPNG_NO_COMPILE_CPP".}
@@ -66,7 +66,7 @@ proc loadImageJPG(fileName:string): Image =
 
 proc loadImageBMP(fileName:string): Image =
   var bmp = loadBMP24(fileName)
-  if bmp != nil:
+  if bmp.width != 0 and bmp.height != 0:
     new(result)
     result.width = bmp.width
     result.height = bmp.height

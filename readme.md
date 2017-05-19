@@ -6,7 +6,7 @@ nimPDF was heavily inspired by PHP-[FPDF](http://www.fpdf.org) but also influenc
 
 after lodePNG substituted with PNG decoder written in nim, nimPDF become one step closer to 100% pure nim
 
-nimPDF implements the following features(see [demo.pdf](https://github.com/jangko/nimpdf/blob/master/demo.pdf)):
+nimPDF implements the following features(see [demo.pdf](https://github.com/jangko/nimpdf/blob/master/demo/demo.pdf)):
 
 * **images**
   - PNG -- ~~use [LodePNG](lodev.org/lodepng), still in C~~ now written in nim
@@ -78,3 +78,10 @@ The documentation provided may not be complete, please help to improve it
 
 * build general demo: `nim c demo`
 * build specific demo: goto nimPDF/demo folder, type `nim e build.nims`
+
+# Dependencies
+
+* ![nimBMP](https://github.com/jangko/nimBMP)
+* ![nimPNG](https://github.com/jangko/nimPNG)
+* ![nimAES](https://github.com/jangko/nimAES)
+* ![nimSHA2](https://github.com/jangko/nimSHA2)
