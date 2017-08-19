@@ -49,7 +49,7 @@ nimPDF implements the following features(see [demo.pdf](https://github.com/jangk
   - top-down mode
   - bottom-up mode
   - unit measured in point, inch, and mm
-  
+
 * **others**
   - output to file or memory using nim stream module
   - images, fonts, and other resources search path(s)
@@ -68,6 +68,7 @@ nimPDF implements the following features(see [demo.pdf](https://github.com/jangk
   - table generator(as in FPDF)(will be implemented as separate layer)
   - ~~document outline~~
   - permission
+  - digital signature
 
 # Documentation
 The documentation is generated using docutils
