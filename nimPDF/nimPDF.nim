@@ -746,7 +746,7 @@ proc stretch*(doc: Document, sx,sy,x,y:float64) =
 proc shear(sx,sy,x,y:float64): Matrix2d =
   let
     m = move(-x,-y)
-    s = matrix2d(1,sx,sy,1,0,0)
+    s = matrix2d(1.0,sx,sy,1.0,0.0,0.0)
   result = m & s & move(x,y)
 
 proc skew*(doc: Document, sx,sy:float64) =
