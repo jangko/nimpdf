@@ -129,11 +129,11 @@ proc encryptInitKey*(enc: pdfEncrypt, object_id, gen_no: int) =
     return
 
   var msg: array[0..4, uint8]
-  msg[0] = object_id and 0xFF
-  msg[1] = (object_id shr 8) and 0xFF
-  msg[2] = (object_id shr 16) and 0xFF
-  msg[3] = gen_no and 0xFF
-  msg[4] = (gen_no shr 8) and 0xFF
+  msg[0] = uint8(object_id and 0xFF)
+  msg[1] = uint8((object_id shr 8) and 0xFF)
+  msg[2] = uint8((object_id shr 16) and 0xFF)
+  msg[3] = uint8(gen_no and 0xFF)
+  msg[4] = uint8((gen_no shr 8) and 0xFF)
 
   var ctx: MD5Context
   ctx.md5Init()
@@ -206,10 +206,10 @@ proc createEncryptionKey*(enc: pdfEncrypt) =
   ctx.md5Update(cstring(enc.ownerKey), PDF_PASSWD_LEN)
 
   # Algorithm3.2 step4
-  tmp[0] = enc.permission and 0xFF
-  tmp[1] = (enc.permission shr 8) and 0xFF
-  tmp[2] = (enc.permission shr 16) and 0xFF
-  tmp[3] = (enc.permission shr 24) and 0xFF
+  tmp[0] = uint8(enc.permission and 0xFF)
+  tmp[1] = uint8((enc.permission shr 8) and 0xFF)
+  tmp[2] = uint8((enc.permission shr 16) and 0xFF)
+  tmp[3] = uint8((enc.permission shr 24) and 0xFF)
 
   # Algorithm3.2 step5
   var digest: MD5Digest
@@ -275,7 +275,7 @@ proc computeEncryptionKeyR5*(enc: pdfEncrypt) =
   let r = createRandom16(enc.userPasswd & enc.ownerPasswd)
   let hash = $computeSHA256(r)
   let key  = hash.substr(0, enc.keyLen)
-  for i in 0..enc.keyLen-1: enc.encryptionKey[i] = ord(key[i])
+  for i in 0..enc.keyLen-1: enc.encryptionKey[i] = uint8(key[i])
 
 proc computeUE*(enc: pdfEncrypt) =
   # Algorithm 3.8 step 1
