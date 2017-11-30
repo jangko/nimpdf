@@ -7,12 +7,12 @@ type
   DocInfo* = enum
     DI_CREATOR, DI_PRODUCER, DI_TITLE, DI_SUBJECT, DI_AUTHOR, DI_KEYWORDS
 
-  encryptDict* = ref object of dictObj
-    enc*: pdfEncrypt
+  EncryptDict* = ref object of DictObj
+    enc*: PdfEncrypt
 
-proc newEncryptDict*(): encryptDict =
+proc newEncryptDict*(): EncryptDict =
   new(result)
-  result.dictObjInit()
+  result.initDictObj()
   result.enc = newEncrypt()
   result.subclass = SUBCLASS_ENCRYPT
 
@@ -21,7 +21,7 @@ proc update(ctx: var MD5Context, info: Table[int, string], field: DocInfo) =
   if info.hasKey(idx):
     ctx.md5Update(cstring(info[idx]), info[idx].len)
 
-proc createID(dict: encryptDict, info: Table[int, string], xref: pdfXref) =
+proc createID(dict: EncryptDict, info: Table[int, string], xref: Pdfxref) =
   var enc = dict.enc
   var ctx: MD5Context
 
@@ -41,13 +41,13 @@ proc createID(dict: encryptDict, info: Table[int, string], xref: pdfXref) =
   ctx.md5Update(cast[cstring](addr(len)), sizeof(len))
   ctx.md5Final(enc.encryptID)
 
-proc makeCryptFilter(enc: pdfEncrypt, xref: pdfXref): dictObj =
-  result = dictObjNew()
+proc makeCryptFilter(enc: PdfEncrypt, xref: Pdfxref): DictObj =
+  result = newDictObj()
   #result.subclass = SUBCLASS_CRYPT_FILTERS
   result.subclass = SUBCLASS_ENCRYPT
   xref.add(result)
 
-  var stdCF = dictObjNew()
+  var stdCF = newDictObj()
   #stdCF.subclass = SUBCLASS_CRYPT_FILTER
   stdCF.subclass = SUBCLASS_ENCRYPT
   stdCF.addName("Type", "CryptFilter")
@@ -68,7 +68,7 @@ proc saslprepFromUtf8(input: string): string =
   if input.len > 127: result = input.substr(0, 127)
   else: result = input
 
-proc prepare*(dict: encryptDict, info: Table[int, string], xref: pdfXref) =
+proc prepare*(dict: EncryptDict, info: Table[int, string], xref: Pdfxref) =
   var enc = dict.enc
   dict.createID(info, xref)
 
@@ -86,8 +86,8 @@ proc prepare*(dict: encryptDict, info: Table[int, string], xref: pdfXref) =
     enc.createEncryptionKey()
     enc.createUserKey()
 
-  dict.addElement("O", binaryObjNew(enc.ownerKey))
-  dict.addElement("U", binaryObjNew(enc.userKey))
+  dict.addElement("O", newBinaryObj(enc.ownerKey))
+  dict.addElement("U", newBinaryObj(enc.userKey))
   dict.addName("Filter", "Standard")
 
   if enc.mode == ENCRYPT_R2:
@@ -113,13 +113,13 @@ proc prepare*(dict: encryptDict, info: Table[int, string], xref: pdfXref) =
     dict.addNumber("Length", enc.keyLen * 8)
 
   if enc.mode == ENCRYPT_R5:
-    dict.addElement("OE", binaryObjNew(enc.OE))
-    dict.addElement("UE", binaryObjNew(enc.UE))
-    dict.addElement("Perms", binaryObjNew(enc.perms))
+    dict.addElement("OE", newBinaryObj(enc.OE))
+    dict.addElement("UE", newBinaryObj(enc.UE))
+    dict.addElement("Perms", newBinaryObj(enc.perms))
 
   dict.addNumber("P", cast[int](enc.permission))
 
-proc setPassword*(dict: encryptDict, ownerPass, userPass: string): bool =
+proc setPassword*(dict: EncryptDict, ownerPass, userPass: string): bool =
   var enc = dict.enc
   if ownerPass.len <= 2: return false
   if ownerPass == userPass: return false

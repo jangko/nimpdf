@@ -264,39 +264,39 @@ proc newGState*(): GState =
 proc newGState*(gs: GState): GState =
   new(result)
 
-  result.trans_matrix   = gs.trans_matrix
+  result.trans_matrix = gs.trans_matrix
   result.line_width   = gs.line_width
   result.line_cap     = gs.line_cap
   result.line_join    = gs.line_join
   result.miter_limit  = gs.miter_limit
-  result.dash       = gs.dash
+  result.dash         = gs.dash
   result.flatness     = gs.flatness
 
-  result.char_space   = gs.char_space
-  result.word_space   = gs.word_space
-  result.h_scaling    = gs.h_scaling
+  result.char_space     = gs.char_space
+  result.word_space     = gs.word_space
+  result.h_scaling      = gs.h_scaling
   result.text_leading   = gs.text_leading
   result.rendering_mode = gs.rendering_mode
-  result.text_rise    = gs.text_rise
+  result.text_rise      = gs.text_rise
 
   result.cs_stroke    = gs.cs_stroke
-  result.cs_fill    = gs.cs_fill
+  result.cs_fill      = gs.cs_fill
   result.rgb_fill     = gs.rgb_fill
   result.rgb_stroke   = gs.rgb_stroke
   result.cmyk_fill    = gs.cmyk_fill
   result.cmyk_stroke  = gs.cmyk_stroke
   result.alpha_fill   = gs.alpha_fill
-  result.alpha_stroke   = gs.alpha_stroke
+  result.alpha_stroke = gs.alpha_stroke
   result.gray_fill    = gs.gray_fill
   result.gray_stroke  = gs.gray_stroke
   result.blend_mode   = gs.blend_mode
-  result.gradient_fill  = gs.gradient_fill
+  result.gradient_fill= gs.gradient_fill
   result.image_fill   = gs.image_fill
 
-  result.font       = gs.font
+  result.font         = gs.font
   result.font_size    = gs.font_size
-  result.writing_mode   = gs.writing_mode
-  result.prev       = gs
+  result.writing_mode = gs.writing_mode
+  result.prev         = gs
 
 proc freeGState*(gs: GState): GState =
   result = gs

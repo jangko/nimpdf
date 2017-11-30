@@ -323,36 +323,36 @@ let
     (0x00EB, 384), (0x00EC, 494), (0x00ED, 494), (0x00EE, 494), (0x00EF, 494), (0x00F1, 329), (0x00F2, 274), (0x00F3, 686), (0x00F4, 686), (0x00F5, 686),
     (0x00F6, 384), (0x00F7, 384), (0x00F8, 384), (0x00F9, 384), (0x00FA, 384), (0x00FB, 384), (0x00FC, 494), (0x00FD, 494), (0x00FE, 494), (0xFFFF, 0)].newTable()
 
-proc CourierGetWidth(cp: int): int = 600
-proc GetWidth(cp:int, widths: TableRef[int,int]): int =
+proc courierGetWidth(cp: int): int = 600
+proc getWidth(cp:int, widths: TableRef[int,int]): int =
   result = 0
   if widths.hasKey(cp): result = widths[cp]
-  
-proc HelveticaGetWidth(cp: int): int = GetWidth(cp, CHAR_DATA_HELVETICA)
-proc HelveticaBoldGetWidth(cp: int): int = GetWidth(cp, CHAR_DATA_HELVETICA_BOLD)
-proc HelveticaBoldObliqueGetWidth(cp: int): int = GetWidth(cp, CHAR_DATA_HELVETICA_BOLD_OBLIQUE)
-proc HelveticaObliqueGetWidth(cp: int): int = GetWidth(cp, CHAR_DATA_HELVETICA_OBLIQUE)
-proc TimesGetWidth(cp: int): int = GetWidth(cp, CHAR_DATA_TIMES_ROMAN)
-proc TimesBoldGetWidth(cp: int): int = GetWidth(cp, CHAR_DATA_TIMES_BOLD)
-proc TimesItalicGetWidth(cp: int): int = GetWidth(cp, CHAR_DATA_TIMES_ITALIC)
-proc TimesBoldItalicGetWidth(cp: int): int = GetWidth(cp, CHAR_DATA_TIMES_BOLD_ITALIC)
-proc SymbolGetWidth(cp: int): int = GetWidth(cp, CHAR_DATA_SYMBOL)
-proc ZapfDingbatsGetWidth(cp: int): int = GetWidth(cp, CHAR_DATA_ZAPF_DINGBATS)
+
+proc helveticaGetWidth(cp: int): int = getWidth(cp, CHAR_DATA_HELVETICA)
+proc helveticaBoldGetWidth(cp: int): int = getWidth(cp, CHAR_DATA_HELVETICA_BOLD)
+proc helveticaBoldObliqueGetWidth(cp: int): int = getWidth(cp, CHAR_DATA_HELVETICA_BOLD_OBLIQUE)
+proc helveticaObliqueGetWidth(cp: int): int = getWidth(cp, CHAR_DATA_HELVETICA_OBLIQUE)
+proc timesGetWidth(cp: int): int = getWidth(cp, CHAR_DATA_TIMES_ROMAN)
+proc timesBoldGetWidth(cp: int): int = getWidth(cp, CHAR_DATA_TIMES_BOLD)
+proc timesItalicGetWidth(cp: int): int = getWidth(cp, CHAR_DATA_TIMES_ITALIC)
+proc timesBoldItalicGetWidth(cp: int): int = getWidth(cp, CHAR_DATA_TIMES_BOLD_ITALIC)
+proc symbolGetWidth(cp: int): int = getWidth(cp, CHAR_DATA_SYMBOL)
+proc zapfDingbatsGetWidth(cp: int): int = getWidth(cp, CHAR_DATA_ZAPF_DINGBATS)
 
 const
   #BaseFont, SearchName, getWidth, is_font_specific, ascent, descent, x_height, cap_height, bbox
   BUILTIN_FONTS* = [
-    ("Courier", "Courier00", CourierGetwidth, false, 629, -157, 426, 562, (-23, -250, 715, 805) ),
-    ("Courier-Bold", "Courier10", CourierGetwidth, false, 629, -157, 439, 562, (-113, -250, 749, 801) ),
-    ("Courier-Oblique", "Courier01", CourierGetwidth, false, 629, -157, 426, 562, (-27, -250, 849, 805) ),
-    ("Courier-BoldOblique", "Courier11", CourierGetwidth, false, 629, -157, 439, 562,(-57, -250, 869, 801) ),
-    ("Helvetica", "Helvetica00", HelveticaGetwidth, false, 718, -207, 523, 718,(-166, -225, 1000, 931) ),
-    ("Helvetica-Bold", "Helvetica10", HelveticaBoldGetwidth, false, 718, -207, 532, 718,(-170, -228, 1003, 962) ),
-    ("Helvetica-Oblique", "Helvetica01", HelveticaObliqueGetwidth, false, 718, -207, 532, 718,(-170, -225, 1116, 931) ),
-    ("Helvetica-BoldOblique", "Helvetica11", HelveticaBoldObliqueGetwidth, false, 718, -207, 532, 718,(-174, -228, 1114, 962) ),
-    ("Times-Roman", "Times00", TimesGetwidth, false, 683, -217, 450, 662,(-168, -218, 1000, 898) ),
-    ("Times-Bold", "Times10", TimesBoldGetwidth, false, 683, -217, 461, 676,(-168, -218, 1000, 935) ),
-    ("Times-Italic", "Times01", TimesItalicGetwidth, false, 683, -217, 441, 653,(-169, -217, 1010, 883) ),
-    ("Times-BoldItalic", "Times11", TimesBoldItalicGetwidth, false, 683, -217, 462, 669,(-200, -218, 996, 921) ),
-    ("Symbol", "Symbol00", SymbolGetwidth, true, 0, 0, 0, 0,(-180, -293, 1090, 1010) ),
-    ("ZapfDingbats", "ZapfDingbats00", ZapfDingbatsGetwidth, true, 0, 0, 0, 0,(-1, -143, 981, 820) )]
+    ("Courier", "Courier00", courierGetWidth, false, 629, -157, 426, 562, (-23, -250, 715, 805) ),
+    ("Courier-Bold", "Courier10", courierGetWidth, false, 629, -157, 439, 562, (-113, -250, 749, 801) ),
+    ("Courier-Oblique", "Courier01", courierGetWidth, false, 629, -157, 426, 562, (-27, -250, 849, 805) ),
+    ("Courier-BoldOblique", "Courier11", courierGetWidth, false, 629, -157, 439, 562,(-57, -250, 869, 801) ),
+    ("Helvetica", "Helvetica00", helveticaGetWidth, false, 718, -207, 523, 718,(-166, -225, 1000, 931) ),
+    ("Helvetica-Bold", "Helvetica10", helveticaBoldGetWidth, false, 718, -207, 532, 718,(-170, -228, 1003, 962) ),
+    ("Helvetica-Oblique", "Helvetica01", helveticaObliqueGetWidth, false, 718, -207, 532, 718,(-170, -225, 1116, 931) ),
+    ("Helvetica-BoldOblique", "Helvetica11", helveticaBoldObliqueGetWidth, false, 718, -207, 532, 718,(-174, -228, 1114, 962) ),
+    ("Times-Roman", "Times00", timesGetWidth, false, 683, -217, 450, 662,(-168, -218, 1000, 898) ),
+    ("Times-Bold", "Times10", timesBoldGetWidth, false, 683, -217, 461, 676,(-168, -218, 1000, 935) ),
+    ("Times-Italic", "Times01", timesItalicGetWidth, false, 683, -217, 441, 653,(-169, -217, 1010, 883) ),
+    ("Times-BoldItalic", "Times11", timesBoldItalicGetWidth, false, 683, -217, 462, 669,(-200, -218, 996, 921) ),
+    ("Symbol", "Symbol00", symbolGetWidth, true, 0, 0, 0, 0,(-180, -293, 1090, 1010) ),
+    ("ZapfDingbats", "ZapfDingbats00", zapfDingbatsGetWidth, true, 0, 0, 0, 0,(-1, -143, 981, 820) )]

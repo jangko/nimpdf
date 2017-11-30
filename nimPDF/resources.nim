@@ -1,37 +1,37 @@
 import gstate, objects, fontmanager, image, "subsetter/Font"
 
-proc putGradients*(xref: pdfXref, gradients: seq[Gradient]): dictObj =
-  if gradients.len > 0: result = dictObjNew()
+proc putGradients*(xref: Pdfxref, gradients: seq[Gradient]): DictObj =
+  if gradients.len > 0: result = newDictObj()
   for gd in gradients:
     let a = gd.a
     let b = gd.b
 
-    var fn = dictObjNew()
+    var fn = newDictObj()
     fn.addNumber("FunctionType", 2)
     fn.addPlain("Domain", "[0.0 1.0]")
-    fn.addElement("C0", arrayNew(a.r, a.g, a.b))
-    fn.addElement("C1", arrayNew(b.r, b.g, b.b))
+    fn.addElement("C0", newArray(a.r, a.g, a.b))
+    fn.addElement("C1", newArray(b.r, b.g, b.b))
     fn.addNumber("N", 1)
 
-    var grad = dictObjNew()
+    var grad = newDictObj()
     if gd.gradType == GDT_LINEAR:
       let cr = gd.axis
       grad.addNumber("ShadingType", 2)
-      grad.addElement("Coords", arrayNew(cr.x1, cr.y1, cr.x2, cr.y2))
+      grad.addElement("Coords", newArray(cr.x1, cr.y1, cr.x2, cr.y2))
     elif gd.gradType == GDT_RADIAL:
       let cr = gd.radCoord
       grad.addNumber("ShadingType", 3)
-      grad.addElement("Coords", arrayNew(cr.x1, cr.y1, cr.r1, cr.x2, cr.y2, cr.r2))
+      grad.addElement("Coords", newArray(cr.x1, cr.y1, cr.r1, cr.x2, cr.y2, cr.r2))
     grad.addName("ColorSpace", "DeviceRGB")
     grad.addElement("Function", fn)
     grad.addPlain("Extend", "[true true]")
     xref.add(grad)
     result.addElement("Sh" & $gd.ID, grad)
 
-proc putExtGStates*(xref: pdfXref, exts: seq[ExtGState]): dictObj =
-  if exts.len > 0: result = dictObjNew()
+proc putExtGStates*(xref: Pdfxref, exts: seq[ExtGState]): DictObj =
+  if exts.len > 0: result = newDictObj()
   for ex in exts:
-    var ext = dictObjNew()
+    var ext = newDictObj()
     ext.addName("Type", "ExtGState")
     if ex.nonstrokingAlpha > 0.0: ext.addReal("ca", ex.nonstrokingAlpha)
     if ex.strokingAlpha > 0.0: ext.addReal("CA", ex.strokingAlpha)
@@ -39,10 +39,10 @@ proc putExtGStates*(xref: pdfXref, exts: seq[ExtGState]): dictObj =
     xref.add(ext)
     result.addElement("GS" & $ex.ID, ext)
 
-proc putImages*(xref: pdfXref, images: seq[Image]): dictObj =
-  if images.len > 0:  result = dictObjNew()
+proc putImages*(xref: Pdfxref, images: seq[Image]): DictObj =
+  if images.len > 0:  result = newDictObj()
   for img in images:
-    var pic = xref.dictStreamNew(img.data)
+    var pic = xref.newDictStream(img.data)
     pic.addName("Type", "XObject")
     pic.addName("Subtype", "Image")
     pic.addNumber("Width", img.width)
@@ -52,7 +52,7 @@ proc putImages*(xref: pdfXref, images: seq[Image]): dictObj =
     result.addElement("I" & $img.ID, pic)
 
     if img.haveMask():
-      var mask = xref.dictStreamNew(img.mask)
+      var mask = xref.newDictStream(img.mask)
       mask.addName("Type", "XObject")
       mask.addName("Subtype", "Image")
       mask.addNumber("Width", img.width)
@@ -62,9 +62,9 @@ proc putImages*(xref: pdfXref, images: seq[Image]): dictObj =
       pic.addElement("SMask", mask)
       result.addElement("Im" & $img.ID, mask)
 
-proc putBase14Fonts(xref: pdfXref, font: Font): dictObj =
+proc putBase14Fonts(xref: Pdfxref, font: Font): DictObj =
   let fon = Base14(font)
-  var fn = dictObjNew()
+  var fn = newDictObj()
   xref.add(fn)
 
   fn.addName("Type", "Font")
@@ -76,7 +76,7 @@ proc putBase14Fonts(xref: pdfXref, font: Font): dictObj =
     elif fon.encoding == ENC_WINANSI: fn.addName("Encoding", "WinAnsiEncoding")
   result = fn
 
-proc putTrueTypeFonts(xref: pdfXref, font: Font, seed: int): dictObj =
+proc putTrueTypeFonts(xref: Pdfxref, font: Font, seed: int): DictObj =
   let fon = TTFont(font)
   let subsetTag  = makeSubsetTag(seed)
 
@@ -87,16 +87,16 @@ proc putTrueTypeFonts(xref: pdfXref, font: Font, seed: int): dictObj =
   let Length1  = buf.len
   let psName   = subsetTag & desc.postscriptName
 
-  var fontFile = xref.dictStreamNew(buf)
+  var fontFile = xref.newDictStream(buf)
   fontFile.addNumber("Length1", Length1)
 
-  var descriptor = dictObjNew()
+  var descriptor = newDictObj()
   xref.add(descriptor)
   descriptor.addName("Type", "FontDescriptor")
   descriptor.addName("FontName", psName)
   descriptor.addString("FontFamily", desc.fontFamily)
   descriptor.addNumber("Flags", desc.Flags)
-  descriptor.addElement("FontBBox", arrayNew(desc.BBox[0], desc.BBox[1], desc.BBox[2], desc.BBox[3]))
+  descriptor.addElement("FontBBox", newArray(desc.BBox[0], desc.BBox[1], desc.BBox[2], desc.BBox[3]))
   descriptor.addReal("ItalicAngle", desc.italicAngle)
   descriptor.addNumber("Ascent", desc.Ascent)
   descriptor.addNumber("Descent", desc.Descent)
@@ -107,7 +107,7 @@ proc putTrueTypeFonts(xref: pdfXref, font: Font, seed: int): dictObj =
 
   # CIDFontType2
   # A CIDFont whose glyph descriptions are based on TrueType font technology
-  var descendant = dictObjNew()
+  var descendant = newDictObj()
   xref.add(descendant)
   descendant.addName("Type", "Font")
   descendant.addName("Subtype", "CIDFontType2")
@@ -135,12 +135,12 @@ end
 end"""
 
   let toUni = toUni1 & ranges & toUni2
-  var toUnicode = xref.dictStreamNew(toUni)
+  var toUnicode = xref.newDictStream(toUni)
 
-  var fn = dictObjNew()
+  var fn = newDictObj()
   xref.add(fn)
 
-  var childs = arrayObjNew()
+  var childs = newArrayObj()
   childs.add(descendant)
 
   fn.addName("Type", "Font")
@@ -154,10 +154,10 @@ end"""
 
   result = fn
 
-proc putFonts*(xref: pdfXref, fonts: seq[Font]): dictObj =
+proc putFonts*(xref: Pdfxref, fonts: seq[Font]): DictObj =
   var seed = fromBase26("NIMPDF")
-  if fonts.len > 0: result = dictObjNew()
-  var fn: dictObj
+  if fonts.len > 0: result = newDictObj()
+  var fn: DictObj
   for fon in fonts:
     if fon.subType == FT_BASE14: fn = xref.putBase14Fonts(fon)
     if fon.subType == FT_TRUETYPE: fn = xref.putTrueTypeFonts(fon, seed)

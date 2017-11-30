@@ -10,11 +10,11 @@ import strutils, streams, sequtils, times, math, basic2d, algorithm, tables
 import image, wtf8, "subsetter/Font", gstate, path, fontmanager, unicode
 import objects, resources, encryptdict, encrypt, os
 
-export encryptdict.DocInfo, encrypt.encryptMode
+export encryptdict.DocInfo, encrypt.EncryptMode
 export path, gstate, image, fontmanager
 
 const
-  nimPDFVersion = "0.3.0"
+  nimPDFVersion = "0.4.0"
   defaultFont = "Times"
   PageNames = [
     #my paper size
@@ -55,7 +55,7 @@ type
 
   CoordinateMode* = enum
     TOP_DOWN, BOTTOM_UP
-    
+
   PageSize* = object
     width*, height*: SizeUnit
 
@@ -73,13 +73,13 @@ type
     of ANNOT_TEXT:
       content: string
     of ANNOT_WIDGET:
-      annot: dictObj
+      annot: DictObj
 
   Page* = ref object
     content: string
     size: PageSize
     annots: seq[Annot]
-    page: dictObj
+    page: DictObj
 
   DocOpt* = ref object
     resourcesPath: seq[string]
@@ -100,7 +100,7 @@ type
     a,b,c,d: float64
     page: Page
 
-  Outline* = ref object of dictObj
+  Outline* = ref object of DictObj
     kids: seq[Outline]
     dest: Destination
     title: string
@@ -112,7 +112,7 @@ type
     fontStyle: FontStyles
     encoding: EncodingType
     fields: seq[Annot]
-    
+
   Document* = ref object of RootObj
     pages: seq[Page]
     docUnit: PageUnit
@@ -130,8 +130,8 @@ type
     labels: seq[PageLabel]
     setFontCall: int
     outlines: seq[Outline]
-    xref: pdfXref
-    encrypt: encryptDict
+    xref: Pdfxref
+    encrypt: EncryptDict
     acroForm: AcroForm
     coordinateMode: CoordinateMode
 
@@ -161,7 +161,7 @@ proc getSizeFromName*(name: string): PageSize =
 proc makePageSize*(w, h: SizeUnit): PageSize =
   result.width = w
   result.height = h
-  
+
 proc escapeString(text: string): string =
   result = ""
   for c in items(text):
@@ -191,8 +191,8 @@ template f2s(a: typed): untyped =
 proc f2sn(a: float64): string =
   if a == 0: "null" else: f2s(a)
 
-proc putDestination(doc: Document, dict: dictObj, dest: Destination) =
-  var arr = arrayObjNew()
+proc putDestination(doc: Document, dict: DictObj, dest: Destination) =
+  var arr = newArrayObj()
   dict.addElement("Dest", arr)
   arr.add(dest.page.page)
 
@@ -223,19 +223,19 @@ proc putDestination(doc: Document, dict: dictObj, dest: Destination) =
     arr.addName("FitBV")
     arr.addPlain(f2sn(dest.a))
 
-proc putPages(doc: Document, resource: dictObj): dictObj =
+proc putPages(doc: Document, resource: DictObj): DictObj =
   let numpages = doc.pages.len()
 
-  var kids = arrayObjNew()
-  var root = dictObjNew()
+  var kids = newArrayObj()
+  var root = newDictObj()
   doc.xref.add(root)
   root.addName("Type", "Pages")
   root.addNumber("Count", numpages)
   root.addElement("Kids", kids)
 
   for p in doc.pages:
-    let content = doc.xref.dictStreamNew(p.content)
-    var page = dictObjNew()
+    let content = doc.xref.newDictStream(p.content)
+    var page = newDictObj()
     p.page = page
     doc.xref.add(page)
     kids.add(page)
@@ -245,17 +245,17 @@ proc putPages(doc: Document, resource: dictObj): dictObj =
     page.addElement("Contents", content)
 
     #Output the page size.
-    var box = arrayNew(0.0,0.0, p.size.width.toPT, p.size.height.toPT)
+    var box = newArray(0.0,0.0, p.size.width.toPT, p.size.height.toPT)
     page.addElement("MediaBox", box)
 
   #the page.page must be initialized first to prevent crash
   var i = 1
   for p in doc.pages:
     if p.annots.len == 0: continue
-    var annots = arrayObjNew()
+    var annots = newArrayObj()
     p.page.addElement("Annots", annots)
     for a in p.annots:
-      var annot = dictObjNew()
+      var annot = newDictObj()
       doc.xref.add(annot)
       annots.add(annot)
       annot.addName("Type", "Annot")
@@ -270,19 +270,19 @@ proc putPages(doc: Document, resource: dictObj): dictObj =
       else:
         annot.addName("Subtype", "Text")
         annot.addString("Contents", a.content)
-      annot.addElement("Rect", arrayNew(a.rect.x, a.rect.y, a.rect.w, a.rect.h))
-      annot.addElement("Border", arrayNew(16, 16, 1))
+      annot.addElement("Rect", newArray(a.rect.x, a.rect.y, a.rect.w, a.rect.h))
+      annot.addElement("Border", newArray(16, 16, 1))
       annot.addPlain("BS", "<</W 0>>")
       inc i
   result = root
 
-proc putResources(doc: Document): dictObj =
+proc putResources(doc: Document): DictObj =
   let grads = putGradients(doc.xref, doc.gradients)
   let exts  = putExtGStates(doc.xref, doc.extGStates)
   let imgs  = putImages(doc.xref, doc.images)
   let fonts = putFonts(doc.xref, doc.fontMan.FontList)
 
-  result = dictObjNew()
+  result = newDictObj()
   doc.xref.add(result)
 
   #doc.put("<</ProcSet [/PDF /Text /ImageB /ImageC /ImageI]")
@@ -291,13 +291,13 @@ proc putResources(doc: Document): dictObj =
   if imgs != nil: result.addElement("XObject", imgs)
   if grads != nil: result.addElement("Shading", grads)
 
-proc writeInfo(doc: Document, dict: dictObj, field: DocInfo) =
+proc writeInfo(doc: Document, dict: DictObj, field: DocInfo) =
   var idx = int(field)
   if doc.info.hasKey(idx):
     dict.addString(INFO_FIELD[idx], doc.info[idx])
 
-proc putInfo(doc: Document): dictObj =
-  var dict = dictObjNew()
+proc putInfo(doc: Document): DictObj =
+  var dict = newDictObj()
   doc.xref.add(dict)
 
   var lt = getLocalTime(getTime())
@@ -310,16 +310,16 @@ proc putInfo(doc: Document): dictObj =
   dict.addString("CreationDate", "D:" & lt.format("yyyyMMddHHmmss"))
   result = dict
 
-proc putLabels(doc: Document): dictObj =
+proc putLabels(doc: Document): DictObj =
   if doc.labels.len == 0: return nil
 
-  var labels = dictObjNew()
+  var labels = newDictObj()
   doc.xref.add(labels)
-  var nums = arrayObjNew()
+  var nums = newArrayObj()
   labels.addElement("Nums", nums)
 
   for label in doc.labels:
-    var dict = dictObjNew()
+    var dict = newDictObj()
     nums.addNumber(label.pageIndex)
     nums.add(dict)
     dict.addName("S", LABEL_STYLE_CH[int(label.style)])
@@ -329,7 +329,7 @@ proc putLabels(doc: Document): dictObj =
 
   result = labels
 
-proc putOutlineItem(doc: Document, outlines: seq[Outline], parent: dictObj, root: Outline, i: int) =
+proc putOutlineItem(doc: Document, outlines: seq[Outline], parent: DictObj, root: Outline, i: int) =
   for kid in root.kids:
     doc.xref.add(kid)
 
@@ -361,13 +361,13 @@ proc putOutlineItem(doc: Document, outlines: seq[Outline], parent: dictObj, root
     doc.putOutlineItem(root.kids, root, kid, i)
     inc(i)
 
-proc putOutlines(doc: Document): dictObj =
+proc putOutlines(doc: Document): DictObj =
   if doc.outlines.len == 0: return nil
 
   for ot in doc.outlines:
     doc.xref.add(ot)
 
-  var root = dictObjNew()
+  var root = newDictObj()
   doc.xref.add(root)
 
   let firstKid = doc.outlines[0]
@@ -384,24 +384,24 @@ proc putOutlines(doc: Document): dictObj =
   result = root
 
 proc putCatalog(doc: Document) =
-  var catalog = dictObjNew()
+  var catalog = newDictObj()
   doc.xref.add(catalog)
   catalog.addName("Type", "Catalog")
-  
+
   var font: Font
   if doc.acroForm != nil:
     #set acroform default appearance
     font = doc.fontMan.makeFont(doc.acroForm.fontFamily, doc.acroForm.fontStyle, doc.acroForm.encoding)
-  
+
   let resource = doc.putResources()
   let pageRoot = doc.putPages(resource)
   #let firstPageID = pageRootID + 1
 
   if doc.acroForm != nil:
     let fontSize = doc.docunit.fromUser(doc.acroForm.fontSize)
-    var acro = dictObjNew()
+    var acro = newDictObj()
     doc.xref.add(acro)
-    var fields = arrayObjNew()
+    var fields = newArrayObj()
     for a in doc.acroForm.fields:
       fields.add a.annot
     catalog.addElement("AcroForm", acro)
@@ -410,13 +410,13 @@ proc putCatalog(doc: Document) =
     let fontID = $font.ID & " " & f2s(fontSize) & " Tf)"
     acro.addPlain("DA", fontColor & fontID)
     acro.addElement("Fields", fields)
-    
+
   let info = doc.putInfo()
   let labels = doc.putLabels()
   let outlines = doc.putOutlines()
 
   catalog.addElement("Pages", pageRoot)
-  
+
   if labels != nil: catalog.addElement("PageLabels", labels)
   if outlines != nil: catalog.addElement("Outlines", outlines)
   #doc.put("/OpenAction [",$firstPageID," 0 R /FitH null]")
@@ -428,9 +428,9 @@ proc putCatalog(doc: Document) =
   if doc.encrypt != nil:
     doc.encrypt.prepare(doc.info, doc.xref)
 
-    var id = arrayObj(trailer.getItem("ID", CLASS_ARRAY))
+    var id = ArrayObj(trailer.getItem("ID", CLASS_ARRAY))
     if id == nil:
-      id = arrayObjNew()
+      id = newArrayObj()
       trailer.addElement("ID", id)
     else:
       id.clear()
@@ -466,7 +466,7 @@ proc initPDF*(opts: DocOpt): Document =
   result.opts = opts
   result.labels = @[]
   result.outlines = @[]
-  result.xref = xrefNew()
+  result.xref = newPdfxref()
   result.setInfo(DI_PRODUCER, "nimPDF")
 
 proc makeDocOpt*(): DocOpt =
@@ -486,13 +486,13 @@ proc addFontsPath*(opt: DocOpt, path: string) =
 
 proc clearFontsPath*(opt: DocOpt) =
   opt.fontsPath.setLen(0)
-  
+
 proc clearImagesPath*(opt: DocOpt) =
   opt.imagesPath.setLen(0)
 
 proc clearResourcesPath*(opt: DocOpt) =
   opt.resourcesPath.setLen(0)
-  
+
 proc clearAllPath*(opt: DocOpt) =
   opt.clearFontsPath()
   opt.clearImagesPath()
@@ -548,13 +548,13 @@ proc setUnit*(doc: Document, unit: PageUnitType) =
 
 proc getUnit*(doc: Document): PageUnitType =
   result = doc.docUnit.unitType
-  
+
 proc setCoordinateMode*(doc: Document, mode: CoordinateMode) =
   doc.coordinateMode = mode
-  
+
 proc getCoordinateMode*(doc: Document): CoordinateMode =
   result = doc.coordinateMode
-  
+
 proc vPoint(doc: Document, val: float64): float64 =
   if doc.coordinateMode == TOP_DOWN:
     result = doc.size.height.toPT - doc.docUnit.fromUser(val)
@@ -566,7 +566,7 @@ proc vPointMirror(doc: Document, val: float64): float64 =
     result = doc.docUnit.fromUser(-val)
   else:
     result = doc.docUnit.fromUser(val)
-    
+
 proc getSize*(doc: Document): PageSize = doc.size
 
 proc setFont*(doc: Document, family:string, style: FontStyles, size: float64, enc: EncodingType = ENC_STANDARD) =
@@ -596,7 +596,7 @@ proc writePDF*(doc: Document, s: Stream) =
   doc.putCatalog()
   #s.write(doc.content)
   s.write("%PDF-1.7\x0A")
-  var enc = pdfEncrypt(nil)
+  var enc = PdfEncrypt(nil)
   if doc.encrypt != nil: enc = doc.encrypt.enc
   doc.xref.writeToStream(s, enc)
 
@@ -697,7 +697,7 @@ proc endText*(doc: Document) =
 
 proc degree_to_radian*(x: float): float =
   result = (x * math.PI) / 180.0
-  
+
 proc setCharSpace*(doc: Document; val: float64) =
   doc.put(f2s(val)," Tc")
   doc.gstate.char_space = val
@@ -1242,7 +1242,7 @@ proc makeOutline*(doc: Document, title: string, dest: Destination): Outline =
   new(result)
   result.class = CLASS_DICT
   result.subclass = SUBCLASS_OUTLINE
-  result.value  = initTable[string, pdfObj]()
+  result.value  = initTable[string, PdfObject]()
   result.filter = {}
   result.filterParams = nil
   result.kids = @[]
@@ -1255,7 +1255,7 @@ proc makeOutline*(ot: Outline, title: string, dest: Destination): Outline =
   new(result)
   result.class = CLASS_DICT
   result.subclass = SUBCLASS_OUTLINE
-  result.value  = initTable[string, pdfObj]()
+  result.value  = initTable[string, PdfObject]()
   result.filter = {}
   result.filterParams = nil
   result.kids = @[]
@@ -1297,7 +1297,7 @@ proc setPassword*(doc: Document, ownerPass, userPass: string): bool =
   result = doc.encrypt.setPassword(ownerPass, userPass)
   doc.xref.add(doc.encrypt)
 
-proc setEncryptionMode*(doc: Document, mode: encryptMode) =
+proc setEncryptionMode*(doc: Document, mode: EncryptMode) =
   if doc.encrypt == nil: return
   var enc = doc.encrypt.enc
 
@@ -1323,22 +1323,22 @@ proc setFontColor*(a: AcroForm, r,g,b: float64) =
   a.r = r
   a.g = r
   a.b = r
-  
+
 proc setFontColor*(a: AcroForm, col: RGBColor) =
   a.setFontColor(col.r,col.g,col.b)
-  
+
 proc setFontSize*(a: AcroForm, size: float64) =
   a.fontSize = size
-  
+
 proc setFontFamily*(a: AcroForm, family: string) =
   a.fontFamily = family
-  
+
 proc setFontStyle*(a: AcroForm, style: FontStyles) =
   a.fontStyle = style
 
 proc setEncoding*(a: AcroForm, enc: EncodingType) =
   a.encoding = enc
-  
+
 proc textField*(doc: Document, rect: Rectangle, src: Page): Annot =
   var acro = doc.initAcroForm()
   new(result)
@@ -1350,5 +1350,5 @@ proc textField*(doc: Document, rect: Rectangle, src: Page): Annot =
   result.rect = initRect(xx,yy,ww,hh)
   src.annots.add(result)
   acro.fields.add(result)
-  
+
 include arc

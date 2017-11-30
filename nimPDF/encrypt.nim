@@ -18,7 +18,7 @@ const
   PDF_ENABLE_EDIT     = 32'u32
 
 type
-  encryptMode* = enum
+  EncryptMode* = enum
     ENCRYPT_R2,
     ENCRYPT_R3,
     ENCRYPT_R4_ARC4,
@@ -29,8 +29,8 @@ type
     idx1, idx2: int
     state: array[0..PDF_ARC4_BUF_SIZE-1, uint8]
 
-  pdfEncrypt* = ref object
-    mode*: encryptMode
+  PdfEncrypt* = ref object
+    mode*: EncryptMode
     ownerPasswd*: string #unencrypted
     userPasswd*: string  #unencrypted
     ownerKey*: string  #encrypted
@@ -75,7 +75,7 @@ proc ARC4CryptBuf(ctx: var ARC4Context, input: string): string =
     let K = ctx.state[idx]
     result[i] = chr(uint8(input[i]) xor K)
 
-proc newEncrypt*(): pdfEncrypt =
+proc newEncrypt*(): PdfEncrypt =
   new(result)
   result.mode = ENCRYPT_R2
   result.keyLen = 5
@@ -87,7 +87,7 @@ proc toString[T](val: openArray[T], len: int): string =
   result = newString(len)
   for i in 0..len-1: result[i] = chr(val[i])
 
-proc encryptReset*(enc: pdfEncrypt) =
+proc encryptReset*(enc: PdfEncrypt) =
   if enc.mode in {ENCRYPT_R2, ENCRYPT_R3, ENCRYPT_R4_ARC4}:
     let keyLen = min(enc.keyLen + 5, PDF_ENCRYPT_KEY_MAX)
     ARC4Init(enc.ARC4Ctx, enc.objectKey, keyLen)
@@ -108,7 +108,7 @@ proc createRandom16(input: string): string =
     result[i] = chr(ord(digest[i]) xor ord(digest[i+15]))
     result[i] = chr(r xor ord(result[i]))
 
-proc encryptCryptBuf*(enc: pdfEncrypt, input: string): string =
+proc encryptCryptBuf*(enc: PdfEncrypt, input: string): string =
   if enc.mode in {ENCRYPT_R2, ENCRYPT_R3, ENCRYPT_R4_ARC4}:
     result = ARC4CryptBuf(enc.ARC4Ctx, input)
   elif enc.mode in {ENCRYPT_R4_AES, ENCRYPT_R5}:
@@ -120,7 +120,7 @@ proc encryptCryptBuf*(enc: pdfEncrypt, input: string): string =
     result = iv
     result.add encryptCBC(enc.AESCtx, cstring(iv), newInput)
 
-proc encryptInitKey*(enc: pdfEncrypt, object_id, gen_no: int) =
+proc encryptInitKey*(enc: PdfEncrypt, object_id, gen_no: int) =
   if enc.mode == ENCRYPT_R5:
     copyMem(addr(enc.objectKey), addr(enc.encryptionKey), enc.keyLen)
     var key = toString(enc.objectKey, enc.keyLen)
@@ -159,7 +159,7 @@ proc padOrTruncatePasswd*(pwd: string): string =
     let len = PDF_PASSWD_LEN - pwd.len
     for i in 0..len-1: result.add PADDING_STRING[i]
 
-proc createOwnerKey*(enc: pdfEncrypt) =
+proc createOwnerKey*(enc: PdfEncrypt) =
   var ARC4Ctx: ARC4Context
   var ctx: MD5Context
   var digest: MD5Digest
@@ -194,7 +194,7 @@ proc createOwnerKey*(enc: pdfEncrypt) =
   # Algorithm 3.3 step 8
   enc.ownerKey = tmppwd
 
-proc createEncryptionKey*(enc: pdfEncrypt) =
+proc createEncryptionKey*(enc: PdfEncrypt) =
   var ctx: MD5Context
   var tmp: array[0..3, uint8]
 
@@ -234,7 +234,7 @@ proc createEncryptionKey*(enc: pdfEncrypt) =
       ctx.md5Final(digest)
       copyMem(addr(enc.encryptionKey[0]), addr(digest[0]), sizeof(digest))
 
-proc createUserKey*(enc: pdfEncrypt) =
+proc createUserKey*(enc: PdfEncrypt) =
   var ARC4Ctx: ARC4Context
   # Algorithm 3.4/5 step1
 
@@ -271,13 +271,13 @@ proc createUserKey*(enc: pdfEncrypt) =
     for i in 0..PDF_MD5_keyLen-1:
       enc.userKey[i] = digest2[i]
 
-proc computeEncryptionKeyR5*(enc: pdfEncrypt) =
+proc computeEncryptionKeyR5*(enc: PdfEncrypt) =
   let r = createRandom16(enc.userPasswd & enc.ownerPasswd)
   let hash = $computeSHA256(r)
   let key  = hash.substr(0, enc.keyLen)
   for i in 0..enc.keyLen-1: enc.encryptionKey[i] = uint8(key[i])
 
-proc computeUE*(enc: pdfEncrypt) =
+proc computeUE*(enc: PdfEncrypt) =
   # Algorithm 3.8 step 1
   var seed = enc.userPasswd
   seed.add enc.ownerPasswd
@@ -301,7 +301,7 @@ proc computeUE*(enc: pdfEncrypt) =
   enc.UE = encryptCBC(enc.AESCtx, cstring(iv), encKey)
   assert enc.UE.len == 32
 
-proc computeOE*(enc: pdfEncrypt) =
+proc computeOE*(enc: PdfEncrypt) =
   # Algorithm 3.9 step 1
   var seed = enc.userPasswd
   seed.add enc.ownerPasswd
@@ -327,7 +327,7 @@ proc computeOE*(enc: pdfEncrypt) =
   enc.OE = encryptCBC(enc.AESCtx, cstring(iv), encKey)
   assert enc.OE.len == 32
 
-proc computePerms*(enc: pdfEncrypt) =
+proc computePerms*(enc: PdfEncrypt) =
   var perms: array[0..15, char]
   perms[3] = chr(int((enc.permission shr 24) and 0xff))
   perms[2] = chr(int((enc.permission shr 16) and 0xff))
