@@ -42,7 +42,7 @@ proc createPDF(doc: PDF) =
   doc.setFont("Helvetica", {FS_BOLD}, 40)
 
   doc.saveState()
-  doc.setRGBFill(makeRGB("lightgray"))
+  doc.setRGBFill(initRGB("lightgray"))
   var y = size.height.toMM / 2.0
   doc.rotate(45, size.width.toMM/2.0, y)
   doc.drawText((size.width.toMM-doc.getTextWidth(text))/2.0 + 10, y, text)

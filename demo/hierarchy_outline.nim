@@ -20,20 +20,20 @@ proc createPDF(doc: PDF) =
   let pg6 = doc.addPage(size, PGO_PORTRAIT)
   doc.drawText(15, 30, "Page 6")
   
-  let dest1 = doc.makeXYZDest(pg1, 0, 0, 0)
-  let dest2 = doc.makeFitDest(pg2)
-  let dest3 = doc.makeFitHDest(pg3, 30)
-  let dest4 = doc.makeFitVDest(pg4, 15)
-  let dest5 = doc.makeXYZDest(pg5, 0, 0, 0)
-  let dest6 = doc.makeXYZDest(pg6, 0, 0, 0)
+  let dest1 = pg1.newXYZDest(0, 0, 0)
+  let dest2 = pg2.newFitDest()
+  let dest3 = pg3.newFitHDest(30)
+  let dest4 = pg4.newFitVDest(15)
+  let dest5 = pg5.newXYZDest(0, 0, 0)
+  let dest6 = pg6.newXYZDest(0, 0, 0)
   
-  let ot1 = doc.makeOutline("Goto Page 1", dest1)
-  discard ot1.makeOutline("Goto Page 2", dest2)
+  let ot1 = doc.outline("Goto Page 1", dest1)
+  discard ot1.newOutline("Goto Page 2", dest2)
   
-  let ot2 = doc.makeOutline("Goto Page 3", dest3)
-  let ot3 = ot2.makeOutline("Goto Page 4", dest4)
-  discard ot2.makeOutline("Goto Page 5", dest5)
-  discard ot3.makeOutline("Goto Page 6", dest6)
+  let ot2 = doc.outline("Goto Page 3", dest3)
+  let ot3 = ot2.newOutline("Goto Page 4", dest4)
+  discard ot2.newOutline("Goto Page 5", dest5)
+  discard ot3.newOutline("Goto Page 6", dest6)
         
 proc main(): bool {.discardable.} = 
   var fileName = "hierarchy_outline.pdf"

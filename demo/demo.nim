@@ -160,7 +160,7 @@ proc draw_demo_2(doc: PDF) =
   doc.drawCircle(cx,cy,radius * 0.5)
   doc.fill()
 
-  doc.setRGBStroke(makeRGB("indigo"))
+  doc.setRGBStroke(initRGB("indigo"))
   doc.drawEllipse(100, 250, 60, 20)
   doc.drawEllipse(100, 230, 20, 40)
   doc.stroke()
@@ -209,8 +209,8 @@ proc draw_demo_4(doc: PDF) =
   doc.addPage(size, PGO_PORTRAIT)
 
   doc.setFont("Times", {FS_REGULAR}, 4)
-  let gray_thin = makeRGB(0.5,0.5,0.5)
-  let gray_bold = makeRGB(0.8,0.8,0.8)
+  let gray_thin = initRGB(0.5,0.5,0.5)
+  let gray_bold = initRGB(0.8,0.8,0.8)
 
   doc.setRGBFill(gray_thin)
   doc.setRGBStroke(gray_bold)
@@ -342,7 +342,7 @@ proc draw_demo_5(doc: PDF) =
 
   var toucan = doc.loadImage("toucan.png")
   x += 60.0
-  doc.setRGBStroke(makeRGB("red"))
+  doc.setRGBStroke(initRGB("red"))
   doc.drawCircle(x,y,20.0)
   doc.stroke()
   doc.saveState()
@@ -465,7 +465,7 @@ proc draw_demo_6(doc: PDF) =
   doc.setDash([], 0)
 
   doc.setLineWidth(10)
-  doc.setRGBStroke(makeRGB("green"))
+  doc.setRGBStroke(initRGB("green"))
 
   #Line Cap Style
   doc.setLineCap(BUTT_END)
@@ -480,7 +480,7 @@ proc draw_demo_6(doc: PDF) =
 
   #Line Join Style
   doc.setLineWidth(10)
-  doc.setRGBStroke(makeRGB("blue"))
+  doc.setRGBStroke(initRGB("blue"))
 
   drawJoin(doc, 30, 180, "MITER JOIN", MITER_JOIN)
   drawJoin(doc, 30, 210, "ROUND JOIN", ROUND_JOIN)
@@ -489,7 +489,7 @@ proc draw_demo_6(doc: PDF) =
   # Draw Rectangle
   doc.setLineWidth(0.5)
   doc.setRGBStroke(0,0,0)
-  doc.setRGBFill(makeRGB("maroon"))
+  doc.setRGBFill(initRGB("maroon"))
 
   draw_rect(doc, 100, 20, "Stroke");
   doc.stroke()
@@ -658,7 +658,7 @@ proc draw_demo_7(doc: PDF) =
 
   y += 35.0
   doc.setFont("Helvetica", {FS_REGULAR}, 3.0)
-  doc.setRGBFill(makeRGB("black"))
+  doc.setRGBFill(initRGB("black"))
   doc.drawText(20, y, "Text Rendering Mode:")
 
   #Font rendering mode
@@ -707,7 +707,7 @@ proc draw_demo_7(doc: PDF) =
   doc.restoreState()
 
   doc.setFont("Helvetica", {FS_REGULAR}, 9.0)
-  doc.setRGBFill(makeRGB("red"))
+  doc.setRGBFill(initRGB("red"))
   let samp_text2 = "ABC123xyz"
   let oldy = y
   doc.setTextRenderingMode(TR_FILL)
@@ -735,7 +735,7 @@ proc draw_demo_7(doc: PDF) =
   doc.restoreState()
 
   doc.setFont("Times", {FS_REGULAR}, 3.0)
-  doc.setRGBFill(makeRGB("black"))
+  doc.setRGBFill(initRGB("black"))
   y = oldy + 35
   doc.drawText(20, y, "Rotating Text")
   doc.drawText(100, y, "Skewing Text")
@@ -748,14 +748,14 @@ proc draw_demo_8(doc: PDF) =
   draw_title(doc, "TEXT DEMO 2")
 
   doc.setFont("Helvetica", {FS_REGULAR}, 3.0)
-  doc.setRGBFill(makeRGB("black"))
+  doc.setRGBFill(initRGB("black"))
   doc.drawText(20, 20, "char-spacing 0")
   doc.drawText(20, 40, "char-spacing 1.5")
   doc.drawText(20, 60, "char-spacing 1.5, word-spacing 2.5")
 
   let samp_text = "The quick brown fox jumps over the lazy dog."
   doc.setFont("Times", {FS_REGULAR}, 7.0)
-  doc.setRGBFill(makeRGB("seagreen"))
+  doc.setRGBFill(initRGB("seagreen"))
   doc.saveState()
   doc.setCharSpace(0)
   doc.drawText(20, 30, samp_text)
@@ -769,8 +769,8 @@ proc draw_demo_8(doc: PDF) =
   let size = getSizeFromName("A4")
   let height = size.height.toPT
 
-  doc.setRGBStroke(makeRGB("fuchsia"))
-  doc.setRGBFill(makeRGB("orange"))
+  doc.setRGBStroke(initRGB("fuchsia"))
+  doc.setRGBFill(initRGB("orange"))
   doc.setLineWidth(0.3)
   let cx = 110.0
   let cy = 170.0
@@ -892,7 +892,7 @@ proc draw_demo_9(doc: PDF) =
   doc.setRGBFill(0,0,0)
   doc.drawText(15, spec.y0 + 10, "Gray color space")
 
-  doc.setRGBStroke(makeRGB("red"))
+  doc.setRGBStroke(initRGB("red"))
   doc.setLineWidth(1.0)
   doc.roundRect(20, spec.y0 + 20, 160.0, 30.0, 7.0)
   doc.stroke()
@@ -922,10 +922,10 @@ proc makeCanvas(doc: PDF): Canvas =
 #proc Transform(cnv: Canvas, p: Point2d): Point2d =
 #  result = point2d(cnv.XTransform.Val(p.x), cnv.YTransform.Val(p.y))
 
-proc drawBBox(doc:Document, p: Path): bound =
+proc drawBBox(doc: PDF, p: Path): bound =
   let bounds = p.calculateBounds()
   doc.setDash([3], 1)
-  doc.setRGBStroke(makeRGB("skyblue"))
+  doc.setRGBStroke(initRGB("skyblue"))
   doc.drawRect(bounds.xmin, bounds.ymin, bounds.xmax - bounds.xmin, bounds.ymax - bounds.ymin)
   doc.stroke()
   doc.setDash([], 0)
@@ -955,7 +955,7 @@ proc addFunction(cnv: Canvas, f: TFunction, fstart, fend: float64, segments: int
 proc drawCurve(cnv:Canvas, c: CyclicCurve, x, y: float64, text:string) =
   cnv.doc.saveState()
   cnv.doc.move(x,y)
-  cnv.doc.setRGBStroke(makeRGB("pink"))
+  cnv.doc.setRGBStroke(initRGB("pink"))
   let bb = cnv.addCyclicCurve(c, 60)
   cnv.doc.drawText(bb.xmin, bb.ymax + 5, text)
   cnv.doc.restoreState()
@@ -963,7 +963,7 @@ proc drawCurve(cnv:Canvas, c: CyclicCurve, x, y: float64, text:string) =
 proc drawFunction(cnv:Canvas, c: TFunction, x, y: float64, text:string) =
   cnv.doc.saveState()
   cnv.doc.move(x,y)
-  cnv.doc.setRGBStroke(makeRGB("pink"))
+  cnv.doc.setRGBStroke(initRGB("pink"))
   let bb = cnv.addFunction(c, 0, degree_to_radian(360), 50)
   cnv.doc.drawText(bb.xmin, bb.ymax + 5, text)
   cnv.doc.restoreState()
@@ -1002,22 +1002,22 @@ proc draw_demo_11(doc: PDF) =
   doc.addPage(size, PGO_PORTRAIT)
   draw_title(doc, "Gradient Demo")
 
-  var coord = makeCoord(0,0,1,0)
-  var gd = makeLinearGradient(makeRGB("red"), makeRGB("blue"), coord)
+  var coord = initCoord(0,0,1,0)
+  var gd = newLinearGradient(initRGB("red"), initRGB("blue"), coord)
   doc.setGradientFill(gd)
   doc.drawCircle(50, 50, 30)
   doc.roundRect(50, 50, 30, 30, 10)
   doc.fill()
 
-  coord = makeCoord(0,0,0,1)
-  gd = makeLinearGradient(makeRGB("yellow"), makeRGB("pink"), coord)
+  coord = initCoord(0,0,0,1)
+  gd = newLinearGradient(initRGB("yellow"), initRGB("pink"), coord)
   doc.setGradientFill(gd)
   doc.roundRect(150, 50, 30, 30, 10)
   doc.drawEllipse(100, 90, 30, 10)
   doc.fill()
 
-  var radCoord = makeCoord(0.5,0.5,0,0.5,0.5,1)
-  gd = makeRadialGradient(makeRGB("yellow"), makeRGB("brown"), radCoord)
+  var radCoord = initCoord(0.5,0.5,0,0.5,0.5,1)
+  gd = newRadialGradient(initRGB("yellow"), initRGB("brown"), radCoord)
   doc.setGradientFill(gd)
   doc.roundRect(10, 70, 30, 30, 10)
   doc.drawEllipse(70, 100, 30, 10)
@@ -1031,12 +1031,12 @@ proc draw_demo_11(doc: PDF) =
   doc.drawText(15, 197, "2. Set clipping area")
   doc.drawText(115, 197, "4. Voila")
 
-  doc.setRGBStroke(makeRGB("black"))
+  doc.setRGBStroke(initRGB("black"))
   doc.drawCircle(15+25, 140+25, 25)
   doc.stroke()
 
   doc.setDash([3], 1)
-  doc.setRGBStroke(makeRGB("skyblue"))
+  doc.setRGBStroke(initRGB("skyblue"))
   doc.drawRect(15, 140, 50, 50)
   doc.drawRect(15, 200, 50, 50)
   doc.drawRect(115, 140, 50, 50)
@@ -1086,7 +1086,7 @@ proc draw_demo_13(doc: PDF) =
   doc.setCoordinateMode(BOTTOM_UP)
   let img = doc.loadImage("abc.png")
   doc.drawImage(0,0, img)
-  
+
 proc createPDF(doc: PDF) =
   draw_demo_1(doc)
   draw_demo_2(doc)
@@ -1112,7 +1112,7 @@ proc main(): bool {.discardable.} =
   var file = newFileStream(fileName, fmWrite)
 
   if file != nil:
-    var opts = makeDocOpt()
+    var opts = newPDFOptions()
     opts.addFontsPath("fonts")
     opts.addImagesPath("resources")
     opts.addImagesPath("pngsuite")

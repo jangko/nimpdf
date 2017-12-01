@@ -206,33 +206,33 @@ proc bezier_arc_endpoints(x0, y0, rrx, rry, angle: float64; large_arc_flag, swee
     approx.vertices[approx.num_vertices - 2] = x2
     approx.vertices[approx.num_vertices - 1] = y2
 
-proc draw_arc_approximation[T](doc: T, a: arc_approx) =
+proc draw_arc_approximation(self: Page, a: arc_approx) =
   if a.cmd == LINE_TO:
-    doc.lineTo(a.vertices[2], a.vertices[3])
+    self.lineTo(a.vertices[2], a.vertices[3])
   else:
     assert a.cmd == BEZIER_TO
     var i = 2
     while i < a.num_vertices:
-      doc.bezierCurveTo(a.vertices[i], a.vertices[i+1], a.vertices[i+2], a.vertices[i+3], a.vertices[i+4], a.vertices[i+5])
+      self.bezierCurveTo(a.vertices[i], a.vertices[i+1], a.vertices[i+2], a.vertices[i+3], a.vertices[i+4], a.vertices[i+5])
       inc(i, 6)
 
-proc drawArc*(doc: PDF; cx, cy, rx, ry, start_angle, sweep_angle: float64) =
+proc drawArc*(self: Page; cx, cy, rx, ry, start_angle, sweep_angle: float64) =
   var approx : arc_approx
   approx.num_vertices = 0
 
   bezier_arc_centre(cx, cy, rx, ry, degree_to_radian(start_angle), degree_to_radian(sweep_angle), approx)
   assert approx.num_vertices > 3
 
-  doc.moveTo(approx.vertices[0], approx.vertices[1])
-  doc.draw_arc_approximation(approx)
+  self.moveTo(approx.vertices[0], approx.vertices[1])
+  self.draw_arc_approximation(approx)
 
 
-proc arcTo*(doc: PDF; x, y, rx, ry, angle: float64; large_arc_flag, sweep_flag: bool) =
+proc arcTo*(self: Page; x, y, rx, ry, angle: float64; large_arc_flag, sweep_flag: bool) =
   var approx : arc_approx
   approx.num_vertices = 0
 
-  bezier_arc_endpoints(doc.path_end_x, doc.path_end_y, rx, ry, degree_to_radian(angle), large_arc_flag, sweep_flag, x, y, approx)
+  bezier_arc_endpoints(self.state.pathEndX, self.state.pathEndY, rx, ry, degree_to_radian(angle), large_arc_flag, sweep_flag, x, y, approx)
   assert approx.num_vertices > 3
   assert 0 == ((approx.num_vertices - 2) mod 6)
 
-  doc.draw_arc_approximation(approx)
+  self.draw_arc_approximation(approx)

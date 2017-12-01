@@ -146,30 +146,30 @@ proc init*(c: var RGBColor; r,g,b: float64) =
   c.g = g
   c.b = b
 
-proc makeRGB*(r,g,b: float64): RGBColor =
+proc initRGB*(r,g,b: float64): RGBColor =
   result.r = r
   result.g = g
   result.b = b
 
-proc makeRGB*(name:string): RGBColor =
+proc initRGB*(name:string): RGBColor =
   for c in NAMED_COLORS:
-    if name == c[0]: return makeRGB(c[1]/255, c[2]/255, c[3]/255)
-  result = makeRGB(0,0,0)
+    if name == c[0]: return initRGB(c[1]/255, c[2]/255, c[3]/255)
+  result = initRGB(0,0,0)
 
-proc makeCMYK*(c,m,y,k: float64): CMYKColor =
+proc initCMYK*(c,m,y,k: float64): CMYKColor =
   result.c = c
   result.m = m
   result.y = y
   result.k = k
 
-proc makeLinearGradient*(a, b: RGBColor, axis: Coord): Gradient =
+proc newLinearGradient*(a, b: RGBColor, axis: Coord): Gradient =
   new(result)
   result.gradType = GDT_LINEAR
   result.a = a
   result.b = b
   result.axis = axis
 
-proc makeRadialGradient*(a, b: RGBColor, coord: CoordRadial): Gradient =
+proc newRadialGradient*(a, b: RGBColor, coord: CoordRadial): Gradient =
   new(result)
   result.gradType = GDT_RADIAL
   result.a = a
@@ -182,13 +182,13 @@ proc init*(cc: var CMYKColor; c,m,y,k: float64) =
   cc.y = y
   cc.k = k
 
-proc makeCoord*(x1,y1,x2,y2: float64): Coord =
+proc initCoord*(x1,y1,x2,y2: float64): Coord =
   result.x1 = x1
   result.y1 = y1
   result.x2 = x2
   result.y2 = y2
 
-proc makeCoord*(x1,y1,r1,x2,y2,r2: float64): CoordRadial =
+proc initCoord*(x1,y1,r1,x2,y2,r2: float64): CoordRadial =
   result.x1 = x1
   result.y1 = y1
   result.r1 = r1
@@ -223,8 +223,8 @@ proc toIN*(v: SizeUnit): float64 = float64(v) / PGU_K_IN
 proc toPT*(v: SizeUnit): float64 = float64(v)
 
 proc newGState*(): GState =
-  let black = makeRGB(0,0,0)
-  let cmyk_black = makeCMYK(0,0,0,0)
+  let black = initRGB(0,0,0)
+  let cmyk_black = initCMYK(0,0,0,0)
   new(result)
 
   result.transMatrix = IDMATRIX

@@ -82,8 +82,8 @@ proc createPDF(doc: PDF) =
     draw_title(doc, enc)
     draw_grid(doc)
     draw_fonts(doc, enc)
-    let dest = doc.makeXYZDest(page, 0, 0, 0)
-    discard doc.makeOutline(enc, dest)
+    let dest = page.newXYZDest(0, 0, 0)
+    discard doc.outline(enc, dest)
   
 proc main(): bool {.discardable.} = 
   var fileName = "encoding_list.pdf"
