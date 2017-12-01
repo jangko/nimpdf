@@ -43,8 +43,8 @@ type
   Base14* = ref object of Font
     baseFont* : string
     getWidth : proc(cp: int): int {.locks:0.}
-    is_font_specific : bool
-    ascent, descent, x_height, cap_height : int
+    isFontSpecific : bool
+    ascent, descent, xHeight, capHeight : int
     bbox : BBox
     missingWidth: int
     encoding*: EncodingType
@@ -54,16 +54,16 @@ type
     numchars*, width*, numspace*, numwords*: int
 
   FontManager* = object
-    FontList*: seq[Font]
-    BaseFont: seq[Base14]
-    TTFontList: StringTableRef
-    TTCList: StringTableRef
+    fontList*: seq[Font]
+    baseFont: seq[Base14]
+    ttFontList: StringTableRef
+    ttcList: StringTableRef
 
 proc GetCharWidth*(f: TTFont, gid: int): int =
-  result = math.round(float(f.hmtx.AdvanceWidth(gid)) * f.scaleFactor).int
+  result = math.round(float(f.hmtx.advanceWidth(gid)) * f.scaleFactor).int
 
 proc GetCharHeight*(f: TTFont, gid: int): int =
-  result = math.round(float(f.vmtx.AdvanceHeight(gid)) * f.scaleFactor).int
+  result = math.round(float(f.vmtx.advanceHeight(gid)) * f.scaleFactor).int
 
 proc GenerateWidths*(f: TTFont): string =
   f.CH2GID.sort(proc(x,y: tuple[key: int, val: TONGID]):int = cmp(x.val.newGID, y.val.newGID) )
@@ -99,7 +99,7 @@ proc GetDescriptor*(f: TTFont): FontDescriptor =
 
 proc GetSubsetBuffer*(f: TTFont, subsetTag: string): string =
    let fd = f.font.Subset(f.CH2GID, subsetTag)
-   result = fd.GetInternalBuffer()
+   result = fd.getInternalBuffer()
 
 method CanWriteVertical*(f: Font): bool {.base.} = false
 method CanWriteVertical*(f: Base14): bool = false
@@ -228,27 +228,27 @@ proc searchFrom[T](list: seq[T], name: string): Font =
       break
 
 proc init*(ff: var FontManager, fontDirs: seq[string]) =
-  ff.FontList = @[]
+  ff.fontList = @[]
 
-  ff.TTFontList = newStringTable(modeCaseInsensitive)
-  ff.TTCList = newStringTable(modeCaseInsensitive)
+  ff.ttFontList = newStringTable(modeCaseInsensitive)
+  ff.ttcList = newStringTable(modeCaseInsensitive)
 
   for fontDir in fontDirs:
-    collectTTF(fontDir, ff.TTFontList)
-    collectTTC(fontDir, ff.TTCList)
+    collectTTF(fontDir, ff.ttFontList)
+    collectTTC(fontDir, ff.ttcList)
 
-  #echo ff.TTFontList
-  #echo ff.TTCList
+  #echo ff.ttFontList
+  #echo ff.ttcList
 
-  newSeq(ff.BaseFont, 14)
+  newSeq(ff.baseFont, 14)
 
   for i in 0..high(BUILTIN_FONTS):
-    new(ff.BaseFont[i])
-    ff.BaseFont[i].baseFont   = BUILTIN_FONTS[i][0]
-    ff.BaseFont[i].searchName = BUILTIN_FONTS[i][1]
-    ff.BaseFont[i].getWidth   = BUILTIN_FONTS[i][2]
-    ff.BaseFont[i].subType    = FT_BASE14
-    ff.BaseFont[i].missingWidth = ff.BaseFont[i].getWidth(0x20)
+    new(ff.baseFont[i])
+    ff.baseFont[i].baseFont   = BUILTIN_FONTS[i][0]
+    ff.baseFont[i].searchName = BUILTIN_FONTS[i][1]
+    ff.baseFont[i].getWidth   = BUILTIN_FONTS[i][2]
+    ff.baseFont[i].subType    = FT_BASE14
+    ff.baseFont[i].missingWidth = ff.baseFont[i].getWidth(0x20)
 
 proc makeTTFont(font: FontDef, searchName: string): TTFont =
   var cmap = CMAPTable(font.GetTable(TAG.cmap))
@@ -276,15 +276,15 @@ proc makeTTFont(font: FontDef, searchName: string): TTFont =
   result = res
 
 proc searchFromTTList(ff: FontManager, name:string): Font =
-  if not ff.TTFontList.hasKey(name): return nil
-  let fileName = ff.TTFontList[name]
+  if not ff.ttFontList.hasKey(name): return nil
+  let fileName = ff.ttFontList[name]
   let font = LoadTTF(fileName)
   if font != nil: return makeTTFont(font, name)
   result = nil
 
-proc searchFromTTCList(ff: FontManager, name:string): Font =
-  if not ff.TTCList.hasKey(name): return nil
-  let fName = ff.TTCList[name]
+proc searchFromttcList(ff: FontManager, name:string): Font =
+  if not ff.ttcList.hasKey(name): return nil
+  let fName = ff.ttcList[name]
   let fileName = substr(fName, 0, fName.len - 2)
   let fontIndex = ord(fName[fName.len-1]) - ord('0')
   let font = LoadTTC(fileName, fontIndex)
@@ -310,11 +310,11 @@ proc clone(src: Base14): Base14 =
   result.searchName = src.searchName
   result.baseFont = src.baseFont
   result.getWidth = src.getWidth
-  result.is_font_specific = src.is_font_specific
+  result.isFontSpecific = src.isFontSpecific
   result.ascent = src.ascent
   result.descent = src.descent
-  result.x_height = src.x_height
-  result.cap_height = src.cap_height
+  result.xHeight = src.xHeight
+  result.capHeight = src.capHeight
   result.bbox = src.bbox
   result.missingWidth = src.missingWidth
   result.encoding = src.encoding
@@ -328,11 +328,11 @@ proc makeFont*(ff: var FontManager, family:string = "Times", style:FontStyles = 
   var searchName = family
   searchName.add(searchStyle)
 
-  var res = searchFrom(ff.BaseFont, searchName)
+  var res = searchFrom(ff.baseFont, searchName)
   if res != nil:
     var encoding = ENC_STANDARD
     if enc in {ENC_STANDARD, ENC_MACROMAN, ENC_WINANSI}: encoding = enc
-    var fon = searchFrom(ff.FontList, searchName & $int(enc))
+    var fon = searchFrom(ff.fontList, searchName & $int(enc))
     if fon != nil: return fon
 
     var fon14 = clone(Base14(res))
@@ -343,23 +343,23 @@ proc makeFont*(ff: var FontManager, family:string = "Times", style:FontStyles = 
     elif encoding == ENC_MACROMAN: fon14.encode = enc_mac_map
     elif encoding == ENC_WINANSI: fon14.encode = enc_win_map
 
-    fon14.ID = ff.FontList.len + 1
-    ff.FontList.add(fon14)
+    fon14.ID = ff.fontList.len + 1
+    ff.fontList.add(fon14)
     return fon14
 
-  res = searchFrom(ff.FontList, searchName)
+  res = searchFrom(ff.fontList, searchName)
   if res != nil: return res
 
   res = searchFromTTList(ff, searchName)
   if res != nil:
-    res.ID = ff.FontList.len + 1
-    ff.FontList.add(res)
+    res.ID = ff.fontList.len + 1
+    ff.fontList.add(res)
     return res
 
-  res = searchFromTTCList(ff, searchName)
+  res = searchFromttcList(ff, searchName)
   if res != nil:
-    res.ID = ff.FontList.len + 1
-    ff.FontList.add(res)
+    res.ID = ff.fontList.len + 1
+    ff.fontList.add(res)
     return res
 
   result = makeFont(ff, defaultFont, style, enc)
@@ -368,7 +368,7 @@ when isMainModule:
   var ff: FontManager
   ff.init()
 
-  for key, val in pairs(ff.TTFontList):
+  for key, val in pairs(ff.ttFontList):
     echo key, ": ", val
 
   var font = ff.makeFont("GoodDog", {FS_REGULAR})

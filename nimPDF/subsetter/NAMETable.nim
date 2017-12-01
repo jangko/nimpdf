@@ -1,6 +1,6 @@
 # Copyright (c) 2015 Andri Lim
 #
-# Distributed under the MIT license 
+# Distributed under the MIT license
 # (See accompanying file LICENSE.txt)
 #
 #-----------------------------------------
@@ -10,7 +10,7 @@ const
   kFormat = 0
   kCount  = 2
   kStorageStart = 4
-  
+
   kRecordSize = 12
   kPlatformID = 0
   kEncodingID = 2
@@ -38,12 +38,12 @@ const
   NAME_PREFERRE_SUBFAMILY* = 17
   NAME_COMPAT_FULL_NAME*   = 18
   NAME_SAMPLE_TEXT*        = 19
-  
+
 type
   nameEntry = object
     platformID, encodingID, languageID, nameID, length, offset: int
     name: string
-    
+
   NAMETable* = ref object of FontTable
     postscriptName: string
     fontFamily: string
@@ -58,10 +58,10 @@ proc GetEncodingID*(t: NAMETable, index: int): int = t.data.ReadUShort(6 + kReco
 proc GetLanguageID*(t: NAMETable, index: int): int = t.data.ReadUShort(6 + kRecordSize * index + kLanguageID)
 proc GetNameID*(t: NAMETable, index: int): int = t.data.ReadUShort(6 + kRecordSize * index + kNameID)
 proc GetStringLength*(t: NAMETable, index: int): int = t.data.ReadUShort(6 + kRecordSize * index + kStringLength)
-proc GetStringOffset*(t: NAMETable, index: int): int = 
+proc GetStringOffset*(t: NAMETable, index: int): int =
   result = t.data.ReadUShort(6 + kRecordSize * index + kStringOffset) + t.GetStorageStart()
 
-proc GetName*(t: NAMETable, index: int): string = 
+proc GetName*(t: NAMETable, index: int): string =
   var len = t.GetStringLength(index)
   var offset = t.GetStringOffset(index)
   result = newString(len)
@@ -69,21 +69,21 @@ proc GetName*(t: NAMETable, index: int): string =
 
 proc FindName(t: NAMETable, ne: nameEntry) =
   #mac=1 roman=0 english=0
-  if ne.platformID == 1 and ne.encodingID == 0 and ne.languageID == 0: 
+  if ne.platformID == 1 and ne.encodingID == 0 and ne.languageID == 0:
     if ne.nameID == NAME_POSTSCRIPT_NAME: t.postscriptName = ne.name
     if ne.nameID == NAME_NAME: t.fontFamily = ne.name
     t.postscriptname_found = true
-    
+
   #microsoft=3 unicode=1 US-english=0x409
   if ne.platformID == 3 and ne.encodingID == 1 and ne.languageID == 0x409:
     if ne.nameID == NAME_POSTSCRIPT_NAME: t.postscriptName = fromUnicode(ne.name)
     if ne.nameID == NAME_NAME: t.fontFamily = fromUnicode(ne.name)
     t.postscriptname_found = true
-  
+
 proc FindName(t: NAMETable) =
   var name: nameEntry
   let count = t.GetCount()
-  
+
   for i in 0..count-1:
     name.platformID = t.GetPlatformID(i)
     name.encodingID = t.GetEncodingID(i)
@@ -104,7 +104,7 @@ proc GetFontFamily*(t: NAMETable): string =
   t.FindName()
   result = t.fontFamily
 
-proc makeNAMETable*(header: Header, data: FontData): NAMETable =
+proc newNAMETable*(header: Header, data: FontData): NAMETable =
   new(result)
   initFontTable(result, header, data)
   result.postscriptname_found = false
@@ -117,24 +117,24 @@ proc UpdateName(ne: var nameEntry, subsettag: string) =
       ne.name = toUnicode(subsettag) & ne.name
     else:
       ne.name = subsettag & ne.name
-      
+
   #mac=1 roman=0 english=0
-  #if ne.platformID == 1 and ne.encodingID == 0 and ne.languageID == 0: 
-  #  if ne.nameID == NAME_POSTSCRIPT_NAME: ne.name = subsettag & ne.name 
+  #if ne.platformID == 1 and ne.encodingID == 0 and ne.languageID == 0:
+  #  if ne.nameID == NAME_POSTSCRIPT_NAME: ne.name = subsettag & ne.name
   #  if ne.nameID == NAME_NAME: ne.name = subsettag & ne.name
   #  #echo ne.name
   #microsoft=3 unicode=1 US-english=0x409
   #if ne.platformID == 3 and ne.encodingID == 1 and ne.languageID == 0x409:
   #  if ne.nameID == NAME_POSTSCRIPT_NAME: ne.name = toUnicode(subsettag) & ne.name
   #  if ne.nameID == NAME_NAME: ne.name = toUnicode(subsettag) & ne.name
-    
-proc EncodeNAMETable*(t: NAMETable, subsettag: string): NAMETable =
+
+proc encodeNAMETable*(t: NAMETable, subsettag: string): NAMETable =
   let numRecord = t.GetCount()
   let storageStart = 6 + numRecord * kRecordSize
   var storageSize = 0
   var names: seq[nameEntry]
   newSeq(names, numRecord)
-  
+
   var string_offset = 0
   for i in 0..numRecord-1:
     names[i].platformID = t.GetPlatformID(i)
@@ -148,13 +148,13 @@ proc EncodeNAMETable*(t: NAMETable, subsettag: string): NAMETable =
     names[i].offset = string_offset
     string_offset += names[i].length
     storageSize += names[i].length
-  
+
   var fd = makeFontData(storageStart + storageSize)
-  
+
   discard fd.WriteUShort(kFormat, 0)
   discard fd.WriteUShort(kCount, numRecord)
   discard fd.WriteUShort(kStorageStart, storageStart)
-  
+
   var offset = 6
   for i in 0..numRecord-1:
     discard fd.WriteUShort(offset + kPlatformID, names[i].platformID)
@@ -164,11 +164,11 @@ proc EncodeNAMETable*(t: NAMETable, subsettag: string): NAMETable =
     discard fd.WriteUShort(offset + kStringLength, names[i].length)
     discard fd.WriteUShort(offset + kStringOffset, names[i].offset)
     inc(offset, kRecordSize)
-  
+
   assert(offset == storageStart)
   offset = storageStart
   for i in 0..numRecord-1:
     discard fd.WriteBytes(offset, names[i].name)
     inc(offset, names[i].length)
-  
-  result = makeNAMETable(makeHeader(TAG.name, checksum(fd, fd.Length()), 0, fd.Length()), fd)
+
+  result = newNAMETable(initHeader(TAG.name, checksum(fd, fd.length()), 0, fd.length()), fd)

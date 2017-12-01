@@ -86,26 +86,26 @@ proc GetTable(header: Header, data: FontData): FontTable =
   let tag = header.tag()
 
   case tag
-  of TAG.head: result = makeHEADTable(header, data)
-  of TAG.cmap: result = makeCMAPTable(header, data)
-  of TAG.hhea: result = makeHHEATable(header, data)
-  of TAG.hmtx: result = makeHMTXTable(header, data)
-  of TAG.maxp: result = makeMAXPTable(header, data)
-  of TAG.vhea: result = makeVHEATable(header, data)
-  of TAG.vmtx: result = makeVMTXTable(header, data)
-  of TAG.name: result = makeNAMETable(header, data)
-  of TAG.OS_2: result = makeOS2Table(header, data)
-  of TAG.glyf: result = makeGLYPHTable(header, data)
-  of TAG.loca: result = makeLOCATable(header, data)
+  of TAG.head: result = newHEADTable(header, data)
+  of TAG.cmap: result = newCMAPTable(header, data)
+  of TAG.hhea: result = newHHEATable(header, data)
+  of TAG.hmtx: result = newHMTXTable(header, data)
+  of TAG.maxp: result = newMAXPTable(header, data)
+  of TAG.vhea: result = newVHEATable(header, data)
+  of TAG.vmtx: result = newVMTXTable(header, data)
+  of TAG.name: result = newNAMETable(header, data)
+  of TAG.OS_2: result = newOS2Table(header, data)
+  of TAG.glyf: result = newGLYPHTable(header, data)
+  of TAG.loca: result = newLOCATable(header, data)
   #of Tag.EBDT, Tag.bdat:
     #result = makeEbdtTableBuilder(header, data)
   #of Tag.EBLC, Tag.bloc:
     #result = makeEblcTableBuilder(header, data)
   #of Tag.EBSC:
     #result = makeEbscTableBuilder(header, data)
-  of TAG.bhed: result = makeHEADTable(header, data)
-  of TAG.hdmx: result = makeHDMXTable(header, data)
-  of TAG.post: result = makePOSTTable(header, data)
+  of TAG.bhed: result = newHEADTable(header, data)
+  of TAG.hdmx: result = newHDMXTable(header, data)
+  of TAG.post: result = newPOSTTable(header, data)
   else:
     new(result)
     initFontTable(result, header, data)
@@ -142,10 +142,10 @@ proc ReadHeader(f: FontDef, fis: FontInputStream): TableHeaderList =
     let checksum = fis.ReadULong()
     let offset   = fis.ReadULongAsInt()
     let length   = fis.ReadULongAsInt()
-    var header   = makeHeader(tag, checksum, offset, length)
+    var header   = initHeader(tag, checksum, offset, length)
     result.add(header)
 
-  result.sort(proc(x,y: Header): int = OffsetSortedComparator(x,y) )
+  result.sort(proc(x,y: Header): int = offsetSortedComparator(x,y) )
 
 proc ReadHeader(f: FontDef, fd: FontData, offset: int): TableHeaderList =
   result = @[]
@@ -161,11 +161,11 @@ proc ReadHeader(f: FontDef, fd: FontData, offset: int): TableHeaderList =
     let checksum = fd.ReadULong(tableOffset + kTableCheckSum)
     let offset   = fd.ReadULongAsInt(tableOffset + kTableOffset)
     let length   = fd.ReadULongAsInt(tableOffset + kTableLength)
-    var header   = makeHeader(tag, checksum, offset, length)
+    var header   = initHeader(tag, checksum, offset, length)
     result.add(header)
     inc(tableOffset, kTableRecordSize)
 
-  result.sort(proc(x,y: Header): int = OffsetSortedComparator(x,y) )
+  result.sort(proc(x,y: Header): int = offsetSortedComparator(x,y) )
 
 proc LoadTable(headers: TableHeaderList, fis: FontInputStream): FontTableMap =
   result = initTable[TTag, FontTable]()
@@ -179,7 +179,7 @@ proc LoadTable(headers: TableHeaderList, fd: FontData): FontTableMap =
   result = initTable[TTag, FontTable]()
   for header in headers:
     var data = makeFontData(header.length())
-    discard fd.CopyTo(data, 0, header.offset(), header.length())
+    discard fd.copyTo(data, 0, header.offset(), header.length())
     result[header.tag()] = GetTable(header, data)
 
 proc InterRelateTables(f: FontDef) =
@@ -194,12 +194,12 @@ proc InterRelateTables(f: FontDef) =
   var vmtx = VMTXTable(f.GetTable(TAG.vmtx))
 
   if vmtx != nil:
-    if maxp != nil: vmtx.SetNumGlyphs(maxp.NumGlyphs())
-    if vhea != nil: vmtx.SetNumberOfVMetrics(vhea.NumberOfVMetrics())
+    if maxp != nil: vmtx.setNumGlyphs(maxp.NumGlyphs())
+    if vhea != nil: vmtx.setNumberOfVMetrics(vhea.NumberOfVMetrics())
 
   if hmtx != nil:
-    if maxp != nil: hmtx.SetNumGlyphs(maxp.NumGlyphs())
-    if hhea != nil: hmtx.SetNumberOfHMetrics(hhea.NumberOfHMetrics())
+    if maxp != nil: hmtx.setNumGlyphs(maxp.NumGlyphs())
+    if hhea != nil: hmtx.setNumberOfHMetrics(hhea.NumberOfHMetrics())
 
   if loca != nil:
     if maxp != nil: loca.SetNumGlyphs(maxp.NumGlyphs())
@@ -227,12 +227,12 @@ proc IsCollection(istream: InputStream): bool =
   var tag = newString(4)
   discard istream.Read(tag)
   discard istream.Skip(-4)
-  result = TAG.ttcf == GenerateTag(tag)
+  result = TAG.ttcf == generateTag(tag)
 
 proc IsCollection(fd: FontData): bool =
   var tag = newString(4)
   discard fd.ReadBytes(0, tag, 0, tag.len)
-  result = TAG.ttcf == GenerateTag(tag)
+  result = TAG.ttcf == generateTag(tag)
 
 proc LoadSingleOTF*(istream: InputStream): FontDef =
   result = makeFont()
@@ -353,7 +353,7 @@ proc SerializeFont*(tables: var seq[FontTable]): FontData =
       discard fd.WriteByte(tableOffset, chr(0))
       inc(tableOffset)
 
-  var checksum = checksum(fd, fd.Length())
+  var checksum = checksum(fd, fd.length())
   discard fd.WriteULong(headoffset + 8, 0xB1B0AFBA - checksum)
   result = fd
 
@@ -393,16 +393,16 @@ proc Subset*(font: FontDef, CH2GID: CH2GIDMAP, newTag: string): FontData =
   head.SetIndexToLocFormat(newLoca.GetFormatVersion())
   hhea.SetNumberOfHMetrics(GID2GID.len)
   maxp.SetNumGlyphs(GID2GID.len)
-  var newhmtx = EncodeHMTXTable(hmtx, GID2GID)
-  var newcmap = EncodeCMAPTable(CH2GID, isSymbol)
-  var newname = EncodeNAMETable(name, newTag)
-  var newpost = EncodePOSTTable(post)
+  var newhmtx = encodeHMTXTable(hmtx, GID2GID)
+  var newcmap = encodeCMAPTable(CH2GID, isSymbol)
+  var newname = encodeNAMETable(name, newTag)
+  var newpost = encodePOSTTable(post)
 
   #cmap, glyf, head, hhea, hmtx, loca, maxp, name, post, os/2
   var tables = @[newcmap, newglyf, head, hhea, newhmtx, newloca, maxp, newname, os2, newpost, prep, cvt, fpgm, gasp]
   if vhea != nil and vmtx != nil:
     vhea.SetNumberOfVMetrics(GID2GID.len)
-    var newvmtx = EncodeVMTXTable(vmtx, GID2GID)
+    var newvmtx = encodeVMTXTable(vmtx, GID2GID)
     tables.add(vhea)
     tables.add(newvmtx)
 
@@ -455,7 +455,7 @@ proc makeDescriptor*(font: FontDef, CH2GID: CH2GIDMAP): FontDescriptor =
   fd.BBox[2] = math.round(float(head.XMax()) * scaleFactor).int
   fd.BBox[3] = math.round(float(head.YMax()) * scaleFactor).int
 
-  fd.missingWidth = math.round(float(hmtx.AdvanceWidth(0)) * scaleFactor).int
+  fd.missingWidth = math.round(float(hmtx.advanceWidth(0)) * scaleFactor).int
   fd.stemV = 50 + int(math.pow(float(usWeightClass) / 65.0, 2))
 
   fd.Ascent = math.round(float(Ascent) * scaleFactor).int

@@ -1,6 +1,6 @@
 # Copyright (c) 2015 Andri Lim
 #
-# Distributed under the MIT license 
+# Distributed under the MIT license
 # (See accompanying file LICENSE.txt)
 #
 #-----------------------------------------
@@ -15,87 +15,87 @@ const
   kHMetricsLeftSideBearing = 2
 
   kLeftSideBearingSize = 2
-  
+
 type
-  metrix = object
+  Metrix = object
     advance, lsb : int
-    
+
   HMTXTable* = ref object of FontTable
-    num_hmetrics: int
-    num_glyphs: int
-    
-proc NumberOfHMetrics*(t: HMTXTable): int = t.num_hmetrics
-proc NumberOfLSBs*(t: HMTXTable): int = t.num_glyphs - t.num_hmetrics
-proc HMetricAdvanceWidth(t: HMTXTable, entry: int): int =
-  if entry > t.num_hmetrics:
+    numHMetrics: int
+    numGlyphs: int
+
+proc numberOfHMetrics*(t: HMTXTable): int = t.numHMetrics
+proc numberOfLSBs*(t: HMTXTable): int = t.numGlyphs - t.numHMetrics
+proc hmetricAdvanceWidth(t: HMTXTable, entry: int): int =
+  if entry > t.numHMetrics:
     raise newIndexError("HMetricAdvanceWidth index error")
 
   let offset = kHMetricsStart + (entry * kHMetricsSize) + kHMetricsAdvanceWidth
   result = t.data.ReadUShort(offset)
-  
-proc HMetricLSB(t: HMTXTable, entry: int): int =
-  if entry > t.num_hmetrics:
+
+proc hmetricLSB(t: HMTXTable, entry: int): int =
+  if entry > t.numHMetrics:
     raise newIndexError("HMetricLSB index error")
 
   let offset = kHMetricsStart + (entry * kHMetricsSize) + kHMetricsLeftSideBearing
   result = t.data.ReadFWord(offset)
-  
-proc LsbTableEntry(t: HMTXTable, entry: int): int =
-  if entry > t.NumberOfLSBs():
+
+proc lsbTableEntry(t: HMTXTable, entry: int): int =
+  if entry > t.numberOfLSBs():
     raise newIndexError("LsbTableEntry index error")
-  
-  let offset = kHMetricsStart + (t.num_hmetrics * kHMetricsSize) + (entry * kLeftSideBearingSize)
+
+  let offset = kHMetricsStart + (t.numHMetrics * kHMetricsSize) + (entry * kLeftSideBearingSize)
   result = t.data.ReadFWord(offset)
-  
-proc AdvanceWidth*(t: HMTXTable, glyph_id: int): int =
-  if glyph_id < t.num_hmetrics:
-    return t.HMetricAdvanceWidth(glyph_id)
-  
-  result = t.HMetricAdvanceWidth(t.num_hmetrics - 1)
-  
-proc LeftSideBearing*(t: HMTXTable, glyph_id: int): int =
-  if glyph_id < t.num_hmetrics:
-    return t.HMetricLSB(glyph_id)
-    
-  result = t.LsbTableEntry(glyph_id - t.num_hmetrics)
-  
-proc makeHMTXTable*(header: Header, data: FontData): HMTXTable =
+
+proc advanceWidth*(t: HMTXTable, glyph_id: int): int =
+  if glyph_id < t.numHMetrics:
+    return t.hmetricAdvanceWidth(glyph_id)
+
+  result = t.hmetricAdvanceWidth(t.numHMetrics - 1)
+
+proc leftSideBearing*(t: HMTXTable, glyph_id: int): int =
+  if glyph_id < t.numHMetrics:
+    return t.hmetricLSB(glyph_id)
+
+  result = t.lsbTableEntry(glyph_id - t.numHMetrics)
+
+proc newHMTXTable*(header: Header, data: FontData): HMTXTable =
   new(result)
   initFontTable(result, header, data)
-  result.num_hmetrics = 0
-  result.num_glyphs = 0
-  
+  result.numHMetrics = 0
+  result.numGlyphs = 0
+
 #----------------------------------
-proc SetNumberOfHMetrics*(t: HMTXTable, num_hmetrics: int) =
-  assert num_hmetrics >= 0
-  t.num_hmetrics = num_hmetrics
+proc setNumberOfHMetrics*(t: HMTXTable, numHMetrics: int) =
+  assert numHMetrics >= 0
+  t.numHMetrics = numHMetrics
 
-proc SetNumGlyphs*(t: HMTXTable, num_glyphs: int) =
-  assert num_glyphs >= 0
-  t.num_glyphs = num_glyphs
+proc setNumGlyphs*(t: HMTXTable, numGlyphs: int) =
+  assert numGlyphs >= 0
+  t.numGlyphs = numGlyphs
 
-proc forGlyph*(t: HMTXTable, id: int): metrix =
-  result.advance = t.AdvanceWidth(id)
-  result.lsb = t.LeftSideBearing(id)
+proc forGlyph*(t: HMTXTable, id: int): Metrix =
+  result.advance = t.advanceWidth(id)
+  result.lsb = t.leftSideBearing(id)
 
-proc SetAdvanceWidth*(t: HMTXTable, entry, val: int) =
+proc setAdvanceWidth*(t: HMTXTable, entry, val: int) =
   let offset = kHMetricsStart + (entry * kHMetricsSize) + kHMetricsAdvanceWidth
   discard t.data.WriteUShort(offset, val)
-  
-proc SetLSB*(t: HMTXTable, entry, val: int) =
+
+proc setLSB*(t: HMTXTable, entry, val: int) =
   let offset = kHMetricsStart + (entry * kHMetricsSize) + kHMetricsLeftSideBearing
   discard t.data.WriteShort(offset, val)
-  
-proc EncodeHMTXTable*(t: HMTXTable, GID2GID: OrderedTable[int, int]): HMTXTable =
+
+proc encodeHMTXTable*(t: HMTXTable, GID2GID: OrderedTable[int, int]): HMTXTable =
   var data = makeFontData(GID2GID.len * kHMetricsSize)
-  var hmtx = makeHMTXTable(makeHeader(TAG.hmtx, checksum(data, data.Length()), 0, data.Length()), data)
-  
+  var hmtx = newHMTXTable(initHeader(TAG.hmtx, checksum(data, data.length()), 0, data.length()), data)
+
   var x = 0
   for i in keys(GID2GID):
-    hmtx.SetAdvanceWidth(x, t.AdvanceWidth(i))
-    hmtx.SetLSB(x, t.LeftSideBearing(i))
+    hmtx.setAdvanceWidth(x, t.advanceWidth(i))
+    hmtx.setLSB(x, t.leftSideBearing(i))
     inc(x)
-  
-  hmtx.num_hmetrics = GID2GID.len
-  hmtx.num_glyphs = GID2GID.len
+
+  hmtx.numHMetrics = GID2GID.len
+  hmtx.numGlyphs = GID2GID.len
   result = hmtx

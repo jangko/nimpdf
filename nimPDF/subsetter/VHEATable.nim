@@ -1,6 +1,6 @@
 # Copyright (c) 2015 Andri Lim
 #
-# Distributed under the MIT license 
+# Distributed under the MIT license
 # (See accompanying file LICENSE.txt)
 #
 #-----------------------------------------
@@ -23,8 +23,8 @@ const
 
 type
   VHEATable* = ref object of FontTable
-  
-proc makeVHEATable*(header: Header, data: FontData): VHEATable =
+
+proc newVHEATable*(header: Header, data: FontData): VHEATable =
   new(result)
   initFontTable(result, header, data)
 

@@ -1,6 +1,6 @@
 # Copyright (c) 2015 Andri Lim
 #
-# Distributed under the MIT license 
+# Distributed under the MIT license
 # (See accompanying file LICENSE.txt)
 #
 #-----------------------------------------
@@ -23,15 +23,15 @@ const
   kLowestRecPPEM = 46
   kFontDirectionHint = 48
   kIndexToLocFormat = 50
-  kGlyphDataFormat = 52  
+  kGlyphDataFormat = 52
 
 type
   HEADTable* = ref object of FontTable
-  
-proc makeHEADTable*(header: Header, data: FontData): HEADTable =
+
+proc newHEADTable*(header: Header, data: FontData): HEADTable =
   new(result)
   initFontTable(result, header, data)
-  
+
 proc TableVersion*(t: HEADTable): int = t.data.ReadFixed(kTableVersion)
 proc FontRevision*(t: HEADTable): int = t.data.ReadFixed(kFontRevision)
 proc ChecksumAdjustment*(t: HEADTable): int64 = t.data.ReadULong(kCheckSumAdjustment)
@@ -47,10 +47,10 @@ proc YMax*(t: HEADTable): int = t.data.ReadFWord(kYMax)
 proc MacStyleAsInt*(t: HEADTable): int = t.data.ReadUShort(kMacStyle)
 proc LowestRecPPEM*(t: HEADTable): int = t.data.ReadUShort(kLowestRecPPEM)
 proc FontDirectionHint*(t: HEADTable): int =  t.data.ReadShort(kFontDirectionHint)
-proc GetIndexToLocFormat*(t: HEADTable): int = t.data.ReadShort(kIndexToLocFormat)  
+proc GetIndexToLocFormat*(t: HEADTable): int = t.data.ReadShort(kIndexToLocFormat)
 proc GlyphDataFormat*(t: HEADTable): int = t.data.ReadShort(kGlyphDataFormat)
 
-   
+
 proc SetTableVersion*(t: HEADTable, version: int) =  discard t.data.WriteFixed(kTableVersion, version)
 proc SetFontRevision*(t: HEADTable, revision: int) = discard t.data.WriteFixed(kFontRevision, revision)
 proc SetChecksumAdjustment*(t: HEADTable, adjustment: int64) = discard t.data.WriteULong(kCheckSumAdjustment, adjustment)

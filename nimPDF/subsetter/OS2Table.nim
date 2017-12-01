@@ -1,6 +1,6 @@
 # Copyright (c) 2015 Andri Lim
 #
-# Distributed under the MIT license 
+# Distributed under the MIT license
 # (See accompanying file LICENSE.txt)
 #
 #-----------------------------------------
@@ -34,7 +34,7 @@ const
   kFsSelection = 62
   kUsFirstCharIndex = 64
   kUsLastCharIndex = 66
-  
+
   kSTypoAscender = 68
   kSTypoDescender = 70
   kSTypoLineGap = 72
@@ -42,7 +42,7 @@ const
   kUsWinDescent = 76
   kUlCodePageRange1 = 78
   kUlCodePageRange2 = 82
-  
+
   kSxHeight = 68
   kSCapHeight = 70
   kUsDefaultChar = 72
@@ -71,7 +71,7 @@ proc SFamilyClass*(t: OS2Table): int = t.data.ReadShort(kSFamilyClass)
 proc Panose*(t: OS2Table): ByteVector =
   result = newString(10)
   discard t.data.ReadBytes(kPanose, result, 0, 10)
-  
+
 proc UlUnicodeRange1*(t: OS2Table): int64 = t.data.ReadULong(kUlUnicodeRange1)
 proc UlUnicodeRange2*(t: OS2Table): int64 = t.data.ReadULong(kUlUnicodeRange2)
 proc UlUnicodeRange3*(t: OS2Table): int64 = t.data.ReadULong(kUlUnicodeRange3)
@@ -79,62 +79,70 @@ proc UlUnicodeRange4*(t: OS2Table): int64 = t.data.ReadULong(kUlUnicodeRange4)
 proc AchVendId*(t: OS2Table): ByteVector =
   result = newString(4)
   discard t.data.ReadBytes(kAchVendId, result, 0, 4)
-  
+
 proc FsSelection*(t: OS2Table): int = t.data.ReadUShort(kFsSelection)
 proc UsFirstCharIndex*(t: OS2Table): int = t.data.ReadUShort(kUsFirstCharIndex)
 proc UsLastCharIndex*(t: OS2Table): int = t.data.ReadUShort(kUsLastCharIndex)
 
-proc STypoAscender*(t: OS2Table): int = 
+proc STypoAscender*(t: OS2Table): int =
   result = 0
-  if t.TableVersion() == 1: 
+  if t.TableVersion() == 1:
     result = t.data.ReadUShort(kSTypoAscender)
-proc STypoDescender*(t: OS2Table): int = 
+
+proc STypoDescender*(t: OS2Table): int =
   result = 0
-  if t.TableVersion() == 1: 
+  if t.TableVersion() == 1:
     result = t.data.ReadUShort(kSTypoDescender)
-proc STypoLineGap*(t: OS2Table): int = 
+
+proc STypoLineGap*(t: OS2Table): int =
   result = 0
-  if t.TableVersion() == 1: 
+  if t.TableVersion() == 1:
     result = t.data.ReadUShort(kSTypoLineGap)
-proc UsWinAscent*(t: OS2Table): int = 
+
+proc UsWinAscent*(t: OS2Table): int =
   result = 0
-  if t.TableVersion() == 1: 
+  if t.TableVersion() == 1:
     result = t.data.ReadUShort(kUsWinAscent)
-proc UsWinDescent*(t: OS2Table): int = 
+
+proc UsWinDescent*(t: OS2Table): int =
   result = 0
-  if t.TableVersion() == 1: 
+  if t.TableVersion() == 1:
     result = t.data.ReadUShort(kUsWinDescent)
 
-proc UlCodePageRange1*(t: OS2Table): int64 = 
+proc UlCodePageRange1*(t: OS2Table): int64 =
   result = 0
   if t.TableVersion() == 1:
     result = t.data.ReadULong(kUlCodePageRange1)
-    
-proc UlCodePageRange2*(t: OS2Table): int64 = 
+
+proc UlCodePageRange2*(t: OS2Table): int64 =
   result = 0
-  if t.TableVersion() == 1: 
+  if t.TableVersion() == 1:
     result = t.data.ReadULong(kUlCodePageRange2)
 
 proc IsSymbolCharSet*(t: OS2Table): bool =
   result = (t.UlCodePageRange1() and 0x80000000) != 0
-  
-proc SxHeight*(t: OS2Table): int = 
+
+proc SxHeight*(t: OS2Table): int =
   result = 0
   if t.TableVersion() == 0: result = t.data.ReadShort(kSxHeight)
-proc SCapHeight*(t: OS2Table): int = 
+
+proc SCapHeight*(t: OS2Table): int =
   result = 0
   if t.TableVersion() == 0: result = t.data.ReadShort(kSCapHeight)
-proc UsDefaultChar*(t: OS2Table): int = 
+
+proc UsDefaultChar*(t: OS2Table): int =
   result = 0
   if t.TableVersion() == 0: result = t.data.ReadUShort(kUsDefaultChar)
-proc UsBreakChar*(t: OS2Table): int = 
+
+proc UsBreakChar*(t: OS2Table): int =
   result = 0
   if t.TableVersion() == 0: result = t.data.ReadUShort(kUsBreakChar)
-proc UsMaxContext*(t: OS2Table): int = 
+
+proc UsMaxContext*(t: OS2Table): int =
   result = 0
   if t.TableVersion() == 0: result = t.data.ReadUShort(kUsMaxContext)
 
-proc makeOS2Table*(header: Header, data: FontData): OS2Table =
+proc newOS2Table*(header: Header, data: FontData): OS2Table =
   new(result)
   initFontTable(result, header, data)
 
@@ -159,7 +167,7 @@ proc SetPanose*(t: OS2Table, panose: ByteVector) =
   if panose.len != kPanoseLength:
     raise newAssertionError("Panose bytes must be exactly 10 in length")
   discard t.data.WriteBytes(kPanose, panose)
-  
+
 proc SetUlUnicodeRange1*(t: OS2Table, range: int64) = discard t.data.WriteULong(kUlUnicodeRange1, range)
 proc SetUlUnicodeRange2*(t: OS2Table, range: int64) = discard t.data.WriteULong(kUlUnicodeRange2, range)
 proc SetUlUnicodeRange3*(t: OS2Table, range: int64) = discard t.data.WriteULong(kUlUnicodeRange3, range)

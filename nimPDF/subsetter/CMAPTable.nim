@@ -85,7 +85,7 @@ method GlyphIndex*(t: CMAP0, charCode: int): int =
   if charCode < 0 or charCode > 255: return 0
   result = t.data.ReadUByte(6 + charCode)
 
-proc makeCMAP0(data: FontData): CMAP0 =
+proc newCMAP0(data: FontData): CMAP0 =
   new(result)
   result.data = data
 
@@ -167,7 +167,7 @@ method GlyphIndex*(t: CMAP4, charCode: int): int =
   if GlyphId == 0: return 0
   result = (GlyphId + IdDelta) and 0xFFFF
 
-proc makeCMAP4(data: FontData): CMAP4 =
+proc newCMAP4(data: FontData): CMAP4 =
   new(result)
   result.data = data
 
@@ -237,7 +237,7 @@ method GlyphIndex*(t: CMAP2, charCode: int): int =
       idx = t.data.ReadUShort(offset)
       if idx != 0: result = (idx + idDelta) and 0xFFFF
 
-proc makeCMAP2(data: FontData): CMAP2 =
+proc newCMAP2(data: FontData): CMAP2 =
   new(result)
   result.data = data
   result.numSubHeaders = 0
@@ -262,7 +262,7 @@ method GlyphIndex*(t: CMAP6, charCode: int): int =
   if idx < t.EntryCount():
     result = t.GlyphIndexArray(idx)
 
-proc makeCMAP6(data: FontData): CMAP6 =
+proc newCMAP6(data: FontData): CMAP6 =
   new(result)
   result.data = data
 
@@ -288,7 +288,7 @@ method GlyphIndex*(t: CMAP12, charCode: int): int =
       break
     dec i
 
-proc makeCMAP12(data: FontData): CMAP12 =
+proc newCMAP12(data: FontData): CMAP12 =
   new(result)
   result.data = data
 
@@ -318,11 +318,11 @@ proc FindEncodingCMap(t: CMAPTable, filter: proc(platformID, encodingID, format:
     let length = if format in {0, 2, 4, 6}: t.data.ReadUShort(offsetx + kLength) else: t.data.ReadULongAsInt(offsetx + 4)
 
     if filter(platformID, encodingID, format):
-      if format == 12: result = makeCMAP12(t.data.Slice(offsetx, length))
-      if format == 4: result = makeCMAP4(t.data.Slice(offsetx, length))
-      if format == 6: result = makeCMAP6(t.data.Slice(offsetx, length))
-      if format == 2: result = makeCMAP2(t.data.Slice(offsetx, length))
-      if format == 0: result = makeCMAP0(t.data.Slice(offsetx, length))
+      if format == 12: result = newCMAP12(t.data.Slice(offsetx, length))
+      if format == 4: result = newCMAP4(t.data.Slice(offsetx, length))
+      if format == 6: result = newCMAP6(t.data.Slice(offsetx, length))
+      if format == 2: result = newCMAP2(t.data.Slice(offsetx, length))
+      if format == 0: result = newCMAP0(t.data.Slice(offsetx, length))
       break
 
 proc CMAPAvailable*(t: CMAPTable, filter: proc(platformID, encodingID, format: int): bool): bool =
@@ -339,7 +339,7 @@ proc CMAPAvailable*(t: CMAPTable, filter: proc(platformID, encodingID, format: i
 
   return false
 
-proc makeCMAPTable*(header: Header, data: FontData): CMAPTable =
+proc newCMAPTable*(header: Header, data: FontData): CMAPTable =
   new(result)
   initFontTable(result, header, data)
   result.encodingcmap = nil
@@ -517,7 +517,7 @@ proc EncodeCMAP12(CH2GID: CH2GIDMAP): FontData =
     discard fd.WriteULong(kGroupStart + kGroupSize * i + kEndCode, endCode[i])
     discard fd.WriteULong(kGroupStart + kGroupSize * i + kStartGlyphCode, startGlyph[i])
 ]#
-proc EncodeCMAPTable*(CH2GID: CH2GIDMAP, isSymbol: bool): CMAPTable =
+proc encodeCMAPTable*(CH2GID: CH2GIDMAP, isSymbol: bool): CMAPTable =
   var tables = [EncodeCMAP0(CH2GID), EncodeCMAP4(CH2GID)]
   let tableStart = kHeaderSize + kSubtableEntrySize * tables.len
   var encID = 1
@@ -527,7 +527,7 @@ proc EncodeCMAPTable*(CH2GID: CH2GIDMAP, isSymbol: bool): CMAPTable =
   let encodingID = [0, encID]
 
   var size = tableStart
-  for t in tables: size += t.Length()
+  for t in tables: size += t.length()
   var fd = makeFontData(size)
 
   discard fd.WriteUShort(kTableVersion, 0)
@@ -540,9 +540,9 @@ proc EncodeCMAPTable*(CH2GID: CH2GIDMAP, isSymbol: bool): CMAPTable =
     discard fd.WriteUShort(offset + kPlatformID, platformID[i])
     discard fd.WriteUShort(offset + kEncodingID, encodingID[i])
     discard fd.WriteULong(offset + kSubtableOffset, subTableOffset)
-    discard t.CopyTo(fd, subTableOffset)
+    discard t.copyTo(fd, subTableOffset)
     inc(i)
-    inc(subTableOffset, t.Length())
+    inc(subTableOffset, t.length())
     inc(offset, kSubtableEntrySize)
 
-  result = makeCMAPTable(makeHeader(TAG.cmap, checksum(fd, fd.Length()), 0, fd.Length()), fd)
+  result = newCMAPTable(initHeader(TAG.cmap, checksum(fd, fd.length()), 0, fd.length()), fd)

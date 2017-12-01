@@ -1,6 +1,6 @@
 # Copyright (c) 2015 Andri Lim
 #
-# Distributed under the MIT license 
+# Distributed under the MIT license
 # (See accompanying file LICENSE.txt)
 #
 #-----------------------------------------
@@ -44,7 +44,7 @@ proc MaxSizeOfInstructions*(t: MAXPTable): int = t.data.ReadUShort(kMaxSizeOfIns
 proc MaxComponentElements*(t: MAXPTable): int = t.data.ReadUShort(kMaxComponentElements)
 proc MaxComponentDepth*(t: MAXPTable): int = t.data.ReadUShort(kMaxComponentDepth)
 
-proc makeMAXPTable*(header: Header, data: FontData): MAXPTable =
+proc newMAXPTable*(header: Header, data: FontData): MAXPTable =
   new(result)
   initFontTable(result, header, data)
 #---------------------------------------
@@ -62,4 +62,5 @@ proc SetMaxInstructionDefs*(t: MAXPTable, max_instruction_defs: int) = discard t
 proc SetMaxStackElements*(t: MAXPTable, max_stack_elements: int) = discard t.data.WriteUShort(kMaxStackElements, max_stack_elements)
 proc SetMaxSizeOfInstructions*(t: MAXPTable, max_size_of_instructions: int) = discard t.data.WriteUShort(kMaxSizeOfInstructions, max_size_of_instructions)
 proc SetMaxComponentElements*(t: MAXPTable, max_component_elements: int) = discard t.data.WriteUShort(kMaxComponentElements, max_component_elements)
+
 proc SetMaxComponentDepth*(t: MAXPTable, max_component_depth: int) = discard t.data.WriteUShort(kMaxComponentDepth, max_component_depth)

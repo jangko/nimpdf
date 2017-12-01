@@ -1,6 +1,6 @@
 # Copyright (c) 2015 Andri Lim
 #
-# Distributed under the MIT license 
+# Distributed under the MIT license
 # (See accompanying file LICENSE.txt)
 #
 #-----------------------------------------
@@ -23,8 +23,8 @@ const
 
 type
   HHEATable* = ref object of FontTable
-  
-proc makeHHEATable*(header: Header, data: FontData): HHEATable =
+
+proc newHHEATable*(header: Header, data: FontData): HHEATable =
   new(result)
   initFontTable(result, header, data)
 
