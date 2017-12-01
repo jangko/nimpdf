@@ -97,18 +97,18 @@ proc Log2*(aa: int): int =
     inc(r)
   result = r - 1
 
-proc PaddingRequired*(size, alignmentSize: int): int =
+proc paddingRequired*(size, alignmentSize: int): int =
   let padding = alignmentSize - (size mod alignmentSize)
   result = padding
   if padding == alignmentSize: result = 0
 
-proc Fixed1616Integral*(fixed: int): int =
+proc fixed1616Integral*(fixed: int): int =
   result = fixed shr 16
 
-proc Fixed1616Fractional*(fixed: int): int =
+proc fixed1616Fractional*(fixed: int): int =
   result = fixed and 0xffff
 
-proc Fixed1616Fixed*(integral, fractional: int): int =
+proc fixed1616Fixed*(integral, fractional: int): int =
   result = ((integral and 0xffff) shl 16) or (fractional and 0xffff)
 
 proc fromUnicode*(s:string): string =
@@ -221,7 +221,7 @@ proc initFontData(fd, data: FontData, offset: int) =
     fd.bound(data.boundOffset + offset, data.boundLength - offset)
 
 #-------------------------------------------------------
-proc makeFontData*(b: ByteVector, growable: bool = false): FontData =
+proc newFontData*(b: ByteVector, growable: bool = false): FontData =
   var ba: ByteArray
   if growable: ba = newGrowableMemoryByteArray()
   else: ba = newMemoryByteArray(b.len)
@@ -229,34 +229,34 @@ proc makeFontData*(b: ByteVector, growable: bool = false): FontData =
   new(result)
   initFontData(result, ba)
 
-proc makeFontData*(ba: ByteArray): FontData =
+proc newFontData*(ba: ByteArray): FontData =
   new(result)
   initFontData(result, ba)
 
-proc makeFontData(data: FontData, offset: int) : FontData =
+proc newFontData(data: FontData, offset: int) : FontData =
   new(result)
   initFontData(result, data, offset)
 
-proc makeFontData(data: FontData, offset, length: int) : FontData =
+proc newFontData(data: FontData, offset, length: int) : FontData =
   new(result)
   initFontData(result, data, offset, length)
 
-proc makeFontData*(length: int): FontData =
+proc newFontData*(length: int): FontData =
   var ba: ByteArray
   if length > 0:
     ba = newMemoryByteArray(length)
     ba.setFilledLength(length)
   else:
     ba = newGrowableMemoryByteArray()
-  result = makeFontData(ba)
+  result = newFontData(ba)
 
-proc ReadUByte*(fd: FontData, index: int): int =
+proc readUByte*(fd: FontData, index: int): int =
   let b = fd.data.get(fd.getBoundOffset(index))
   if b < 0:
     raise newIndexError("Index attempted to be read from is out of bounds " & $index)
   result = b
 
-proc ReadByte*(fd: FontData, index: int): int =
+proc readByte*(fd: FontData, index: int): int =
   let b = fd.data.get(fd.getBoundOffset(index))
   if b < 0:
     raise newIndexError("Index attempted to be read from is out of bounds " & $index)
@@ -264,60 +264,60 @@ proc ReadByte*(fd: FontData, index: int): int =
   result = b
   if b >= 0x80: result = b - 0x100
 
-proc ReadBytes*(fd: FontData, index: int, b: var string, offset, length: int): int =
+proc readBytes*(fd: FontData, index: int, b: var string, offset, length: int): int =
   result = fd.data.get(fd.getBoundOffset(index), b, offset, fd.getBoundLength(index, length))
 
-proc ReadUShort*(fd: FontData, index: int): int =
-  result = 0xffff and (fd.ReadUByte(index) shl 8 or fd.ReadUByte(index + 1))
+proc readUShort*(fd: FontData, index: int): int =
+  result = 0xffff and (fd.readUByte(index) shl 8 or fd.readUByte(index + 1))
 
-proc ReadShort*(fd: FontData, index: int): int =
-  result = fd.ReadUShort(index)
+proc readShort*(fd: FontData, index: int): int =
+  result = fd.readUShort(index)
   if result >= 0x8000: result -= 0x10000
 
-proc ReadUInt24*(fd: FontData, index: int): int =
-  result = 0xffffff and (fd.ReadUByte(index) shl 16 or fd.ReadUByte(index + 1) shl 8 or fd.ReadUByte(index + 2))
+proc readUInt24*(fd: FontData, index: int): int =
+  result = 0xffffff and (fd.readUByte(index) shl 16 or fd.readUByte(index + 1) shl 8 or fd.readUByte(index + 2))
 
-proc ReadULong*(fd: FontData, index: int): int64 =
-  let val = (fd.ReadUByte(index) shl 24) or
-    fd.ReadUByte(index + 1) shl 16 or
-    fd.ReadUByte(index + 2) shl 8 or
-    fd.ReadUByte(index + 3)
+proc readULong*(fd: FontData, index: int): int64 =
+  let val = (fd.readUByte(index) shl 24) or
+    fd.readUByte(index + 1) shl 16 or
+    fd.readUByte(index + 2) shl 8 or
+    fd.readUByte(index + 3)
 
   result = 0xffffffff and int64(cast[uint32](val))
 
-proc ReadULongAsInt*(fd: FontData, index: int): int =
-  let ulong = fd.ReadULong(index)
+proc readULongAsInt*(fd: FontData, index: int): int =
+  let ulong = fd.readULong(index)
 
   if (ulong and 0x80000000) == 0x80000000:
     raise newArithErr("Long value too large to fit into an integer.")
 
   result = cast[int](ulong)
 
-proc ReadULongLE*(fd: FontData, index: int): int64 =
-  let val = (fd.ReadUByte(index) or
-    fd.ReadUByte(index + 1) shl 8 or
-    fd.ReadUByte(index + 2) shl 16 or
-    fd.ReadUByte(index + 3) shl 24)
+proc readULongLE*(fd: FontData, index: int): int64 =
+  let val = (fd.readUByte(index) or
+    fd.readUByte(index + 1) shl 8 or
+    fd.readUByte(index + 2) shl 16 or
+    fd.readUByte(index + 3) shl 24)
 
   result = 0xffffffff and int64(cast[uint32](val))
 
-proc ReadLong*(fd: FontData, index: int): int =
-  result = fd.ReadByte(index) shl 24 or
-    fd.ReadUByte(index + 1) shl 16 or
-    fd.ReadUByte(index + 2) shl 8 or
-    fd.ReadUByte(index + 3)
+proc readLong*(fd: FontData, index: int): int =
+  result = fd.readByte(index) shl 24 or
+    fd.readUByte(index + 1) shl 16 or
+    fd.readUByte(index + 2) shl 8 or
+    fd.readUByte(index + 3)
 
-proc ReadFixed*(fd: FontData, index: int): int =
-  result = fd.ReadLong(index)
+proc readFixed*(fd: FontData, index: int): int =
+  result = fd.readLong(index)
 
-proc ReadDateTimeAsLong*(fd: FontData, index: int): int64 =
-  result = int64(fd.ReadULong(index)) shl 32 or fd.ReadULong(index + 4)
+proc readDateTimeAsLong*(fd: FontData, index: int): int64 =
+  result = int64(fd.readULong(index)) shl 32 or fd.readULong(index + 4)
 
-proc ReadFWord*(fd: FontData, index: int): int =
-  result = fd.ReadShort(index)
+proc readFWord*(fd: FontData, index: int): int =
+  result = fd.readShort(index)
 
-proc ReadUFWord*(fd: FontData, index: int): int =
-  result = fd.ReadUShort(index)
+proc readUFWord*(fd: FontData, index: int): int =
+  result = fd.readUShort(index)
 
 proc copyTo*(fd: FontData, os: OutputStream): int =
   result = fd.data.copyToOS(fd.getBoundOffset(0), fd.length(), os)
@@ -334,97 +334,97 @@ proc copyTo*(fd: FontData, wfd: FontData, index : int): int =
 proc copyTo*(fd: FontData, ba: ByteArray): int =
   result = fd.data.copyTo(ba, fd.getBoundOffset(0), fd.length())
 
-proc Slice*(fd: FontData, offset, length: int): FontData =
+proc slice*(fd: FontData, offset, length: int): FontData =
   if (offset < 0) or ((offset + length) > fd.size()):
     raise newIndexError("Attempt to bind data outside of its limits")
 
-  result = makeFontData(fd, offset, length)
+  result = newFontData(fd, offset, length)
 
-proc Slice*(fd: FontData, offset: int): FontData =
+proc slice*(fd: FontData, offset: int): FontData =
   if (offset < 0) or (offset > fd.size()):
     raise newIndexError("Attempt to bind data outside of its limits")
 
-  result = makeFontData(fd, offset)
+  result = newFontData(fd, offset)
 
 #-------------------------------------------------------------------------
-proc WriteByte*(fd: FontData, index: int, b: char): int =
+proc writeByte*(fd: FontData, index: int, b: char): int =
   fd.data.put(fd.getBoundOffset(index), b)
   result = 1
 
-proc WriteBytes*(fd: FontData, index: int, b: ByteVector, offset, length: int): int =
+proc writeBytes*(fd: FontData, index: int, b: ByteVector, offset, length: int): int =
   result = fd.data.put(fd.getBoundOffset(index), b, offset, fd.getBoundLength(index, length))
 
-proc WriteBytes*(fd: FontData, index: int, b: ByteVector): int =
-  result = fd.WriteBytes(index, b, 0, b.len)
+proc writeBytes*(fd: FontData, index: int, b: ByteVector): int =
+  result = fd.writeBytes(index, b, 0, b.len)
 
-proc WritePadding*(fd: FontData, index, count: int, pad: char): int =
+proc writePadding*(fd: FontData, index, count: int, pad: char): int =
   for i in 0..count-1:
     fd.data.put(index + i, pad)
   result = count
 
-proc WritePadding*(fd: FontData, index, count: int): int =
-  result = fd.WritePadding(index, count, chr(0))
+proc writePadding*(fd: FontData, index, count: int): int =
+  result = fd.writePadding(index, count, chr(0))
 
-proc WriteBytesPad*(fd: FontData, index: int, b: ByteVector, offset, length: int, pad: char): int =
+proc writeBytesPad*(fd: FontData, index: int, b: ByteVector, offset, length: int, pad: char): int =
   var written =  fd.data.put(fd.getBoundOffset(index), b, offset, fd.getBoundLength(index, min(length, b.len - offset)))
-  written += fd.WritePadding(written + index, length - written, pad)
+  written += fd.writePadding(written + index, length - written, pad)
   result = written
 
-proc WriteChar*(fd: FontData, index: int, c: char): int =
-  result = fd.WriteByte(index, c)
+proc writeChar*(fd: FontData, index: int, c: char): int =
+  result = fd.writeByte(index, c)
 
-proc WriteUShort*(fd: FontData, index, us: int): int =
-  discard fd.WriteByte(index, char((us shr 8) and 0xff))
-  discard fd.WriteByte(index + 1, char(us and 0xff))
+proc writeUShort*(fd: FontData, index, us: int): int =
+  discard fd.writeByte(index, char((us shr 8) and 0xff))
+  discard fd.writeByte(index + 1, char(us and 0xff))
   result = 2
 
-proc WriteFWord*(fd: FontData, index, us: int): int =
-  result = fd.WriteUShort(index, us)
+proc writeFWord*(fd: FontData, index, us: int): int =
+  result = fd.writeUShort(index, us)
 
-proc WriteUShortLE*(fd: FontData, index, us: int): int =
-  discard fd.WriteByte(index, char(us and 0xff))
-  discard fd.WriteByte(index + 1, char((us shr 8) and 0xff))
+proc writeUShortLE*(fd: FontData, index, us: int): int =
+  discard fd.writeByte(index, char(us and 0xff))
+  discard fd.writeByte(index + 1, char((us shr 8) and 0xff))
   result = 2
 
-proc WriteShort*(fd: FontData, index, s: int): int =
-  result = fd.WriteUShort(index, s)
+proc writeShort*(fd: FontData, index, s: int): int =
+  result = fd.writeUShort(index, s)
 
-proc WriteUInt24*(fd: FontData, index, ui: int): int =
-  discard fd.WriteByte(index, char((ui shr 16) and 0xff))
-  discard fd.WriteByte(index + 1, char((ui shr 8) and 0xff))
-  discard fd.WriteByte(index + 2, char(ui and 0xff))
+proc writeUInt24*(fd: FontData, index, ui: int): int =
+  discard fd.writeByte(index, char((ui shr 16) and 0xff))
+  discard fd.writeByte(index + 1, char((ui shr 8) and 0xff))
+  discard fd.writeByte(index + 2, char(ui and 0xff))
   result = 3
 
-proc WriteULong*(fd: FontData, index: int, ul: int64): int =
-  discard fd.WriteByte(index, char((ul shr 24) and 0xff))
-  discard fd.WriteByte(index + 1, char((ul shr 16) and 0xff))
-  discard fd.WriteByte(index + 2, char((ul shr 8) and 0xff))
-  discard fd.WriteByte(index + 3, char(ul and 0xff))
+proc writeULong*(fd: FontData, index: int, ul: int64): int =
+  discard fd.writeByte(index, char((ul shr 24) and 0xff))
+  discard fd.writeByte(index + 1, char((ul shr 16) and 0xff))
+  discard fd.writeByte(index + 2, char((ul shr 8) and 0xff))
+  discard fd.writeByte(index + 3, char(ul and 0xff))
   result = 4
 
-proc WriteULongLE*(fd: FontData, index: int, ul: int64): int =
-  discard fd.WriteByte(index, char(ul and 0xff))
-  discard fd.WriteByte(index + 1, char((ul shr 8) and 0xff))
-  discard fd.WriteByte(index + 2, char((ul shr 16) and 0xff))
-  discard fd.WriteByte(index + 3, char((ul shr 24) and 0xff))
+proc writeULongLE*(fd: FontData, index: int, ul: int64): int =
+  discard fd.writeByte(index, char(ul and 0xff))
+  discard fd.writeByte(index + 1, char((ul shr 8) and 0xff))
+  discard fd.writeByte(index + 2, char((ul shr 16) and 0xff))
+  discard fd.writeByte(index + 3, char((ul shr 24) and 0xff))
   result = 4
 
-proc WriteLong*(fd: FontData, index: int, lg: int64): int =
-  result = fd.WriteULong(index, lg)
+proc writeLong*(fd: FontData, index: int, lg: int64): int =
+  result = fd.writeULong(index, lg)
 
-proc WriteFixed*(fd: FontData, index, f: int): int =
-  result = fd.WriteLong(index, f)
+proc writeFixed*(fd: FontData, index, f: int): int =
+  result = fd.writeLong(index, f)
 
-proc WriteDateTime*(fd: FontData, index: int, date: int64): int =
-  discard fd.WriteULong(index, (date shr 32) and 0xffffffff)
-  discard fd.WriteULong(index + 4, date and 0xffffffff)
+proc writeDateTime*(fd: FontData, index: int, date: int64): int =
+  discard fd.writeULong(index, (date shr 32) and 0xffffffff)
+  discard fd.writeULong(index + 4, date and 0xffffffff)
   result = 8
 
-proc CopyFrom*(fd: FontData, inp: InputStream, length: int) =
-  fd.data.CopyFrom(inp, length)
+proc copyFrom*(fd: FontData, inp: InputStream, length: int) =
+  fd.data.copyFrom(inp, length)
 
-proc CopyFrom*(fd: FontData, inp: InputStream) =
-  fd.data.CopyFrom(inp)
+proc copyFrom*(fd: FontData, inp: InputStream) =
+  fd.data.copyFrom(inp)
 
 #-----------------------------------------------------
 proc checksum*(data: FontData, len:int): int64 =
@@ -432,40 +432,40 @@ proc checksum*(data: FontData, len:int): int64 =
   let off = len and -4
 
   for i in countup(0, len-4, 4):
-    result = result + data.ReadULong(i)
+    result = result + data.readULong(i)
     #result = result and 0xFFFFFFFF
 
   if off < len:
-    var b3 = data.ReadUByte(off)
+    var b3 = data.readUByte(off)
     var b2 = 0
     var b1 = 0
     var b0 = 0
-    if off + 1 < len: b2 = data.ReadUByte(off + 1)
-    if off + 2 < len: b1 = data.ReadUByte(off + 2)
+    if off + 1 < len: b2 = data.readUByte(off + 1)
+    if off + 2 < len: b1 = data.readUByte(off + 2)
     result += (b3 shl 24) or (b2 shl 16) or (b1 shl 8) or b0
 
   result = result and 0xFFFFFFFF
 
-proc CalculatedChecksum*(t: FontTable): int64 =
+proc calculatedChecksum*(t: FontTable): int64 =
   if not t.checksumSet:
     t.checksum = checksum(t.data, t.header.length())
     t.checksumSet = true
     t.header.setChecksum(t.checksum)
   result = t.checksum
 
-proc GetHeader*(t: FontTable): Header = t.header
-proc HeaderTag*(t: FontTable): TTag = t.header.tag()
-proc HeaderOffset*(t: FontTable): int = t.header.offset()
-proc HeaderLength*(t: FontTable): int = t.header.length()
-proc HeaderChecksum*(t: FontTable): int64 = t.header.checksum()
-proc GetPadding*(t: FontTable): int = t.padding
-proc SetPadding*(t: FontTable, padding: int) = t.padding = padding
-proc DataLength*(t: FontTable): int = t.data.length()
-proc Serialize*(t: FontTable, os: OutputStream): int = t.data.copyTo(os)
-proc Serialize*(t: FontTable, data: FontData, index: int): int = t.data.copyTo(data, index, 0, data.length())
-proc SetHeader*(t: FontTable, header: Header) = t.header = header
-proc GetTableData*(t: FontTable): FontData = t.data
-proc SetTableOffset*(t: FontTable, offset:int) = t.header.setOffset(offset)
+proc getHeader*(t: FontTable): Header = t.header
+proc headerTag*(t: FontTable): TTag = t.header.tag()
+proc headerOffset*(t: FontTable): int = t.header.offset()
+proc headerLength*(t: FontTable): int = t.header.length()
+proc headerChecksum*(t: FontTable): int64 = t.header.checksum()
+proc getPadding*(t: FontTable): int = t.padding
+proc setPadding*(t: FontTable, padding: int) = t.padding = padding
+proc dataLength*(t: FontTable): int = t.data.length()
+proc serialize*(t: FontTable, os: OutputStream): int = t.data.copyTo(os)
+proc serialize*(t: FontTable, data: FontData, index: int): int = t.data.copyTo(data, index, 0, data.length())
+proc setHeader*(t: FontTable, header: Header) = t.header = header
+proc getTableData*(t: FontTable): FontData = t.data
+proc setTableOffset*(t: FontTable, offset:int) = t.header.setOffset(offset)
 
 proc initFontTable*(t: FontTable, header: Header, data: FontData) =
   t.header = header

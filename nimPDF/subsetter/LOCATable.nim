@@ -23,8 +23,8 @@ proc Loca*(t: LOCATable, index: int): int =
   if index > t.numGlyphs:
     raise newIndexError("loca outside bound")
   if t.version == IndexToLocFormat.kShortOffset:
-    return 2 * t.data.ReadUShort(index * DataSize.kUSHORT)
-  result = t.data.ReadULongAsInt(index * DataSize.kULONG)
+    return 2 * t.data.readUShort(index * DataSize.kUSHORT)
+  result = t.data.readULongAsInt(index * DataSize.kULONG)
 
 proc GlyphOffset*(t: LOCATable, glyph_id: int): int =
   if (glyph_id < 0) or (glyph_id >= t.numGlyphs):
@@ -62,13 +62,13 @@ proc encodeLOCATable*(loca: LocaList): LOCATable =
   if LocFormat == IndexToLocFormat.kLongOffset: newlocalength = loca.len * 4
 
   var size = 0
-  var newlocadata = makeFontData(newlocalength)
+  var newlocadata = newFontData(newlocalength)
   for loc in loca:
     if LocFormat == IndexToLocFormat.kLongOffset:
-      size += newlocadata.WriteULong(size, loc)
+      size += newlocadata.writeULong(size, loc)
     else:
       let lc = int(float(loc) / 2)
-      size += newlocadata.WriteUShort(size, lc)
+      size += newlocadata.writeUShort(size, lc)
 
   var newloca = newLOCATable(initHeader(TAG.loca, checksum(newlocadata, newlocadata.length()), 0, newlocadata.length()), newlocadata)
 

@@ -65,7 +65,7 @@ proc parseHead(tt:TableRec, s:Stream): string =
   if (macStyle and 0x01) != 0: result[0] = '1' #bold
   if (macStyle and 0x02) != 0: result[1] = '1' #italic
 
-proc Read[T](s: Stream, ne: var T): bool =
+proc read[T](s: Stream, ne: var T): bool =
   result = s.readData(addr(ne), sizeof(T)) == sizeof(T)
 
 proc parseName(tt:TableRec, s:Stream, fontFamily: var string): bool =
@@ -86,7 +86,7 @@ proc parseName(tt:TableRec, s:Stream, fontFamily: var string): bool =
     return false
 
   for i in 1..count:
-    if not s.Read(ne): return false
+    if not s.read(ne): return false
     let
       platformID = swap16(ne.platformID)
       encodingID = swap16(ne.encodingID)
@@ -124,7 +124,7 @@ proc parseTTF(s:Stream, fontFamily: var string): bool =
   var head, name, tmp: TableRec
 
   for i in 0..numTables-1:
-    if not s.Read(tmp):
+    if not s.read(tmp):
       echo "error reading tag"
       return false
     tmp.tag = swap32(tmp.tag)

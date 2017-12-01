@@ -100,7 +100,7 @@ method copyToOS*(ba: ByteArray, offset, length: int, os: OutputStream): int {.ba
   while true:
     bytesRead = ba.get(index + offset, b, 0, bufferLength)
     if bytesRead <= 0: break
-    discard os.Write(b, 0, bytesRead)
+    discard os.write(b, 0, bytesRead)
     index += bytesRead
     bufferLength = min(b.len, length - index)
   result = index
@@ -108,7 +108,7 @@ method copyToOS*(ba: ByteArray, offset, length: int, os: OutputStream): int {.ba
 method copyToOS*(ba: ByteArray, os: OutputStream): int {.base.} =
   result = ba.copyToOS(0, ba.length(), os)
 
-method CopyFrom*(ba: ByteArray, inp: InputStream, len: int) {.base.} =
+method copyFrom*(ba: ByteArray, inp: InputStream, len: int) {.base.} =
   var b = newString(COPY_BUFFER_SIZE)
   var index = 0
   var length = len
@@ -116,7 +116,7 @@ method CopyFrom*(ba: ByteArray, inp: InputStream, len: int) {.base.} =
   var bytesRead = 0
 
   while true:
-    bytesRead = inp.Read(b, 0, bufferLength)
+    bytesRead = inp.read(b, 0, bufferLength)
     if bytesRead <= 0: break
     if ba.put(index, b, 0, bytesRead) != bytesRead:
       raise newEIO("Error writing bytes.")
@@ -124,14 +124,14 @@ method CopyFrom*(ba: ByteArray, inp: InputStream, len: int) {.base.} =
     length -= bytesRead
     bufferLength = min(b.len, length)
 
-method CopyFrom*(ba: ByteArray, inp: InputStream) {.base.} =
+method copyFrom*(ba: ByteArray, inp: InputStream) {.base.} =
   var b = newString(COPY_BUFFER_SIZE)
   var index = 0
   var bufferLength = b.len
   var bytesRead = 0
 
   while true:
-    bytesRead = inp.Read(b, 0, bufferLength)
+    bytesRead = inp.read(b, 0, bufferLength)
     if bytesRead <= 0: break
     if ba.put(index, b, 0, bytesRead) != bytesRead:
       raise newEIO("Error writing bytes.")
@@ -139,7 +139,7 @@ method CopyFrom*(ba: ByteArray, inp: InputStream) {.base.} =
 
 #----------------------------------------------------------
 method copyToOS*(ba: MemoryByteArray, offset, length: int, os: OutputStream) : int =
-  result = os.Write(ba.b, offset, length)
+  result = os.write(ba.b, offset, length)
 
 method internalPut(ba: MemoryByteArray, index: int, b: char) =
   ba.b[index] = b
@@ -174,7 +174,7 @@ proc newMemoryByteArray*(b: ByteVector, filled_length: int): MemoryByteArray =
 #---------------------------------------------------------
 
 method copyTo*(ba: GrowableMemoryByteArray, offset, length: int, os: OutputStream) : int {.base.} =
-  os.Write(ba.b, offset, length)
+  os.write(ba.b, offset, length)
 
 method internalPut(ba: GrowableMemoryByteArray, index: int, b: char) =
   if index >= ba.b.len:

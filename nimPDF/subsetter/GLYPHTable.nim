@@ -31,8 +31,8 @@ type
 proc GetAdditionalGlyphs(t: GLYPHTable, index: int, additionalGlyphs: var HashSet[int]) =
   var offset = kGlyphBodyStart + t.loca.GlyphOffset(index)
   while true:
-    let flags = t.data.ReadUShort(offset + kFlags)
-    let glyphIndex = t.data.ReadUShort(offset + kGlyphIndex)
+    let flags = t.data.readUShort(offset + kFlags)
+    let glyphIndex = t.data.readUShort(offset + kGlyphIndex)
     additionalGlyphs.incl(glyphIndex)
     offset += 4
 
@@ -61,24 +61,24 @@ proc GetAdditionalGlyphs(t: GLYPHTable, index: int, additionalGlyphs: var HashSe
 
 proc XMin*(t: GLYPHTable, index: int): int =
   let offset = t.loca.GlyphOffset(index)
-  result = t.data.ReadFWord(offset + kXMin)
+  result = t.data.readFWord(offset + kXMin)
 
 proc YMin*(t: GLYPHTable, index: int): int =
   let offset = t.loca.GlyphOffset(index)
-  result = t.data.ReadFWord(offset + kYMin)
+  result = t.data.readFWord(offset + kYMin)
 
 proc XMax*(t: GLYPHTable, index: int): int =
   let offset = t.loca.GlyphOffset(index)
-  result = t.data.ReadFWord(offset + kXMax)
+  result = t.data.readFWord(offset + kXMax)
 
 proc YMax*(t: GLYPHTable, index: int): int =
   let offset = t.loca.GlyphOffset(index)
-  result = t.data.ReadFWord(offset + kYMax)
+  result = t.data.readFWord(offset + kYMax)
 
 proc NumberOfContours*(t: GLYPHTable, index: int): int =
   let offset = t.loca.GlyphOffset(index)
   #let length = t.loca.GlyphLength(index)
-  result = t.data.ReadShort(offset + kNumberOfContours)
+  result = t.data.readShort(offset + kNumberOfContours)
 
 proc SetLoca*(t: GLYPHTable, loca: LOCATable) =
   t.loca = loca
@@ -127,10 +127,10 @@ proc CollectMoreGlyphs(t: GLYPHTable, neededGlyphs: HashSet[int]): HashSet[int] 
 proc UpdateGlyphsOffset(fd: FontData, loc: int, GID2GID: OrderedTable[int, int]) =
   var offset = kGlyphBodyStart + loc
   while true:
-    let flags = fd.ReadUShort(offset + kFlags)
+    let flags = fd.readUShort(offset + kFlags)
 
-    let GlyphIndex = fd.ReadUShort(offset + kGlyphIndex)
-    discard fd.WriteUShort(offset + kGlyphIndex, GID2GID[GlyphIndex])
+    let GlyphIndex = fd.readUShort(offset + kGlyphIndex)
+    discard fd.writeUShort(offset + kGlyphIndex, GID2GID[GlyphIndex])
 
     offset += 4
 
@@ -160,8 +160,8 @@ proc EncodeGLYPHTable*(t: GLYPHTable, GID2GID: var OrderedTable[int, int]): GLYP
 
   GID2GID.sort(proc(x,y: tuple[key,val: int] ):int = cmp(x.val,y.val) )
 
-  var newdata = makeFontData(size)
-  var olddata = t.GetTableData()
+  var newdata = newFontData(size)
+  var olddata = t.getTableData()
 
   var LocaList : seq[int] = @[]
   #let numGlyphs = Glyphs.len + moreGlyphs.len
@@ -173,7 +173,7 @@ proc EncodeGLYPHTable*(t: GLYPHTable, GID2GID: var OrderedTable[int, int]): GLYP
 
     if length > 0:
       discard olddata.copyTo(newdata, loc, offset, length)
-      if newdata.ReadShort(loc + kNumberOfContours) < 0:
+      if newdata.readShort(loc + kNumberOfContours) < 0:
         UpdateGlyphsOffset(newdata, loc, GID2GID)
 
     LocaList.add(loc)

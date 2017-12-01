@@ -382,7 +382,7 @@ when isMainModule:
     var str = newString(8)
     var buf = str.cstring
     for i in 0.. <0x1ffff:
-      # Skip surrogates, as they are not allowed in utf8
+      # skip surrogates, as they are not allowed in utf8
       if  i >= 0xd800 and i <= 0xdfff: continue
       zeroMem(buf, 8)
       let ret1 = wtf8_encode(i, buf)

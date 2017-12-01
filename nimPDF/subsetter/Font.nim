@@ -82,7 +82,7 @@ type
     xHeight*:int
     missingWidth*: int
 
-proc GetTable(header: Header, data: FontData): FontTable =
+proc newTable(header: Header, data: FontData): FontTable =
   let tag = header.tag()
 
   case tag
@@ -110,88 +110,88 @@ proc GetTable(header: Header, data: FontData): FontTable =
     new(result)
     initFontTable(result, header, data)
 
-proc GetSfntVersion*(f: FontDef): int = f.sfntVersion
-proc GetChecksum*(f: FontDef): int64 = f.checksum
-proc GetNumTables*(f: FontDef): int = f.tables.len
+proc getSfntVersion*(f: FontDef): int = f.sfntVersion
+proc getChecksum*(f: FontDef): int64 = f.checksum
+proc getNumTables*(f: FontDef): int = f.tables.len
 
-proc HasTable*(f: FontDef, tag: TTag): bool = f.tables.hasKey(tag)
+proc hasTable*(f: FontDef, tag: TTag): bool = f.tables.hasKey(tag)
 
-proc GetTable*(f: FontDef, tag: TTag): FontTable =
-  if not f.HasTable(tag): return nil
+proc getTable*(f: FontDef, tag: TTag): FontTable =
+  if not f.hasTable(tag): return nil
   result = f.tables[tag]
 
-proc GetTableMap*(f: FontDef): FontTableMap = f.tables
+proc getTableMap*(f: FontDef): FontTableMap = f.tables
 
-proc makeFont*(): FontDef =
+proc newFont*(): FontDef =
   new(result)
-  result.sfntVersion = Fixed1616Fixed(SFNTVERSION_MAJOR, SFNTVERSION_MINOR)
+  result.sfntVersion = fixed1616Fixed(SFNTVERSION_MAJOR, SFNTVERSION_MINOR)
 
-proc ReadHeader(f: FontDef, fis: FontInputStream): TableHeaderList =
+proc readHeader(f: FontDef, fis: FontInputStream): TableHeaderList =
   result = @[]
 
-  f.sfntVersion   = fis.ReadFixed()
-  f.numTables   = fis.ReadUShort()
-  f.searchRange   = fis.ReadUShort()
-  f.entrySelector = fis.ReadUShort()
-  f.rangeShift  = fis.ReadUShort()
+  f.sfntVersion   = fis.readFixed()
+  f.numTables     = fis.readUShort()
+  f.searchRange   = fis.readUShort()
+  f.entrySelector = fis.readUShort()
+  f.rangeShift    = fis.readUShort()
 
   for table_number in 0..f.numTables-1:
     #Need to use temporary vars here.  C++ evaluates function parameters from
     #right to left and thus breaks the order of input stream.
-    let tag      = TTag(fis.ReadULongAsInt())
-    let checksum = fis.ReadULong()
-    let offset   = fis.ReadULongAsInt()
-    let length   = fis.ReadULongAsInt()
+    let tag      = TTag(fis.readULongAsInt())
+    let checksum = fis.readULong()
+    let offset   = fis.readULongAsInt()
+    let length   = fis.readULongAsInt()
     var header   = initHeader(tag, checksum, offset, length)
     result.add(header)
 
   result.sort(proc(x,y: Header): int = offsetSortedComparator(x,y) )
 
-proc ReadHeader(f: FontDef, fd: FontData, offset: int): TableHeaderList =
+proc readHeader(f: FontDef, fd: FontData, offset: int): TableHeaderList =
   result = @[]
-  f.sfntVersion   = fd.ReadFixed(offset + kSfntVersion)
-  f.numTables     = fd.ReadUShort(offset + kNumTables)
-  f.searchRange   = fd.ReadUShort(offset + kSearchRange)
-  f.entrySelector = fd.ReadUShort(offset + kEntrySelector)
-  f.rangeShift    = fd.ReadUShort(offset + kRangeShift)
+  f.sfntVersion   = fd.readFixed(offset + kSfntVersion)
+  f.numTables     = fd.readUShort(offset + kNumTables)
+  f.searchRange   = fd.readUShort(offset + kSearchRange)
+  f.entrySelector = fd.readUShort(offset + kEntrySelector)
+  f.rangeShift    = fd.readUShort(offset + kRangeShift)
 
   var tableOffset = offset + kTableRecordBegin
   for table_number in 0..f.numTables-1:
-    let tag      = TTag(fd.ReadULongAsInt(tableOffset + kTableTag))
-    let checksum = fd.ReadULong(tableOffset + kTableCheckSum)
-    let offset   = fd.ReadULongAsInt(tableOffset + kTableOffset)
-    let length   = fd.ReadULongAsInt(tableOffset + kTableLength)
+    let tag      = TTag(fd.readULongAsInt(tableOffset + kTableTag))
+    let checksum = fd.readULong(tableOffset + kTableCheckSum)
+    let offset   = fd.readULongAsInt(tableOffset + kTableOffset)
+    let length   = fd.readULongAsInt(tableOffset + kTableLength)
     var header   = initHeader(tag, checksum, offset, length)
     result.add(header)
     inc(tableOffset, kTableRecordSize)
 
   result.sort(proc(x,y: Header): int = offsetSortedComparator(x,y) )
 
-proc LoadTable(headers: TableHeaderList, fis: FontInputStream): FontTableMap =
+proc loadTable(headers: TableHeaderList, fis: FontInputStream): FontTableMap =
   result = initTable[TTag, FontTable]()
   for header in headers:
-    discard fis.Skip(header.offset() - fis.Position())
-    var data = makeFontData(header.length())
-    data.CopyFrom(fis, header.length())
-    result[header.tag()] = GetTable(header, data)
+    discard fis.skip(header.offset() - fis.position())
+    var data = newFontData(header.length())
+    data.copyFrom(fis, header.length())
+    result[header.tag()] = newTable(header, data)
 
-proc LoadTable(headers: TableHeaderList, fd: FontData): FontTableMap =
+proc loadTable(headers: TableHeaderList, fd: FontData): FontTableMap =
   result = initTable[TTag, FontTable]()
   for header in headers:
-    var data = makeFontData(header.length())
+    var data = newFontData(header.length())
     discard fd.copyTo(data, 0, header.offset(), header.length())
-    result[header.tag()] = GetTable(header, data)
+    result[header.tag()] = newTable(header, data)
 
 proc InterRelateTables(f: FontDef) =
-  var head = HEADTable(f.GetTable(TAG.head))
-  var hhea = HHEATable(f.GetTable(TAG.hhea))
-  var maxp = MAXPTable(f.GetTable(TAG.maxp))
-  var loca = LOCATable(f.GetTable(TAG.loca))
-  var hmtx = HMTXTable(f.GetTable(TAG.hmtx))
-  var hdmx = HDMXTable(f.GetTable(TAG.hdmx))
-  var glyf = GLYPHTable(f.GetTable(TAG.glyf))
-  var vhea = VHEATable(f.GetTable(TAG.vhea))
-  var vmtx = VMTXTable(f.GetTable(TAG.vmtx))
+  var head = HEADTable(f.getTable(TAG.head))
+  var hhea = HHEATable(f.getTable(TAG.hhea))
+  var maxp = MAXPTable(f.getTable(TAG.maxp))
+  var loca = LOCATable(f.getTable(TAG.loca))
+  var hmtx = HMTXTable(f.getTable(TAG.hmtx))
+  var hdmx = HDMXTable(f.getTable(TAG.hdmx))
+  var glyf = GLYPHTable(f.getTable(TAG.glyf))
+  var vhea = VHEATable(f.getTable(TAG.vhea))
+  var vmtx = VMTXTable(f.getTable(TAG.vmtx))
 
   if vmtx != nil:
     if maxp != nil: vmtx.setNumGlyphs(maxp.NumGlyphs())
@@ -210,174 +210,174 @@ proc InterRelateTables(f: FontDef) =
   if maxp != nil and hdmx != nil:
     hdmx.SetNumGlyphs(maxp.NumGlyphs())
 
-proc LoadFont(f: FontDef, istream: InputStream) =
-  var fis = makeFontInputStream(istream)
-  var headers = f.ReadHeader(fis)
-  f.tables = LoadTable(headers, fis)
+proc loadFont(f: FontDef, istream: InputStream) =
+  var fis = newFontInputStream(istream)
+  var headers = f.readHeader(fis)
+  f.tables = loadTable(headers, fis)
   InterRelateTables(f)
-  fis.Close()
+  fis.close()
 
-proc LoadFont(f: FontDef, fd: FontData, offset_to_offset_table: int) =
-  var headers = f.ReadHeader(fd, offset_to_offset_table)
-  f.tables = LoadTable(headers, fd)
+proc loadFont(f: FontDef, fd: FontData, offset_to_offset_table: int) =
+  var headers = f.readHeader(fd, offset_to_offset_table)
+  f.tables = loadTable(headers, fd)
   InterRelateTables(f)
 
 #-------------------------------------------------------------
-proc IsCollection(istream: InputStream): bool =
+proc isCollection(istream: InputStream): bool =
   var tag = newString(4)
-  discard istream.Read(tag)
-  discard istream.Skip(-4)
+  discard istream.read(tag)
+  discard istream.skip(-4)
   result = TAG.ttcf == generateTag(tag)
 
-proc IsCollection(fd: FontData): bool =
+proc isCollection(fd: FontData): bool =
   var tag = newString(4)
-  discard fd.ReadBytes(0, tag, 0, tag.len)
+  discard fd.readBytes(0, tag, 0, tag.len)
   result = TAG.ttcf == generateTag(tag)
 
-proc LoadSingleOTF*(istream: InputStream): FontDef =
-  result = makeFont()
-  LoadFont(result, istream)
+proc loadSingleOTF*(istream: InputStream): FontDef =
+  result = newFont()
+  loadFont(result, istream)
 
-proc LoadSingleOTF*(fd: FontData): FontDef =
-  result = makeFont()
-  LoadFont(result, fd, 0)
+proc loadSingleOTF*(fd: FontData): FontDef =
+  result = newFont()
+  loadFont(result, fd, 0)
 
-proc LoadCollection*(fd: FontData): FontArray =
+proc loadCollection*(fd: FontData): FontArray =
   result = @[]
 
-  discard fd.ReadULongAsInt(kTTCTag)
-  discard fd.ReadFixed(kVersion)
-  let num_fonts = fd.ReadULongAsInt(kNumFonts)
+  discard fd.readULongAsInt(kTTCTag)
+  discard fd.readFixed(kVersion)
+  let numFonts = fd.readULongAsInt(kNumFonts)
 
-  var offset_tableOffset = kOffsetTable
-  for i in 0..num_fonts-1:
-    let offset = fd.ReadULongAsInt(offset_tableOffset)
-    var font = makeFont()
-    LoadFont(font, fd, offset)
+  var offsetTableOffset = kOffsetTable
+  for i in 0..numFonts-1:
+    let offset = fd.readULongAsInt(offsetTableOffset)
+    var font = newFont()
+    loadFont(font, fd, offset)
     result.add(font)
-    offset_tableOffset += DataSize.kULONG
+    offsetTableOffset += DataSize.kULONG
 
-proc LoadCollection*(istream: InputStream): FontArray =
-  var fd = makeFontData(istream.Available())
-  fd.CopyFrom(istream)
-  result = LoadCollection(fd)
+proc loadCollection*(istream: InputStream): FontArray =
+  var fd = newFontData(istream.available())
+  fd.copyFrom(istream)
+  result = loadCollection(fd)
 
-proc LoadFonts*(istream: InputStream): FontArray =
-  if IsCollection(istream):
-    return LoadCollection(istream)
+proc loadFonts*(istream: InputStream): FontArray =
+  if isCollection(istream):
+    return loadCollection(istream)
 
-  var font = LoadSingleOTF(istream)
+  var font = loadSingleOTF(istream)
   if font != nil:
     return @[font]
 
   result = @[]
 
-proc LoadFonts*(b: ByteVector): FontArray =
-  var fd = makeFontData(b)
-  if IsCollection(fd):
-    return LoadCollection(fd)
+proc loadFonts*(b: ByteVector): FontArray =
+  var fd = newFontData(b)
+  if isCollection(fd):
+    return loadCollection(fd)
 
-  var font = LoadSingleOTF(fd)
+  var font = loadSingleOTF(fd)
   if font != nil:
     return @[font]
 
   result = @[]
 
-proc LoadTTF*(fileName: string): FontDef =
-  var fis = makeFileInputStream(fileName)
+proc loadTTF*(fileName: string): FontDef =
+  var fis = newFileInputStream(fileName)
   if fis == nil:
     echo "cannot open ", fileName
     return nil
-  result = LoadSingleOTF(fis)
+  result = loadSingleOTF(fis)
 
-proc LoadTTC*(fileName: string, fontIndex: int): FontDef =
-  var fis = makeFileInputStream(fileName)
+proc loadTTC*(fileName: string, fontIndex: int): FontDef =
+  var fis = newFileInputStream(fileName)
   if fis == nil:
     echo "cannot open ", fileName
     return nil
-  let fonts = LoadCollection(fis)
+  let fonts = loadCollection(fis)
   if fontIndex < 0 or fontIndex >= fonts.len:
-    echo "LoadTTC out of bound"
+    echo "loadTTC out of bound"
     return nil
   result = fonts[fontIndex]
 
 #-------------------------------------------------------
-proc SerializeFont*(tables: var seq[FontTable]): FontData =
+proc serializeFont*(tables: var seq[FontTable]): FontData =
   keepItIf(tables, it != nil)
 
   let numTables = tables.len
   var offset = kSfntHeaderSize + kTableRecordSize * numTables
 
-  tables.sort(proc(x,y: FontTable): int = cmp( int(x.HeaderTag()), int(y.HeaderTag()) ) )
+  tables.sort(proc(x,y: FontTable): int = cmp( int(x.headerTag()), int(y.headerTag()) ) )
 
   var headoffset = 0
   for i in 0..tables.len-1:
     if tables[i] == nil: continue
-    if tables[i].HeaderTag() == TAG.head:
+    if tables[i].headerTag() == TAG.head:
       HEADTable(tables[i]).SetChecksumAdjustment(0)
       headoffset = offset
 
-    discard tables[i].CalculatedChecksum()
-    tables[i].SetTableOffset(offset)
-    offset += ((tables[i].DataLength() + 3) and not 3)
+    discard tables[i].calculatedChecksum()
+    tables[i].setTableOffset(offset)
+    offset += ((tables[i].dataLength() + 3) and not 3)
 
-  var fd = makeFontData(offset)
+  var fd = newFontData(offset)
 
-  discard fd.WriteFixed(kSfntVersion, Fixed1616Fixed(SFNTVERSION_MAJOR, SFNTVERSION_MINOR))
-  discard fd.WriteUShort(kNumTables, numTables)
+  discard fd.writeFixed(kSfntVersion, fixed1616Fixed(SFNTVERSION_MAJOR, SFNTVERSION_MINOR))
+  discard fd.writeUShort(kNumTables, numTables)
 
   let log2_of_max_power_of_2 = Log2(numTables)
   let searchRange = 2 shl (log2_of_max_power_of_2 - 1 + 4)
 
-  discard fd.WriteUShort(kSearchRange, searchRange)
-  discard fd.WriteUShort(kEntrySelector, log2_of_max_power_of_2)
-  discard fd.WriteUShort(kRangeShift, (numTables * kTableRecordSize) - searchRange)
+  discard fd.writeUShort(kSearchRange, searchRange)
+  discard fd.writeUShort(kEntrySelector, log2_of_max_power_of_2)
+  discard fd.writeUShort(kRangeShift, (numTables * kTableRecordSize) - searchRange)
 
   var tableOffset = kTableRecordBegin
   for i in 0..tables.len-1:
     if tables[i] == nil: continue
-    let header = tables[i].GetHeader()
-    discard fd.WriteULong(tableOffset + kTableTag, int(header.tag()))
-    discard fd.WriteULong(tableOffset + kTableCheckSum, header.checksum())
-    discard fd.WriteULong(tableOffset + kTableOffset, header.offset())
-    discard fd.WriteULong(tableOffset + kTableLength, header.length())
+    let header = tables[i].getHeader()
+    discard fd.writeULong(tableOffset + kTableTag, int(header.tag()))
+    discard fd.writeULong(tableOffset + kTableCheckSum, header.checksum())
+    discard fd.writeULong(tableOffset + kTableOffset, header.offset())
+    discard fd.writeULong(tableOffset + kTableLength, header.length())
     tableOffset += kTableRecordSize
 
   for i in 0..tables.len-1:
     if tables[i] == nil: continue
-    discard tables[i].Serialize(fd, tableOffset)
-    let tableSize = tables[i].DataLength()
+    discard tables[i].serialize(fd, tableOffset)
+    let tableSize = tables[i].dataLength()
     let paddingSize = ((tableSize + 3) and not 3) - tableSize
     tableOffset += tableSize
     for i in 0..paddingSize-1:
-      discard fd.WriteByte(tableOffset, chr(0))
+      discard fd.writeByte(tableOffset, chr(0))
       inc(tableOffset)
 
   var checksum = checksum(fd, fd.length())
-  discard fd.WriteULong(headoffset + 8, 0xB1B0AFBA - checksum)
+  discard fd.writeULong(headoffset + 8, 0xB1B0AFBA - checksum)
   result = fd
 
-proc Subset*(font: FontDef, CH2GID: CH2GIDMAP, newTag: string): FontData =
-  var cmap = CMAPTable(font.GetTable(TAG.cmap))
-  var maxp = MAXPTable(font.GetTable(TAG.maxp))
-  var glyf = GLYPHTable(font.GetTable(TAG.glyf))
-  var head = HEADTable(font.GetTable(TAG.head))
-  var hhea = HHEATable(font.GetTable(TAG.hhea))
-  var hmtx = HMTXTable(font.GetTable(TAG.hmtx))
-  var name = NAMETable(font.GetTable(TAG.name))
-  var post = POSTTable(font.GetTable(TAG.post))
-  var os2  = OS2Table(font.GetTable(TAG.OS_2))
-  var cvt  = font.GetTable(TAG.cvt)
-  var fpgm = font.GetTable(TAG.fpgm)
-  var prep = font.GetTable(TAG.prep)
-  var gasp = font.GetTable(TAG.gasp)
-  var vhea = VHEATable(font.GetTable(TAG.vhea))
-  var vmtx = VMTXTable(font.GetTable(TAG.vmtx))
+proc subset*(font: FontDef, CH2GID: CH2GIDMAP, newTag: string): FontData =
+  var cmap = CMAPTable(font.getTable(TAG.cmap))
+  var maxp = MAXPTable(font.getTable(TAG.maxp))
+  var glyf = GLYPHTable(font.getTable(TAG.glyf))
+  var head = HEADTable(font.getTable(TAG.head))
+  var hhea = HHEATable(font.getTable(TAG.hhea))
+  var hmtx = HMTXTable(font.getTable(TAG.hmtx))
+  var name = NAMETable(font.getTable(TAG.name))
+  var post = POSTTable(font.getTable(TAG.post))
+  var os2  = OS2Table(font.getTable(TAG.OS_2))
+  var cvt  = font.getTable(TAG.cvt)
+  var fpgm = font.getTable(TAG.fpgm)
+  var prep = font.getTable(TAG.prep)
+  var gasp = font.getTable(TAG.gasp)
+  var vhea = VHEATable(font.getTable(TAG.vhea))
+  var vmtx = VMTXTable(font.getTable(TAG.vmtx))
 
   var isSymbol = false
   if os2 != nil:
     isSymbol = os2.IsSymbolCharSet() and
-      cmap.CMAPAvailable(proc(platformID, encodingID, format: int): bool =
+      cmap.CMAPavailable(proc(platformID, encodingID, format: int): bool =
         result = (platformID == 3) and (encodingID == 0) )
 
   var GID2GID = initOrderedTable[int, int](math.nextPowerOfTwo(CH2GID.len))
@@ -406,19 +406,19 @@ proc Subset*(font: FontDef, CH2GID: CH2GIDMAP, newTag: string): FontData =
     tables.add(vhea)
     tables.add(newvmtx)
 
-  result = SerializeFont(tables)
+  result = serializeFont(tables)
 
-proc makeDescriptor*(font: FontDef, CH2GID: CH2GIDMAP): FontDescriptor =
+proc newFontDescriptor*(font: FontDef, CH2GID: CH2GIDMAP): FontDescriptor =
   var fd: FontDescriptor
   new(fd)
 
-  var name = NAMETable(font.GetTable(TAG.name))
-  var post = POSTTable(font.GetTable(TAG.post))
-  var os2  = OS2Table(font.GetTable(TAG.OS_2))
-  var head = HEADTable(font.GetTable(TAG.head))
-  var hhea = HHEATable(font.GetTable(TAG.hhea))
-  var hmtx = HMTXTable(font.GetTable(TAG.hmtx))
-  var cmap = CMAPTable(font.GetTable(TAG.cmap))
+  var name = NAMETable(font.getTable(TAG.name))
+  var post = POSTTable(font.getTable(TAG.post))
+  var os2  = OS2Table(font.getTable(TAG.OS_2))
+  var head = HEADTable(font.getTable(TAG.head))
+  var hhea = HHEATable(font.getTable(TAG.hhea))
+  var hmtx = HMTXTable(font.getTable(TAG.hmtx))
+  var cmap = CMAPTable(font.getTable(TAG.cmap))
 
   fd.postscriptName = name.GetPostscriptName()
   fd.fontFamily = name.GetFontFamily()
@@ -433,7 +433,7 @@ proc makeDescriptor*(font: FontDef, CH2GID: CH2GIDMAP): FontDescriptor =
     Descent = os2.STypoDescender()
     LineGap = os2.STypoLineGap()
     isSymbol = os2.IsSymbolCharSet() and
-      cmap.CMAPAvailable(proc(platformID, encodingID, format: int): bool =
+      cmap.CMAPavailable(proc(platformID, encodingID, format: int): bool =
         result = (platformID == 3) and (encodingID == 0) )
 
   fd.capHeight = Ascent

@@ -1,6 +1,6 @@
 # Copyright (c) 2015 Andri Lim
 #
-# Distributed under the MIT license 
+# Distributed under the MIT license
 # (See accompanying file LICENSE.txt)
 #
 #-----------------------------------------
@@ -15,29 +15,29 @@ type
     f: File
     pos: size_t
     len: size_t
-  
+
   MemoryInputStream* = ref object of InputStream
     buf: ByteVector
     pos: size_t
     len: size_t
-  
+
   OutputStream* = ref object of RootObj
   MemoryOutputStream* = ref object of OutputStream
     store: ByteVector
- 
+
   FileOutputStream* = ref object of OutputStream
     f: File
     len: size_t
-    
+
   FontInputStream* = ref object of InputStream
     inp: InputStream
-    position: int64
+    pos: int64
     length: int64  #bound on length of data to read
     bounded: bool
-  
+
   FontOutputStream* = ref object of OutputStream
     stream : OutputStream
-    position : size_t
+    pos : size_t
 
 proc newEIO*(msg: string): ref IOError =
   new(result)
@@ -56,24 +56,24 @@ proc newAssertionError*(msg: string): ref AssertionError =
   result.msg = msg
 
 #----------------------------------------------------------
-method Available*(s: InputStream): int {.base.} = discard
-method Close*(s: InputStream) {.base.} = discard
-method Read*(s: InputStream): int {.base.} = discard
-method Read*(s: InputStream, b: var ByteVector): int {.base.} = discard
-method Read*(s: InputStream, b: var ByteVector, offset, length: int): int {.base.} = discard
-method Skip*(s: InputStream, n: int64): int64 {.base.} = discard
+method available*(s: InputStream): int {.base.} = discard
+method close*(s: InputStream) {.base.} = discard
+method read*(s: InputStream): int {.base.} = discard
+method read*(s: InputStream, b: var ByteVector): int {.base.} = discard
+method read*(s: InputStream, b: var ByteVector, offset, length: int): int {.base.} = discard
+method skip*(s: InputStream, n: int64): int64 {.base.} = discard
 
 #-------------------------------------------------------
-method Available*(s: FileInputStream): int = s.len - s.pos
+method available*(s: FileInputStream): int = s.len - s.pos
 
-method Close*(s: FileInputStream) = 
+method close*(s: FileInputStream) =
   if s.f != nil:
     close(s.f)
     s.len = 0
     s.pos = 0
     s.f = nil
-  
-method Read*(s: FileInputStream): int = 
+
+method read*(s: FileInputStream): int =
   if s.f == nil:
     raise newEIO("no opened file")
 
@@ -85,32 +85,32 @@ method Read*(s: FileInputStream): int =
   inc(s.pos, length)
   result = ord(value)
 
-method Read*(s: FileInputStream, b: var ByteVector, offset, length: int): int =
+method read*(s: FileInputStream, b: var ByteVector, offset, length: int): int =
   if s.f == nil:
     raise newEIO("no opened file")
-    
+
   if endOfFile(s.f):
     return -1
-    
-  let read_count = min(s.len - s.pos, length)
-  
-  if b == nil: b = newString(offset + read_count)
-  
-  if b.len < (offset + read_count):
-    let grow = (offset + read_count) - b.len
-    b.add(repeat(chr(0), grow))
-    
-  let actual_read = readBuffer(s.f, addr(b[offset]), read_count)
-  inc(s.pos, actual_read)
-  result = actual_read
-    
-method Read*(s: FileInputStream, b: var ByteVector): int = 
-  result = s.Read(b, 0, b.len)
 
-method Skip*(s: FileInputStream, n: int64): int64 =
+  let readCount = min(s.len - s.pos, length)
+
+  if b == nil: b = newString(offset + readCount)
+
+  if b.len < (offset + readCount):
+    let grow = (offset + readCount) - b.len
+    b.add(repeat(chr(0), grow))
+
+  let actualRead = readBuffer(s.f, addr(b[offset]), readCount)
+  inc(s.pos, actualRead)
+  result = actualRead
+
+method read*(s: FileInputStream, b: var ByteVector): int =
+  result = s.read(b, 0, b.len)
+
+method skip*(s: FileInputStream, n: int64): int64 =
   if s.f == nil:
     raise newEIO("no opened file")
-    
+
   var skip_count: int64 = 0
   if n < 0: #move backwards
     skip_count = max(0 - int64(s.pos), n)
@@ -120,12 +120,12 @@ method Skip*(s: FileInputStream, n: int64): int64 =
     skip_count = min(s.len - s.pos, n)
     s.pos += size_t(skip_count)
     setFilePos(s.f, s.pos)
-  
+
   result = skip_count
 
-proc makeFileInputStream*(filePath: string): FileInputStream =
+proc newFileInputStream*(filePath: string): FileInputStream =
   var f: File
-  
+
   result = nil
   if open(f, filePath, fmRead):
     new(result)
@@ -134,35 +134,35 @@ proc makeFileInputStream*(filePath: string): FileInputStream =
     result.f = f
 
 #---------------------------------------------------------------
-method Available*(s: MemoryInputStream): int = s.len - s.pos
-method Close*(s: MemoryInputStream) = discard
+method available*(s: MemoryInputStream): int = s.len - s.pos
+method close*(s: MemoryInputStream) = discard
 
-method Read*(s: MemoryInputStream): int = 
+method read*(s: MemoryInputStream): int =
   if s.pos >= s.len:
     raise newEIO("eof reached")
-  
+
   let value = s.buf[s.pos]
   inc(s.pos)
   result = ord(value)
 
-method Read*(s: MemoryInputStream, b: var ByteVector, offset, length: int): int =
+method read*(s: MemoryInputStream, b: var ByteVector, offset, length: int): int =
   if s.pos >= s.len:
     raise newEIO("eof reached")
-    
-  let read_count = min(s.len - s.pos, length)
-  if b.len < offset + read_count:
-    let grow = (offset + read_count) - b.len
+
+  let readCount = min(s.len - s.pos, length)
+  if b.len < offset + readCount:
+    let grow = (offset + readCount) - b.len
     b.add(repeat(chr(0), grow))
-  
-  copyMem(addr(b[offset]), addr(s.buf[s.pos]), read_count)
-  
-  inc(s.pos, read_count)
-  result = read_count
-  
-method Read*(s: MemoryInputStream, b: var ByteVector): int = 
-  result = s.Read(b, 0, b.len)
- 
-method Skip*(s: MemoryInputStream, n: int64): int64 = 
+
+  copyMem(addr(b[offset]), addr(s.buf[s.pos]), readCount)
+
+  inc(s.pos, readCount)
+  result = readCount
+
+method read*(s: MemoryInputStream, b: var ByteVector): int =
+  result = s.read(b, 0, b.len)
+
+method skip*(s: MemoryInputStream, n: int64): int64 =
   var skip_count: int64 = 0
   if n < 0:  #move backwards
     skip_count = max(0 - int64(s.pos), n)
@@ -172,41 +172,41 @@ method Skip*(s: MemoryInputStream, n: int64): int64 =
     s.pos += size_t(skip_count)
   result = skip_count
 
-proc makeMemoryInputStream*(length: size_t): MemoryInputStream =
+proc newMemoryInputStream*(length: size_t): MemoryInputStream =
   new(result)
   result.len = length
   result.pos = 0
   result.buf = newString(length)
 
-proc makeMemoryInputStream*(b: ByteVector, length: size_t): MemoryInputStream =
+proc newMemoryInputStream*(b: ByteVector, length: size_t): MemoryInputStream =
   new(result)
   result.len = length
   result.pos = 0
   result.buf = b
 
 #---------------------------------------------------------------
-method Close*(s:OutputStream) {.base.} = discard
-method Flush*(s:OutputStream) {.base.} = discard
-method Write*(s:OutputStream, b: ByteVector): int {.base.} = discard
-method Write*(s:OutputStream, b: ByteVector, offset, length:int): int{.base.} = discard
-method Write*(s:OutputStream, b: char): int {.base.} = discard
+method close*(s:OutputStream) {.base.} = discard
+method flush*(s:OutputStream) {.base.} = discard
+method write*(s:OutputStream, b: ByteVector): int {.base.} = discard
+method write*(s:OutputStream, b: ByteVector, offset, length:int): int{.base.} = discard
+method write*(s:OutputStream, b: char): int {.base.} = discard
 
 #---------------------------------------------------------------
-method Close*(s:MemoryOutputStream) = discard
-method Flush*(s:MemoryOutputStream) = discard
+method close*(s:MemoryOutputStream) = discard
+method flush*(s:MemoryOutputStream) = discard
 
-method Write*(s:MemoryOutputStream, b: ByteVector): int = 
+method write*(s:MemoryOutputStream, b: ByteVector): int =
   s.store.add(b)
   result = b.len
-  
-method Write*(s:MemoryOutputStream, b: ByteVector, offset, length: int): int =
+
+method write*(s:MemoryOutputStream, b: ByteVector, offset, length: int): int =
   if offset >= 0 and length > 0:
     s.store.add(b.substr(offset, offset + length))
     result = length
   else:
     raise newIndexError("Attempt to write outside the bounds of the data.")
-  
-method Write*(s:MemoryOutputStream, b: char): int = 
+
+method write*(s:MemoryOutputStream, b: char): int =
   s.store.add(b)
   result = 1
 
@@ -216,34 +216,34 @@ proc Get*(s: MemoryOutputStream): ByteVector =
 proc Size*(s: MemoryOutputStream): size_t =
   result = s.store.len
 
-proc makeMemoryOutputStream*(): MemoryOutputStream =
+proc newMemoryOutputStream*(): MemoryOutputStream =
   new(result)
   result.store = ""
 
 #------------------------------------------------------------
-method Close*(s:FileOutputStream) = 
+method close*(s:FileOutputStream) =
   if s.f != nil:
     close(s.f)
     s.len = 0
     s.f = nil
-  
-method Flush*(s:FileOutputStream) = 
+
+method flush*(s:FileOutputStream) =
   flushFile(s.f)
-  
-method Write*(s:FileOutputStream, b: ByteVector): int = 
+
+method write*(s:FileOutputStream, b: ByteVector): int =
   write(s.f, b)
   s.len += b.len
   result = b.len
-  
-method Write*(s:FileOutputStream, b: ByteVector, offset, length: int): int =
+
+method write*(s:FileOutputStream, b: ByteVector, offset, length: int): int =
   if offset >= 0 and length > 0:
     write(s.f, b.substr(offset, offset + length))
     s.len += length
     result = length
   else:
     raise newIndexError("Attempt to write outside the bounds of the data.")
-  
-method Write*(s:FileOutputStream, b: char): int = 
+
+method write*(s:FileOutputStream, b: char): int =
   write(s.f, b)
   inc(s.len)
   result = 1
@@ -251,165 +251,164 @@ method Write*(s:FileOutputStream, b: char): int =
 proc Size*(s: FileOutputStream): size_t =
   result = s.len
 
-proc makeFileOutputStream*(filePath: string): FileOutputStream =
+proc newFileOutputStream*(filePath: string): FileOutputStream =
   var f: File
-  
+
   result = nil
   if open(f, filePath, fmWrite):
     new(result)
     result.len = 0
     result.f = f
 #--------------------------------------------------------------
-proc makeFontInputStream*(inp: InputStream, length: int): FontInputStream =
+proc newFontInputStream*(inp: InputStream, length: int): FontInputStream =
   new(result)
   result.inp = inp
-  result.position = 0
+  result.pos = 0
   result.length   = length
   result.bounded  = true
 
-proc makeFontInputStream*(inp: InputStream): FontInputStream =
+proc newFontInputStream*(inp: InputStream): FontInputStream =
   new(result)
   result.inp = inp
-  result.position = 0
+  result.pos = 0
   result.length   = 0
   result.bounded  = false
 
-method Available*(s: FontInputStream): int = 
+method available*(s: FontInputStream): int =
   result = 0
-  if s.inp != nil: result = s.inp.Available()
-  
-method Close*(s: FontInputStream) = 
-  if s.inp != nil: s.inp.Close()
-  
-method Read*(s: FontInputStream): int =
-  if s.bounded and s.position >= s.length:
+  if s.inp != nil: result = s.inp.available()
+
+method close*(s: FontInputStream) =
+  if s.inp != nil: s.inp.close()
+
+method read*(s: FontInputStream): int =
+  if s.bounded and s.pos >= s.length:
     return -1
-  
-  let b = ord(s.inp.Read())
+
+  let b = ord(s.inp.read())
   if b >= 0:
-    inc(s.position)
-  
+    inc(s.pos)
+
   result = b
-  
-method Read*(s: FontInputStream, b: var ByteVector, offset, length: int): int =
-  if s.bounded and s.position >= s.length:
+
+method read*(s: FontInputStream, b: var ByteVector, offset, length: int): int =
+  if s.bounded and s.pos >= s.length:
     return -1
-  
+
   var bytesToRead = length
-  if s.bounded: 
-    bytesToRead = min(length, int(s.length - s.position))
-    
-  let bytesRead = s.inp.Read(b, offset, bytesToRead)
-  inc(s.position, bytesRead)
+  if s.bounded:
+    bytesToRead = min(length, int(s.length - s.pos))
+
+  let bytesRead = s.inp.read(b, offset, bytesToRead)
+  inc(s.pos, bytesRead)
   result = bytesRead
-  
-method Read*(s: FontInputStream, b: var ByteVector): int =
-  result = s.Read(b, 0, b.len)
 
-method Position*(s: FontInputStream): int64 {.base.} =
-  result = s.position
-  
-method ReadChar*(s: FontInputStream): int {.base.} =
-  result = s.Read()
+method read*(s: FontInputStream, b: var ByteVector): int =
+  result = s.read(b, 0, b.len)
 
-method ReadUShort*(s: FontInputStream): int {.base.} =
-  result = 0xffff and (s.Read() shl 8 or s.Read())
-  
-method ReadShort*(s: FontInputStream): int {.base.} =
-  result = ((s.Read() shl 8 or s.Read()) shl 16) shr 16
+method position*(s: FontInputStream): int64 {.base.} =
+  result = s.pos
 
-method ReadUInt24*(s: FontInputStream): int {.base.} =
-  result = 0xffffff and (s.Read() shl 16 or s.Read() shl 8 or s.Read())
+method readChar*(s: FontInputStream): int {.base.} =
+  result = s.read()
 
-method ReadLong*(s: FontInputStream): int {.base.} =
-  result = s.Read() shl 24 or s.Read() shl 16 or s.Read() shl 8 or s.Read()
-  
-method ReadULong*(s: FontInputStream): int64 {.base.} =
-  let val = s.ReadLong()
+method readUShort*(s: FontInputStream): int {.base.} =
+  result = 0xffff and (s.read() shl 8 or s.read())
+
+method readShort*(s: FontInputStream): int {.base.} =
+  result = ((s.read() shl 8 or s.read()) shl 16) shr 16
+
+method readUInt24*(s: FontInputStream): int {.base.} =
+  result = 0xffffff and (s.read() shl 16 or s.read() shl 8 or s.read())
+
+method readLong*(s: FontInputStream): int {.base.} =
+  result = s.read() shl 24 or s.read() shl 16 or s.read() shl 8 or s.read()
+
+method readULong*(s: FontInputStream): int64 {.base.} =
+  let val = s.readLong()
   return 0xffffffff and int64(cast[uint32](val))
-  
-method ReadULongAsInt*(s: FontInputStream): int {.base.} =
-  let ulong = s.ReadULong()
+
+method readULongAsInt*(s: FontInputStream): int {.base.} =
+  let ulong = s.readULong()
   if (ulong and 0x80000000) == 0x80000000:
     raise newArithErr("Long value too large to fit into an integer.")
-  
+
   result = int(ulong) and not 0x80000000'i32
 
-method ReadFixed*(s: FontInputStream): int {.base.} =
-  result = s.ReadLong()
+method readFixed*(s: FontInputStream): int {.base.} =
+  result = s.readLong()
 
-method ReadDateTimeAsLong*(s: FontInputStream): int64 {.base.} =
-  result = s.ReadULong() shl 32 or s.ReadULong()
+method readDateTimeAsLong*(s: FontInputStream): int64 {.base.} =
+  result = s.readULong() shl 32 or s.readULong()
 
-method Skip*(s: FontInputStream, n: int64): int64 =
+method skip*(s: FontInputStream, n: int64): int64 =
   result = 0
   if s.inp != nil:
-    let skipped = s.inp.Skip(n)
-    s.position += skipped
+    let skipped = s.inp.skip(n)
+    s.pos += skipped
     result = skipped
 
 #--------------------------------------------------------------
 
-proc makeFontOutputStream*(os: OutputStream): FontOutputStream =
+proc newFontOutputStream*(os: OutputStream): FontOutputStream =
   new(result)
   result.stream = os
-  result.position = 0
-  
-method Close*(s:FontOutputStream) = 
-  if s.stream != nil:
-    s.stream.Flush()
-    s.stream.Close()
-    s.position = 0
-  
-method Flush*(s:FontOutputStream) = 
-  if s.stream != nil:
-    s.stream.Flush()
+  result.pos = 0
 
-method Write*(s:FontOutputStream, b: ByteVector, offset, length:int): int = 
+method close*(s:FontOutputStream) =
+  if s.stream != nil:
+    s.stream.flush()
+    s.stream.close()
+    s.pos = 0
+
+method flush*(s:FontOutputStream) =
+  if s.stream != nil:
+    s.stream.flush()
+
+method write*(s:FontOutputStream, b: ByteVector, offset, length:int): int =
   assert(s.stream != nil)
   if (offset < 0 or length < 0 or (offset + length) < 0 or (offset + length) > b.len):
     raise newIndexError("Attempt to write outside the bounds of the data.")
-  
-  result = s.stream.Write(b, offset, length)
-  s.position += length
-  
-method Write*(s:FontOutputStream, b: ByteVector): int = 
-  result = s.Write(b, 0, b.len)
-  s.position += b.len
-  
-method Write*(s:FontOutputStream, b: char): int = 
+
+  result = s.stream.write(b, offset, length)
+  s.pos += length
+
+method write*(s:FontOutputStream, b: ByteVector): int =
+  result = s.write(b, 0, b.len)
+  s.pos += b.len
+
+method write*(s:FontOutputStream, b: char): int =
   if s.stream != nil:
-    result = s.stream.Write(b)
-    inc(s.position)
-  
-method WriteChar*(s:FontOutputStream, c: char) {.base.} =
-  discard s.Write(c)
-  
-method WriteUShort*(s:FontOutputStream, us: int) {.base.} =
-  discard s.Write(chr((us shr 8) and 0xff))
-  discard s.Write(chr(us and 0xff))
-  
-method WriteShort*(s:FontOutputStream, sh: int) {.base.} =
-  s.WriteUShort(sh)
-  
-method WriteUInt24*(s:FontOutputStream, ui: int) {.base.} =
-  discard s.Write(chr((ui shr 16) and 0xff))
-  discard s.Write(chr((ui shr 8) and 0xff))
-  discard s.Write(chr(ui and 0xff))
-  
-method WriteULong*(s:FontOutputStream, ul: int64) {.base.} =
-  discard s.Write(chr(int((ul shr 24) and 0xff)))
-  discard s.Write(chr(int((ul shr 16) and 0xff)))
-  discard s.Write(chr(int((ul shr 8) and 0xff)))
-  discard s.Write(chr(int(ul and 0xff)))
-  
-method WriteLong*(s:FontOutputStream, lg: int64) {.base.} =
-  s.WriteULong(lg)
+    result = s.stream.write(b)
+    inc(s.pos)
 
-method WriteFixed*(s:FontOutputStream, lg: int) {.base.} =
-  s.WriteULong(lg)
+method writeChar*(s:FontOutputStream, c: char) {.base.} =
+  discard s.write(c)
 
-method WriteDateTime*(s:FontOutputStream, date: int64) {.base.} =
-  s.WriteULong((date shr 32) and 0xffffffff)
-  s.WriteULong(date and 0xffffffff)
-  
+method writeUShort*(s:FontOutputStream, us: int) {.base.} =
+  discard s.write(chr((us shr 8) and 0xff))
+  discard s.write(chr(us and 0xff))
+
+method writeShort*(s:FontOutputStream, sh: int) {.base.} =
+  s.writeUShort(sh)
+
+method writeUInt24*(s:FontOutputStream, ui: int) {.base.} =
+  discard s.write(chr((ui shr 16) and 0xff))
+  discard s.write(chr((ui shr 8) and 0xff))
+  discard s.write(chr(ui and 0xff))
+
+method writeULong*(s:FontOutputStream, ul: int64) {.base.} =
+  discard s.write(chr(int((ul shr 24) and 0xff)))
+  discard s.write(chr(int((ul shr 16) and 0xff)))
+  discard s.write(chr(int((ul shr 8) and 0xff)))
+  discard s.write(chr(int(ul and 0xff)))
+
+method writeLong*(s:FontOutputStream, lg: int64) {.base.} =
+  s.writeULong(lg)
+
+method writeFixed*(s:FontOutputStream, lg: int) {.base.} =
+  s.writeULong(lg)
+
+method writeDateTime*(s:FontOutputStream, date: int64) {.base.} =
+  s.writeULong((date shr 32) and 0xffffffff)
+  s.writeULong(date and 0xffffffff)

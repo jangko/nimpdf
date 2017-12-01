@@ -95,10 +95,10 @@ proc GenerateRanges*(f: TTFont): string =
 
 proc GetDescriptor*(f: TTFont): FontDescriptor =
    f.CH2GID.sort(proc(x,y: tuple[key: int, val: TONGID]):int = cmp(x.key, y.key) )
-   result = f.font.makeDescriptor(f.CH2GID)
+   result = f.font.newFontDescriptor(f.CH2GID)
 
 proc GetSubsetBuffer*(f: TTFont, subsetTag: string): string =
-   let fd = f.font.Subset(f.CH2GID, subsetTag)
+   let fd = f.font.subset(f.CH2GID, subsetTag)
    result = fd.getInternalBuffer()
 
 method CanWriteVertical*(f: Font): bool {.base.} = false
@@ -251,9 +251,9 @@ proc init*(ff: var FontManager, fontDirs: seq[string]) =
     ff.baseFont[i].missingWidth = ff.baseFont[i].getWidth(0x20)
 
 proc makeTTFont(font: FontDef, searchName: string): TTFont =
-  var cmap = CMAPTable(font.GetTable(TAG.cmap))
-  var head = HEADTable(font.GetTable(TAG.head))
-  var hmtx = HMTXTable(font.GetTable(TAG.hmtx))
+  var cmap = CMAPTable(font.getTable(TAG.cmap))
+  var head = HEADTable(font.getTable(TAG.head))
+  var hmtx = HMTXTable(font.getTable(TAG.hmtx))
   if cmap == nil or head == nil or hmtx == nil: return nil
   var encodingcmap = cmap.GetEncodingCMAP()
 
@@ -269,7 +269,7 @@ proc makeTTFont(font: FontDef, searchName: string): TTFont =
   res.font     = font
   res.cmap     = encodingcmap
   res.hmtx     = hmtx
-  res.vmtx     = VMTXTable(font.GetTable(TAG.vmtx))
+  res.vmtx     = VMTXTable(font.getTable(TAG.vmtx))
   res.scaleFactor= 1000 / head.UnitsPerEm()
   res.CH2GID   = initOrderedTable[int, TONGID]()
   res.newGID   = 1
@@ -278,7 +278,7 @@ proc makeTTFont(font: FontDef, searchName: string): TTFont =
 proc searchFromTTList(ff: FontManager, name:string): Font =
   if not ff.ttFontList.hasKey(name): return nil
   let fileName = ff.ttFontList[name]
-  let font = LoadTTF(fileName)
+  let font = loadTTF(fileName)
   if font != nil: return makeTTFont(font, name)
   result = nil
 
@@ -287,7 +287,7 @@ proc searchFromttcList(ff: FontManager, name:string): Font =
   let fName = ff.ttcList[name]
   let fileName = substr(fName, 0, fName.len - 2)
   let fontIndex = ord(fName[fName.len-1]) - ord('0')
-  let font = LoadTTC(fileName, fontIndex)
+  let font = loadTTC(fileName, fontIndex)
   if font != nil: return makeTTFont(font, name)
   result = nil
 

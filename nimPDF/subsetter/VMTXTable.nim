@@ -31,14 +31,14 @@ proc vmetricAdvanceHeight(t: VMTXTable, entry: int): int =
     raise newIndexError("VMetricAdvanceHeight index error")
 
   let offset = kVMetricsStart + (entry * kVMetricsSize) + kVMetricsAdvanceHeight
-  result = t.data.ReadUShort(offset)
+  result = t.data.readUShort(offset)
 
 proc vmetricTSB(t: VMTXTable, entry: int): int =
   if entry > t.numVMetrics:
     raise newIndexError("VMetricTSB index error")
 
   let offset = kVMetricsStart + (entry * kVMetricsSize) + kVMetricsTopSideBearing
-  result = t.data.ReadFWord(offset)
+  result = t.data.readFWord(offset)
 
 proc tsbTableEntry(t: VMTXTable, entry: int): int =
   if entry > t.numberOfTSBs():
@@ -46,7 +46,7 @@ proc tsbTableEntry(t: VMTXTable, entry: int): int =
     raise newIndexError("TSBTableEntry index error")
 
   let offset = kVMetricsStart + (t.numVMetrics * kVMetricsSize) + (entry * kTopSideBearingSize)
-  result = t.data.ReadFWord(offset)
+  result = t.data.readFWord(offset)
 
 proc advanceHeight*(t: VMTXTable, glyph_id: int): int =
   if glyph_id < t.numVMetrics:
@@ -81,14 +81,14 @@ proc forGlyph*(t: VMTXTable, id: int): Metrix =
 
 proc setAdvanceHeight*(t: VMTXTable, entry, val: int) =
   let offset = kVMetricsStart + (entry * kVMetricsSize) + kVMetricsAdvanceHeight
-  discard t.data.WriteUShort(offset, val)
+  discard t.data.writeUShort(offset, val)
 
 proc setTSB*(t: VMTXTable, entry, val: int) =
   let offset = kVMetricsStart + (entry * kVMetricsSize) + kVMetricsTopSideBearing
-  discard t.data.WriteShort(offset, val)
+  discard t.data.writeShort(offset, val)
 
 proc encodeVMTXTable*(t: VMTXTable, GID2GID: OrderedTable[int, int]): VMTXTable =
-  var data = makeFontData(GID2GID.len * kVMetricsSize)
+  var data = newFontData(GID2GID.len * kVMetricsSize)
   var VMTX = newVMTXTable(initHeader(TAG.vmtx, checksum(data, data.length()), 0, data.length()), data)
 
   var x = 0

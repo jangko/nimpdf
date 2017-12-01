@@ -31,21 +31,21 @@ proc hmetricAdvanceWidth(t: HMTXTable, entry: int): int =
     raise newIndexError("HMetricAdvanceWidth index error")
 
   let offset = kHMetricsStart + (entry * kHMetricsSize) + kHMetricsAdvanceWidth
-  result = t.data.ReadUShort(offset)
+  result = t.data.readUShort(offset)
 
 proc hmetricLSB(t: HMTXTable, entry: int): int =
   if entry > t.numHMetrics:
     raise newIndexError("HMetricLSB index error")
 
   let offset = kHMetricsStart + (entry * kHMetricsSize) + kHMetricsLeftSideBearing
-  result = t.data.ReadFWord(offset)
+  result = t.data.readFWord(offset)
 
 proc lsbTableEntry(t: HMTXTable, entry: int): int =
   if entry > t.numberOfLSBs():
     raise newIndexError("LsbTableEntry index error")
 
   let offset = kHMetricsStart + (t.numHMetrics * kHMetricsSize) + (entry * kLeftSideBearingSize)
-  result = t.data.ReadFWord(offset)
+  result = t.data.readFWord(offset)
 
 proc advanceWidth*(t: HMTXTable, glyph_id: int): int =
   if glyph_id < t.numHMetrics:
@@ -80,14 +80,14 @@ proc forGlyph*(t: HMTXTable, id: int): Metrix =
 
 proc setAdvanceWidth*(t: HMTXTable, entry, val: int) =
   let offset = kHMetricsStart + (entry * kHMetricsSize) + kHMetricsAdvanceWidth
-  discard t.data.WriteUShort(offset, val)
+  discard t.data.writeUShort(offset, val)
 
 proc setLSB*(t: HMTXTable, entry, val: int) =
   let offset = kHMetricsStart + (entry * kHMetricsSize) + kHMetricsLeftSideBearing
-  discard t.data.WriteShort(offset, val)
+  discard t.data.writeShort(offset, val)
 
 proc encodeHMTXTable*(t: HMTXTable, GID2GID: OrderedTable[int, int]): HMTXTable =
-  var data = makeFontData(GID2GID.len * kHMetricsSize)
+  var data = newFontData(GID2GID.len * kHMetricsSize)
   var hmtx = newHMTXTable(initHeader(TAG.hmtx, checksum(data, data.length()), 0, data.length()), data)
 
   var x = 0

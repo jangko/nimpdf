@@ -49,23 +49,23 @@ type
     fontFamily: string
     postscriptname_found: bool
 
-proc GetFormat*(t: NAMETable): int = t.data.ReadUShort(kFormat)
-proc GetCount*(t: NAMETable): int = t.data.ReadUShort(kCount)
-proc GetStorageStart*(t: NAMETable): int = t.data.ReadUShort(kStorageStart)
+proc GetFormat*(t: NAMETable): int = t.data.readUShort(kFormat)
+proc GetCount*(t: NAMETable): int = t.data.readUShort(kCount)
+proc GetStorageStart*(t: NAMETable): int = t.data.readUShort(kStorageStart)
 
-proc GetPlatformID*(t: NAMETable, index: int): int = t.data.ReadUShort(6 + kRecordSize * index + kPlatformID)
-proc GetEncodingID*(t: NAMETable, index: int): int = t.data.ReadUShort(6 + kRecordSize * index + kEncodingID)
-proc GetLanguageID*(t: NAMETable, index: int): int = t.data.ReadUShort(6 + kRecordSize * index + kLanguageID)
-proc GetNameID*(t: NAMETable, index: int): int = t.data.ReadUShort(6 + kRecordSize * index + kNameID)
-proc GetStringLength*(t: NAMETable, index: int): int = t.data.ReadUShort(6 + kRecordSize * index + kStringLength)
+proc GetPlatformID*(t: NAMETable, index: int): int = t.data.readUShort(6 + kRecordSize * index + kPlatformID)
+proc GetEncodingID*(t: NAMETable, index: int): int = t.data.readUShort(6 + kRecordSize * index + kEncodingID)
+proc GetLanguageID*(t: NAMETable, index: int): int = t.data.readUShort(6 + kRecordSize * index + kLanguageID)
+proc GetNameID*(t: NAMETable, index: int): int = t.data.readUShort(6 + kRecordSize * index + kNameID)
+proc GetStringLength*(t: NAMETable, index: int): int = t.data.readUShort(6 + kRecordSize * index + kStringLength)
 proc GetStringOffset*(t: NAMETable, index: int): int =
-  result = t.data.ReadUShort(6 + kRecordSize * index + kStringOffset) + t.GetStorageStart()
+  result = t.data.readUShort(6 + kRecordSize * index + kStringOffset) + t.GetStorageStart()
 
 proc GetName*(t: NAMETable, index: int): string =
   var len = t.GetStringLength(index)
   var offset = t.GetStringOffset(index)
   result = newString(len)
-  discard t.data.ReadBytes(offset, result, 0, len)
+  discard t.data.readBytes(offset, result, 0, len)
 
 proc FindName(t: NAMETable, ne: nameEntry) =
   #mac=1 roman=0 english=0
@@ -149,26 +149,26 @@ proc encodeNAMETable*(t: NAMETable, subsettag: string): NAMETable =
     string_offset += names[i].length
     storageSize += names[i].length
 
-  var fd = makeFontData(storageStart + storageSize)
+  var fd = newFontData(storageStart + storageSize)
 
-  discard fd.WriteUShort(kFormat, 0)
-  discard fd.WriteUShort(kCount, numRecord)
-  discard fd.WriteUShort(kStorageStart, storageStart)
+  discard fd.writeUShort(kFormat, 0)
+  discard fd.writeUShort(kCount, numRecord)
+  discard fd.writeUShort(kStorageStart, storageStart)
 
   var offset = 6
   for i in 0..numRecord-1:
-    discard fd.WriteUShort(offset + kPlatformID, names[i].platformID)
-    discard fd.WriteUShort(offset + kEncodingID, names[i].encodingID)
-    discard fd.WriteUShort(offset + kLanguageID, names[i].languageID)
-    discard fd.WriteUShort(offset + kNameID, names[i].nameID)
-    discard fd.WriteUShort(offset + kStringLength, names[i].length)
-    discard fd.WriteUShort(offset + kStringOffset, names[i].offset)
+    discard fd.writeUShort(offset + kPlatformID, names[i].platformID)
+    discard fd.writeUShort(offset + kEncodingID, names[i].encodingID)
+    discard fd.writeUShort(offset + kLanguageID, names[i].languageID)
+    discard fd.writeUShort(offset + kNameID, names[i].nameID)
+    discard fd.writeUShort(offset + kStringLength, names[i].length)
+    discard fd.writeUShort(offset + kStringOffset, names[i].offset)
     inc(offset, kRecordSize)
 
   assert(offset == storageStart)
   offset = storageStart
   for i in 0..numRecord-1:
-    discard fd.WriteBytes(offset, names[i].name)
+    discard fd.writeBytes(offset, names[i].name)
     inc(offset, names[i].length)
 
   result = newNAMETable(initHeader(TAG.name, checksum(fd, fd.length()), 0, fd.length()), fd)

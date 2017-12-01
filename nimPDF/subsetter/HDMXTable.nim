@@ -21,27 +21,27 @@ type
   HDMXTable* = ref object of FontTable
     num_glyphs: int
 
-proc Version*(t: HDMXTable): int = t.data.ReadUShort(kVersion)
-proc NumRecords*(t: HDMXTable): int = t.data.ReadShort(kNumRecords)
-proc RecordSize*(t: HDMXTable): int = t.data.ReadLong(kSizeDeviceRecord)
+proc Version*(t: HDMXTable): int = t.data.readUShort(kVersion)
+proc NumRecords*(t: HDMXTable): int = t.data.readShort(kNumRecords)
+proc RecordSize*(t: HDMXTable): int = t.data.readLong(kSizeDeviceRecord)
 
 proc PixelSize*(t: HDMXTable, record_index: int): int =
   if record_index < 0 or record_index >= t.NumRecords():
     raise newIndexError("Pixel size index error")
 
-  result = t.data.ReadUByte(kRecords + record_index * t.RecordSize() + kDeviceRecordPixelSize)
+  result = t.data.readUByte(kRecords + record_index * t.RecordSize() + kDeviceRecordPixelSize)
 
 proc MaxWidth*(t: HDMXTable, record_index: int): int =
   if record_index < 0 or record_index >= t.NumRecords():
     raise newIndexError("max width index error")
 
-  result = t.data.ReadUByte(kRecords + record_index * t.RecordSize() + kDeviceRecordMaxWidth)
+  result = t.data.readUByte(kRecords + record_index * t.RecordSize() + kDeviceRecordMaxWidth)
 
 proc Width*(t: HDMXTable, record_index, glyph_num: int): int =
   if record_index < 0 or record_index >= t.NumRecords() or glyph_num < 0 or glyph_num >= t.num_glyphs:
     raise newIndexError("max width index error")
 
-  result = t.data.ReadUByte(kRecords + record_index * t.RecordSize() + kDeviceRecordWidths + glyph_num)
+  result = t.data.readUByte(kRecords + record_index * t.RecordSize() + kDeviceRecordWidths + glyph_num)
 
 proc newHDMXTable*(header: Header, data: FontData): HDMXTable =
   new(result)
