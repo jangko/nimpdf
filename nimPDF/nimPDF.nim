@@ -575,7 +575,7 @@ proc setFont*(doc: Document, family:string, style: FontStyles, size: float64, en
   let fontSize = doc.docUnit.fromUser(size)
   doc.put("BT /F",$fontNumber," ",$fontSize," Tf ET")
   doc.gstate.font = font
-  doc.gstate.font_size = fontSize
+  doc.gstate.fontSize = fontSize
   inc(doc.setFontCall)
 
 proc addPage*(doc: Document, size: PageSize, orient = PGO_PORTRAIT): Page {.discardable.} =
@@ -643,7 +643,7 @@ proc drawVText*(doc: Document; x,y: float64; text: string) =
   var i = 0
   for b in runes(utf8):
     doc.put(f2s(xx)," ",f2s(yy)," Td <", substr(cid, i, i + 3),"> Tj")
-    yy = -float(TTFont(font).GetCharHeight(int(b))) * doc.gstate.font_size / 1000
+    yy = -float(TTFont(font).GetCharHeight(int(b))) * doc.gstate.fontSize / 1000
     xx = 0
     inc(i, 4)
   doc.put("ET")
@@ -700,19 +700,19 @@ proc degree_to_radian*(x: float): float =
 
 proc setCharSpace*(doc: Document; val: float64) =
   doc.put(f2s(val)," Tc")
-  doc.gstate.char_space = val
+  doc.gstate.charSpace = val
 
 proc setTextHScale*(doc: Document; val: float64) =
   doc.put(f2s(val)," Th")
-  doc.gstate.h_scaling = val
+  doc.gstate.hScaling = val
 
 proc setWordSpace*(doc: Document; val: float64) =
   doc.put(f2s(val)," Tw")
-  doc.gstate.word_space = val
+  doc.gstate.wordSpace = val
 
 proc setTransform*(doc: Document, m: Matrix2d) =
   doc.put(f2s(m.ax)," ", f2s(m.ay), " ", f2s(m.bx), " ", f2s(m.by), " ", f2s(m.tx)," ",f2s(m.ty)," cm")
-  doc.gstate.trans_matrix = doc.gstate.trans_matrix & m
+  doc.gstate.transMatrix = doc.gstate.transMatrix & m
 
 proc rotate*(doc: Document, angle:float64) =
   doc.setTransform(rotate(degree_to_radian(angle)))
@@ -779,9 +779,9 @@ proc drawImage*(doc: Document, x:float64, y:float64, source: Image) =
       found = true
       break
 
-  if doc.gstate.alpha_fill > 0.0 and doc.gstate.alpha_fill < 1.0:
+  if doc.gstate.alphaFill > 0.0 and doc.gstate.alphaFill < 1.0:
     img = img.clone()
-    img.adjustTransparency(doc.gstate.alpha_fill)
+    img.adjustTransparency(doc.gstate.alphaFill)
     found = false
 
   if not found:
@@ -941,49 +941,49 @@ proc drawEllipse*(doc: Document; x, y, r1, r2 : float64) =
 proc drawCircle*(doc: Document; x, y, radius : float64) =
   doc.drawEllipse(x,y,radius,radius)
 
-proc setLineWidth*(doc: Document, line_width: float64) =
-  let lw = doc.docUnit.fromUser(line_width)
-  if line_width != doc.gstate.line_width: doc.put(f2s(lw), " w")
-  doc.gstate.line_width = line_width
+proc setLineWidth*(doc: Document, lineWidth: float64) =
+  let lw = doc.docUnit.fromUser(lineWidth)
+  if lineWidth != doc.gstate.lineWidth: doc.put(f2s(lw), " w")
+  doc.gstate.lineWidth = lineWidth
 
-proc setLineCap*(doc: Document, line_cap: LineCap) =
-  let lc = cast[int](line_cap)
-  if line_cap != doc.gstate.line_cap: doc.put($lc, " J")
-  doc.gstate.line_cap = line_cap
+proc setLineCap*(doc: Document, lineCap: LineCap) =
+  let lc = cast[int](lineCap)
+  if lineCap != doc.gstate.lineCap: doc.put($lc, " J")
+  doc.gstate.lineCap = lineCap
 
-proc setLineJoin*(doc: Document, line_join: LineJoin) =
-  let lj = cast[int](line_join)
-  if doc.gstate.line_join != line_join: doc.put($lj, " j")
-  doc.gstate.line_join = line_join
+proc setLineJoin*(doc: Document, lineJoin: LineJoin) =
+  let lj = cast[int](lineJoin)
+  if doc.gstate.lineJoin != lineJoin: doc.put($lj, " j")
+  doc.gstate.lineJoin = lineJoin
 
-proc setMiterLimit*(doc: Document, miter_limit: float64) =
-  let ml = doc.docUnit.fromUser(miter_limit)
-  if doc.gstate.miter_limit != miter_limit: doc.put(f2s(ml), " M")
-  doc.gstate.miter_limit = miter_limit
+proc setMiterLimit*(doc: Document, miterLimit: float64) =
+  let ml = doc.docUnit.fromUser(miterLimit)
+  if doc.gstate.miterLimit != miterLimit: doc.put(f2s(ml), " M")
+  doc.gstate.miterLimit = miterLimit
 
 proc setGrayFill*(doc: Document; g:float64) =
   doc.put(f2s(g), " g")
-  doc.gstate.gray_fill = g
-  doc.gstate.cs_fill = CS_DEVICE_GRAY
+  doc.gstate.grayFill = g
+  doc.gstate.csFill = CS_DEVICE_GRAY
   doc.shapes = nil
   doc.record_shape = false
 
 proc setGrayStroke*(doc: Document; g:float64) =
   doc.put(f2s(g), " G")
-  doc.gstate.gray_stroke = g
-  doc.gstate.cs_stroke = CS_DEVICE_GRAY
+  doc.gstate.grayStroke = g
+  doc.gstate.csStroke = CS_DEVICE_GRAY
 
 proc setRGBFill*(doc: Document; r,g,b:float64) =
   doc.put(f2s(r), " ",f2s(g), " ",f2s(b), " rg")
-  doc.gstate.rgb_fill = makeRGB(r,g,b)
-  doc.gstate.cs_fill = CS_DEVICE_RGB
+  doc.gstate.rgbFill = makeRGB(r,g,b)
+  doc.gstate.csFill = CS_DEVICE_RGB
   doc.shapes = nil
   doc.record_shape = false
 
 proc setRGBStroke*(doc: Document; r,g,b:float64) =
   doc.put(f2s(r), " ",f2s(g), " ",f2s(b), " RG")
-  doc.gstate.rgb_stroke = makeRGB(r,g,b)
-  doc.gstate.cs_stroke = CS_DEVICE_RGB
+  doc.gstate.rgbStroke = makeRGB(r,g,b)
+  doc.gstate.csStroke = CS_DEVICE_RGB
 
 proc setRGBFill*(doc: Document; col: RGBColor) =
   doc.setRGBFill(col.r,col.g,col.b)
@@ -993,15 +993,15 @@ proc setRGBStroke*(doc: Document; col: RGBColor) =
 
 proc setCMYKFill*(doc: Document; c,m,y,k:float64) =
   doc.put(f2s(c), " ",f2s(m), " ",f2s(y), " ",f2s(k), " k")
-  doc.gstate.cmyk_fill = makeCMYK(c,m,y,k)
-  doc.gstate.cs_fill = CS_DEVICE_CMYK
+  doc.gstate.cmykFill = makeCMYK(c,m,y,k)
+  doc.gstate.csFill = CS_DEVICE_CMYK
   doc.shapes = nil
   doc.record_shape = false
 
 proc setCMYKStroke*(doc: Document; c,m,y,k:float64) =
   doc.put(f2s(c), " ",f2s(m), " ",f2s(y), " ",f2s(k), " K")
-  doc.gstate.cmyk_fill = makeCMYK(c,m,y,k)
-  doc.gstate.cs_fill = CS_DEVICE_CMYK
+  doc.gstate.cmykFill = makeCMYK(c,m,y,k)
+  doc.gstate.csFill = CS_DEVICE_CMYK
 
 proc setCMYKFill*(doc: Document; col: CMYKColor) =
   doc.setCMYKFill(col.c,col.m,col.y,col.k)
@@ -1015,8 +1015,8 @@ proc setAlpha*(doc: Document, a: float64) =
   gs.init(id, a, a)
   doc.extGStates.add(gs)
   doc.put("/GS",$id," gs")
-  doc.gstate.alpha_fill = a
-  doc.gstate.alpha_stroke = a
+  doc.gstate.alphaFill = a
+  doc.gstate.alphaStroke = a
 
 proc setBlendMode*(doc: Document, bm: BlendMode) =
   let id = doc.extGStates.len() + 1
@@ -1025,7 +1025,7 @@ proc setBlendMode*(doc: Document, bm: BlendMode) =
   gs.init(id, -1.0, -1.0, BM_NAMES[bmid])
   doc.extGStates.add(gs)
   doc.put("/GS",$id," gs")
-  doc.gstate.blend_mode = bm
+  doc.gstate.blendMode = bm
 
 proc saveState*(doc: Document) =
   doc.gstate = newGState(doc.gstate)
@@ -1039,9 +1039,9 @@ proc getTextWidth*(doc: Document, text:string): float64 =
   var res = 0.0
   let tw = doc.gstate.font.GetTextWidth(text)
 
-  res += doc.gstate.word_space * float64(tw.numspace)
-  res += float64(tw.width) * doc.gstate.font_size / 1000
-  res += doc.gstate.char_space * float64(tw.numchars)
+  res += doc.gstate.wordSpace * float64(tw.numspace)
+  res += float64(tw.width) * doc.gstate.fontSize / 1000
+  res += doc.gstate.charSpace * float64(tw.numchars)
 
   result = doc.docUnit.toUser(res)
 
@@ -1049,9 +1049,9 @@ proc getTextHeight*(doc: Document, text:string): float64 =
   var res = 0.0
   let tw = doc.gstate.font.GetTextHeight(text)
 
-  res += doc.gstate.word_space * float64(tw.numspace)
-  res += float64(tw.width) * doc.gstate.font_size / 1000
-  res += doc.gstate.char_space * float64(tw.numchars)
+  res += doc.gstate.wordSpace * float64(tw.numspace)
+  res += float64(tw.width) * doc.gstate.fontSize / 1000
+  res += doc.gstate.charSpace * float64(tw.numchars)
 
   result = doc.docUnit.toUser(res)
 
@@ -1135,13 +1135,13 @@ proc applyGradient(doc: Document) =
       let hh = doc.docUnit.fromUser(bb.ymax - bb.ymin)
       #set up transformation matrix for gradient
       doc.put(f2s(ww)," 0 0 ", f2s(hh), " ", f2s(xx), " ", f2s(yy), " cm")
-      doc.put("/Sh",$doc.gstate.gradient_fill.ID," sh") #paint the gradient
+      doc.put("/Sh",$doc.gstate.gradientFill.ID," sh") #paint the gradient
       doc.put("Q")
 
 proc fill*(doc: Document) =
   if doc.record_shape:
     doc.record_shape = false
-    if doc.gstate.cs_fill == CS_GRADIENT: doc.applyGradient()
+    if doc.gstate.csFill == CS_GRADIENT: doc.applyGradient()
     doc.shapes = @[]
     doc.shapes.add(makePath())
     doc.record_shape = true
@@ -1162,7 +1162,7 @@ proc stroke*(doc: Document) =
 proc fillAndStroke*(doc: Document) =
   if doc.record_shape:
     doc.record_shape = false
-    if doc.gstate.cs_fill == CS_GRADIENT: doc.applyGradient()
+    if doc.gstate.csFill == CS_GRADIENT: doc.applyGradient()
     doc.record_shape = true
     doc.stroke()
   else:
@@ -1184,8 +1184,8 @@ proc setGradientFill*(doc: Document, grad: Gradient) =
   doc.shapes = @[]
   doc.shapes.add(makePath())
   doc.record_shape = true
-  doc.gstate.cs_fill = CS_GRADIENT
-  doc.gstate.gradient_fill = grad
+  doc.gstate.csFill = CS_GRADIENT
+  doc.gstate.gradientFill = grad
 
 proc makeXYZDest*(doc: Document, page: Page, x,y,z: float64): Destination =
   new(result)

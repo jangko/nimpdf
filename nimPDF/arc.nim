@@ -1,6 +1,6 @@
 # Copyright (c) 2015 Andri Lim
 #
-# Distributed under the MIT license 
+# Distributed under the MIT license
 # (See accompanying file LICENSE.txt)
 #
 #-------------------------------------
@@ -8,7 +8,7 @@
 # using Bezier cubic curve
 # this module export arcTo, drawArc, and degree_to_radian
 
-const 
+const
   bezier_arc_angle_epsilon = 0.01
 
 type
@@ -25,10 +25,10 @@ proc arc_to_bezier(cx, cy, rx, ry, start_angle, sweep_angle: float64, curve: var
   let y0 = math.sin(sweep_angle / 2.0)
   let tx = (1.0 - x0) * 4.0 / 3.0
   let ty = y0 - tx * x0 / y0
-    
+
   var px = [x0, x0 + tx, x0 + tx, x0]
   var py = [-y0, -ty, ty, y0]
-    
+
   let sn = math.sin(start_angle + sweep_angle / 2.0)
   let cs = math.cos(start_angle + sweep_angle / 2.0)
 
@@ -56,7 +56,7 @@ proc bezier_arc_centre(x, y, rx, ry, start, sweep : float64, approx: var arc_app
   var total_sweep = 0.0
   var local_sweep = 0.0
   var prev_sweep: float64
-  
+
   approx.num_vertices = 2
   approx.cmd = BEZIER_TO
   var done = false
@@ -82,7 +82,7 @@ proc bezier_arc_centre(x, y, rx, ry, start, sweep : float64, approx: var arc_app
       approx.vertices[approx.num_vertices - 2 + i] = curve[i]
     approx.num_vertices += 6
     start_angle += local_sweep
-    
+
     if done or (approx.num_vertices >= 26):
       break
 
@@ -124,12 +124,12 @@ proc bezier_arc_endpoints(x0, y0, rrx, rry, angle: float64; large_arc_flag, swee
     prx = rx * rx
     pry = ry * ry
     if radii_check > 10.0: radii_ok = false
-    
+
 
   #Calculate (cx1, cy1)
   #------------------------
   var sign = 1.0
-  if large_arc_flag == sweep_flag: 
+  if large_arc_flag == sweep_flag:
     sign = -1.0
   var sq   = (prx*pry - prx*py1 - pry*px1) / (prx*py1 + pry*px1)
   if sq < 0: sq = 0
@@ -137,7 +137,7 @@ proc bezier_arc_endpoints(x0, y0, rrx, rry, angle: float64; large_arc_flag, swee
   let cx1  = coef *  ((rx * y1) / ry)
   let cy1  = coef * -((ry * x1) / rx)
 
-    
+
   #Calculate (cx, cy) from (cx1, cy1)
   #------------------------
   let sx2 = (x0 + x2) / 2.0
@@ -157,11 +157,11 @@ proc bezier_arc_endpoints(x0, y0, rrx, rry, angle: float64; large_arc_flag, swee
   #------------------------
   n = math.sqrt(ux*ux + uy*uy)
   p = ux #(1 * ux) + (0 * uy)
-  if uy < 0: 
-    sign = -1.0 
-  else: 
+  if uy < 0:
+    sign = -1.0
+  else:
     sign = 1.0
-   
+
   var v = p / n
   if v < -1.0: v = -1.0
   if v >  1.0: v =  1.0
@@ -171,15 +171,15 @@ proc bezier_arc_endpoints(x0, y0, rrx, rry, angle: float64; large_arc_flag, swee
   #------------------------
   n = math.sqrt((ux*ux + uy*uy) * (vx*vx + vy*vy))
   p = ux * vx + uy * vy
-  if (ux * vy - uy * vx) < 0: 
-    sign = -1.0 
-  else:  
+  if (ux * vy - uy * vx) < 0:
+    sign = -1.0
+  else:
     sign = 1.0
-  
+
   v = p / n
   if v < -1.0: v = -1.0
   if v >  1.0: v =  1.0
-  
+
   var sweep_angle = sign * math.arccos(v);
   if (not sweep_flag) and (sweep_angle > 0):
     sweep_angle -= math.PI * 2.0
@@ -197,7 +197,7 @@ proc bezier_arc_endpoints(x0, y0, rrx, rry, angle: float64; large_arc_flag, swee
   while i < approx.num_vertices - 2:
     mtx.apply(approx.vertices[i], approx.vertices[i + 1])
     inc(i, 2)
-  
+
   #We must make sure that the starting and ending points
   #exactly coincide with the initial (x0,y0) and (x2,y2)
   approx.vertices[0] = x0
@@ -222,7 +222,7 @@ proc drawArc*(doc: Document; cx, cy, rx, ry, start_angle, sweep_angle: float64) 
 
   bezier_arc_centre(cx, cy, rx, ry, degree_to_radian(start_angle), degree_to_radian(sweep_angle), approx)
   assert approx.num_vertices > 3
-  
+
   doc.moveTo(approx.vertices[0], approx.vertices[1])
   doc.draw_arc_approximation(approx)
 

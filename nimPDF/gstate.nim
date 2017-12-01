@@ -118,27 +118,27 @@ type
       radCoord*: CoordRadial
 
   GState* = ref object
-    trans_matrix*: Matrix2d
-    line_width*: float64
-    line_cap*: LineCap
-    line_join*: LineJoin
-    miter_limit*: float64
+    transMatrix*: Matrix2d
+    lineWidth*: float64
+    lineCap*: LineCap
+    lineJoin*: LineJoin
+    miterLimit*: float64
     dash*: DashMode
     flatness*: float64
-    char_space*, word_space*, h_scaling*, text_leading*: float64
+    charSpace*, wordSpace*, hScaling*, textLeading*: float64
     rendering_mode*: TextRenderingMode
-    text_rise*: float64
-    cs_fill*, cs_stroke*: ColorSpace
-    rgb_fill*, rgb_stroke*: RGBColor
-    cmyk_fill*, cmyk_stroke*: CMYKColor
-    alpha_fill*, alpha_stroke*: float64
-    gray_stroke*, gray_fill*:float64
-    blend_mode*: BlendMode
-    gradient_fill*: Gradient
-    image_fill*: Image
+    textRise*: float64
+    csFill*, csStroke*: ColorSpace
+    rgbFill*, rgbStroke*: RGBColor
+    cmykFill*, cmykStroke*: CMYKColor
+    alphaFill*, alphaStroke*: float64
+    grayStroke*, grayFill*:float64
+    blendMode*: BlendMode
+    gradientFill*: Gradient
+    imageFill*: Image
     font*: Font
-    font_size*: float64
-    writing_mode*: WritingMode
+    fontSize*: float64
+    writingMode*: WritingMode
     prev: GState
 
 proc init*(c: var RGBColor; r,g,b: float64) =
@@ -227,75 +227,75 @@ proc newGState*(): GState =
   let cmyk_black = makeCMYK(0,0,0,0)
   new(result)
 
-  result.trans_matrix = IDMATRIX
-  result.line_width   = fromMM(1.0).toPT
-  result.line_cap     = BUTT_END
-  result.line_join    = MITER_JOIN
-  result.miter_limit  = fromMM(10).toPT
+  result.transMatrix = IDMATRIX
+  result.lineWidth   = fromMM(1.0).toPT
+  result.lineCap     = BUTT_END
+  result.lineJoin    = MITER_JOIN
+  result.miterLimit  = fromMM(10).toPT
   result.dash.init()
   result.flatness     = fromMM(1.0).toPT
 
-  result.char_space   = 0
-  result.word_space   = 0
-  result.h_scaling    = 100
-  result.text_leading   = 0
+  result.charSpace   = 0
+  result.wordSpace   = 0
+  result.hScaling    = 100
+  result.textLeading   = 0
   result.rendering_mode = TR_FILL
-  result.text_rise    = 0
+  result.textRise    = 0
 
-  result.cs_stroke    = CS_DEVICE_RGB
-  result.cs_fill    = CS_DEVICE_RGB
-  result.rgb_fill     = black
-  result.rgb_stroke   = black
-  result.cmyk_fill    = cmyk_black
-  result.cmyk_stroke  = cmyk_black
-  result.alpha_fill   = 1.0
-  result.alpha_stroke   = 1.0
-  result.gray_fill    = 0.0
-  result.gray_stroke  = 0.0
-  result.blend_mode   = BM_NORMAL
-  result.gradient_fill  = nil
-  result.image_fill   = nil
+  result.csStroke    = CS_DEVICE_RGB
+  result.csFill    = CS_DEVICE_RGB
+  result.rgbFill     = black
+  result.rgbStroke   = black
+  result.cmykFill    = cmyk_black
+  result.cmykStroke  = cmyk_black
+  result.alphaFill   = 1.0
+  result.alphaStroke   = 1.0
+  result.grayFill    = 0.0
+  result.grayStroke  = 0.0
+  result.blendMode   = BM_NORMAL
+  result.gradientFill  = nil
+  result.imageFill   = nil
 
   result.font       = nil
-  result.font_size    = fromMM(10).toPT
-  result.writing_mode   = WMODE_HORIZONTAL
+  result.fontSize    = fromMM(10).toPT
+  result.writingMode   = WMODE_HORIZONTAL
   result.prev       = nil
 
 proc newGState*(gs: GState): GState =
   new(result)
 
-  result.trans_matrix = gs.trans_matrix
-  result.line_width   = gs.line_width
-  result.line_cap     = gs.line_cap
-  result.line_join    = gs.line_join
-  result.miter_limit  = gs.miter_limit
+  result.transMatrix = gs.transMatrix
+  result.lineWidth   = gs.lineWidth
+  result.lineCap     = gs.lineCap
+  result.lineJoin    = gs.lineJoin
+  result.miterLimit  = gs.miterLimit
   result.dash         = gs.dash
   result.flatness     = gs.flatness
 
-  result.char_space     = gs.char_space
-  result.word_space     = gs.word_space
-  result.h_scaling      = gs.h_scaling
-  result.text_leading   = gs.text_leading
+  result.charSpace     = gs.charSpace
+  result.wordSpace     = gs.wordSpace
+  result.hScaling      = gs.hScaling
+  result.textLeading   = gs.textLeading
   result.rendering_mode = gs.rendering_mode
-  result.text_rise      = gs.text_rise
+  result.textRise      = gs.textRise
 
-  result.cs_stroke    = gs.cs_stroke
-  result.cs_fill      = gs.cs_fill
-  result.rgb_fill     = gs.rgb_fill
-  result.rgb_stroke   = gs.rgb_stroke
-  result.cmyk_fill    = gs.cmyk_fill
-  result.cmyk_stroke  = gs.cmyk_stroke
-  result.alpha_fill   = gs.alpha_fill
-  result.alpha_stroke = gs.alpha_stroke
-  result.gray_fill    = gs.gray_fill
-  result.gray_stroke  = gs.gray_stroke
-  result.blend_mode   = gs.blend_mode
-  result.gradient_fill= gs.gradient_fill
-  result.image_fill   = gs.image_fill
+  result.csStroke    = gs.csStroke
+  result.csFill      = gs.csFill
+  result.rgbFill     = gs.rgbFill
+  result.rgbStroke   = gs.rgbStroke
+  result.cmykFill    = gs.cmykFill
+  result.cmykStroke  = gs.cmykStroke
+  result.alphaFill   = gs.alphaFill
+  result.alphaStroke = gs.alphaStroke
+  result.grayFill    = gs.grayFill
+  result.grayStroke  = gs.grayStroke
+  result.blendMode   = gs.blendMode
+  result.gradientFill= gs.gradientFill
+  result.imageFill   = gs.imageFill
 
   result.font         = gs.font
-  result.font_size    = gs.font_size
-  result.writing_mode = gs.writing_mode
+  result.fontSize    = gs.fontSize
+  result.writingMode = gs.writingMode
   result.prev         = gs
 
 proc freeGState*(gs: GState): GState =
