@@ -14,7 +14,7 @@ const
     "Symbol-Set",
     "ZapfDingbats-Set"]
     
-proc draw_title(doc: Document, text:string) = 
+proc draw_title(doc: PDF, text:string) = 
   doc.setFont("Helvetica", {FS_BOLD}, 5)
   let tw = doc.getTextWidth(text)
   let x = PGSIZE.width.toMM/2 - tw/2
@@ -25,7 +25,7 @@ proc draw_title(doc: Document, text:string) =
   doc.drawRect(10,15,PGSIZE.width.toMM - 20, PGSIZE.height.toMM-25)
   doc.stroke()
 
-proc draw_grid(doc: Document) =
+proc draw_grid(doc: PDF) =
   #Draw 16 X 15 cells
 
   #Draw vertical lines.
@@ -50,7 +50,7 @@ proc draw_grid(doc: Document) =
     if (i > 1):
       doc.drawText(LEFT + 3, y - 3, toHex(i, 1))
 
-proc draw_fonts(doc: Document, enc: string) =
+proc draw_fonts(doc: PDF, enc: string) =
   #Draw all character from 0x20 to 0xFF to the canvas. */
   
   case enc:
@@ -76,7 +76,7 @@ proc draw_fonts(doc: Document, enc: string) =
         let xx = x - doc.getTextWidth(str) / 2
         doc.drawText(xx, y, str)
  
-proc createPDF(doc: Document) = 
+proc createPDF(doc: PDF) = 
   for enc in encodings:
     let page = doc.addPage(PGSIZE, PGO_PORTRAIT)
     draw_title(doc, enc)
@@ -90,7 +90,7 @@ proc main(): bool {.discardable.} =
   var file = newFileStream(fileName, fmWrite)
   
   if file != nil:
-    var doc = initPDF()    
+    var doc = newPDF()    
     doc.createPDF()
     doc.writePDF(file)
     file.close()

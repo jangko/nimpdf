@@ -1,6 +1,6 @@
 import streams, nimPDF
 
-proc createPDF(doc: Document) = 
+proc createPDF(doc: PDF) = 
   let size = getSizeFromName("A4")
 
   doc.setLabel(LS_UPPER_ROMAN)
@@ -57,7 +57,7 @@ proc main(): bool {.discardable.} =
   var file = newFileStream(fileName, fmWrite)
   
   if file != nil:
-    var doc = initPDF()    
+    var doc = newPDF()    
     doc.createPDF()
     doc.writePDF(file)
     file.close()

@@ -81,7 +81,7 @@ type
     annots: seq[Annot]
     page: DictObj
 
-  DocOpt* = ref object
+  PDFOptions* = ref object
     resourcesPath: seq[string]
     fontsPath: seq[string]
     imagesPath: seq[string]
@@ -113,7 +113,7 @@ type
     encoding: EncodingType
     fields: seq[Annot]
 
-  Document* = ref object of RootObj
+  PDF* = ref object of RootObj
     pages: seq[Page]
     docUnit: PageUnit
     size: PageSize
@@ -122,18 +122,18 @@ type
     gradients: seq[Gradient]
     fontMan: FontManager
     gstate: GState
-    path_start_x, path_start_y, path_end_x, path_end_y: float64
-    record_shape: bool
+    pathStartX, pathStartY, pathEndX, pathEndY: float64
+    recordShape: bool
     shapes: seq[Path]
     info: Table[int, string]
-    opts: DocOpt
+    opts: PDFOptions
     labels: seq[PageLabel]
-    setFontCall: int
+    setFontCount: int
     outlines: seq[Outline]
     xref: Pdfxref
     encrypt: EncryptDict
     acroForm: AcroForm
-    coordinateMode: CoordinateMode
+    coordMode: CoordinateMode
 
   NamedPageSize = tuple[name: string, width: float64, height: float64]
 
@@ -181,7 +181,7 @@ proc put(p: var Page, text: varargs[string]) =
   for s in items(text): p.content.add(s)
   p.content.add('\x0A')
 
-proc put(doc: Document, text: varargs[string]) =
+proc put(doc: PDF, text: varargs[string]) =
   let p = doc.pages.high()
   doc.pages[p].put(text)
 
@@ -191,7 +191,7 @@ template f2s(a: typed): untyped =
 proc f2sn(a: float64): string =
   if a == 0: "null" else: f2s(a)
 
-proc putDestination(doc: Document, dict: DictObj, dest: Destination) =
+proc putDestination(doc: PDF, dict: DictObj, dest: Destination) =
   var arr = newArrayObj()
   dict.addElement("Dest", arr)
   arr.add(dest.page.page)
@@ -223,7 +223,7 @@ proc putDestination(doc: Document, dict: DictObj, dest: Destination) =
     arr.addName("FitBV")
     arr.addPlain(f2sn(dest.a))
 
-proc putPages(doc: Document, resource: DictObj): DictObj =
+proc putPages(doc: PDF, resource: DictObj): DictObj =
   let numpages = doc.pages.len()
 
   var kids = newArrayObj()
@@ -276,7 +276,7 @@ proc putPages(doc: Document, resource: DictObj): DictObj =
       inc i
   result = root
 
-proc putResources(doc: Document): DictObj =
+proc putResources(doc: PDF): DictObj =
   let grads = putGradients(doc.xref, doc.gradients)
   let exts  = putExtGStates(doc.xref, doc.extGStates)
   let imgs  = putImages(doc.xref, doc.images)
@@ -291,12 +291,12 @@ proc putResources(doc: Document): DictObj =
   if imgs != nil: result.addElement("XObject", imgs)
   if grads != nil: result.addElement("Shading", grads)
 
-proc writeInfo(doc: Document, dict: DictObj, field: DocInfo) =
+proc writeInfo(doc: PDF, dict: DictObj, field: DocInfo) =
   var idx = int(field)
   if doc.info.hasKey(idx):
     dict.addString(INFO_FIELD[idx], doc.info[idx])
 
-proc putInfo(doc: Document): DictObj =
+proc putInfo(doc: PDF): DictObj =
   var dict = newDictObj()
   doc.xref.add(dict)
 
@@ -310,7 +310,7 @@ proc putInfo(doc: Document): DictObj =
   dict.addString("CreationDate", "D:" & lt.format("yyyyMMddHHmmss"))
   result = dict
 
-proc putLabels(doc: Document): DictObj =
+proc putLabels(doc: PDF): DictObj =
   if doc.labels.len == 0: return nil
 
   var labels = newDictObj()
@@ -329,7 +329,7 @@ proc putLabels(doc: Document): DictObj =
 
   result = labels
 
-proc putOutlineItem(doc: Document, outlines: seq[Outline], parent: DictObj, root: Outline, i: int) =
+proc putOutlineItem(doc: PDF, outlines: seq[Outline], parent: DictObj, root: Outline, i: int) =
   for kid in root.kids:
     doc.xref.add(kid)
 
@@ -361,7 +361,7 @@ proc putOutlineItem(doc: Document, outlines: seq[Outline], parent: DictObj, root
     doc.putOutlineItem(root.kids, root, kid, i)
     inc(i)
 
-proc putOutlines(doc: Document): DictObj =
+proc putOutlines(doc: PDF): DictObj =
   if doc.outlines.len == 0: return nil
 
   for ot in doc.outlines:
@@ -383,7 +383,7 @@ proc putOutlines(doc: Document): DictObj =
 
   result = root
 
-proc putCatalog(doc: Document) =
+proc putCatalog(doc: PDF) =
   var catalog = newDictObj()
   doc.xref.add(catalog)
   catalog.addName("Type", "Catalog")
@@ -443,24 +443,24 @@ proc putCatalog(doc: Document) =
 
     trailer.addElement("Encrypt", doc.encrypt)
 
-proc setInfo*(doc: Document, field: DocInfo, info: string) =
+proc setInfo*(doc: PDF, field: DocInfo, info: string) =
   doc.info[int(field)] = info
 
-proc initPDF*(opts: DocOpt): Document =
+proc newPDF*(opts: PDFOptions): PDF =
   new(result)
   result.pages = @[]
   result.extGStates = @[]
   result.images = @[]
   result.gradients = @[]
-  result.coordinateMode = TOP_DOWN
+  result.coordMode = TOP_DOWN
   result.docUnit.setUnit(PGU_MM)
   result.fontMan.init(opts.fontsPath)
   result.gstate = newGState()
-  result.path_start_x = 0
-  result.path_start_y = 0
-  result.path_end_x = 0
-  result.path_end_y = 0
-  result.record_shape = false
+  result.pathStartX = 0
+  result.pathStartY = 0
+  result.pathEndX = 0
+  result.pathEndY = 0
+  result.recordShape = false
   result.shapes = nil
   result.info = initTable[int, string]()
   result.opts = opts
@@ -469,46 +469,46 @@ proc initPDF*(opts: DocOpt): Document =
   result.xref = newPdfxref()
   result.setInfo(DI_PRODUCER, "nimPDF")
 
-proc makeDocOpt*(): DocOpt =
+proc newPDFOptions*(): PDFOptions =
   new(result)
   result.resourcesPath = @[]
   result.fontsPath = @[]
   result.imagesPath = @[]
 
-proc addResourcesPath*(opt: DocOpt, path: string) =
+proc addResourcesPath*(opt: PDFOptions, path: string) =
   opt.resourcesPath.add(path)
 
-proc addImagesPath*(opt: DocOpt, path: string) =
+proc addImagesPath*(opt: PDFOptions, path: string) =
   opt.imagesPath.add(path)
 
-proc addFontsPath*(opt: DocOpt, path: string) =
+proc addFontsPath*(opt: PDFOptions, path: string) =
   opt.fontsPath.add(path)
 
-proc clearFontsPath*(opt: DocOpt) =
+proc clearFontsPath*(opt: PDFOptions) =
   opt.fontsPath.setLen(0)
 
-proc clearImagesPath*(opt: DocOpt) =
+proc clearImagesPath*(opt: PDFOptions) =
   opt.imagesPath.setLen(0)
 
-proc clearResourcesPath*(opt: DocOpt) =
+proc clearResourcesPath*(opt: PDFOptions) =
   opt.resourcesPath.setLen(0)
 
-proc clearAllPath*(opt: DocOpt) =
+proc clearAllPath*(opt: PDFOptions) =
   opt.clearFontsPath()
   opt.clearImagesPath()
   opt.clearResourcesPath()
 
-proc getOpt*(doc: Document): DocOpt =
+proc getOpt*(doc: PDF): PDFOptions =
   result = doc.opts
 
-proc initPDF*(): Document =
-  var opts = makeDocOpt()
+proc newPDF*(): PDF =
+  var opts = newPDFOptions()
   opts.addFontsPath("fonts")
   opts.addImagesPath("resources")
   opts.addResourcesPath("resources")
-  result = initPDF(opts)
+  result = newPDF(opts)
 
-proc setLabel*(doc: Document, style: LabelStyle, prefix: string, start: int) =
+proc setLabel*(doc: PDF, style: LabelStyle, prefix: string, start: int) =
   var label: PageLabel
   label.pageIndex = doc.pages.len
   label.style = style
@@ -516,14 +516,14 @@ proc setLabel*(doc: Document, style: LabelStyle, prefix: string, start: int) =
   label.start = start
   doc.labels.add(label)
 
-proc setLabel*(doc: Document, style: LabelStyle) =
+proc setLabel*(doc: PDF, style: LabelStyle) =
   var label: PageLabel
   label.pageIndex = doc.pages.len
   label.style = style
   label.start = -1
   doc.labels.add(label)
 
-proc setLabel*(doc: Document, style: LabelStyle, prefix: string) =
+proc setLabel*(doc: PDF, style: LabelStyle, prefix: string) =
   var label: PageLabel
   label.pageIndex = doc.pages.len
   label.style = style
@@ -531,7 +531,7 @@ proc setLabel*(doc: Document, style: LabelStyle, prefix: string) =
   label.start = -1
   doc.labels.add(label)
 
-proc loadImage*(doc: Document, fileName: string): Image =
+proc loadImage*(doc: PDF, fileName: string): Image =
   for p in doc.opts.imagesPath:
     let image = loadImage(p & DirSep & fileName)
     if image != nil: return image
@@ -540,45 +540,45 @@ proc loadImage*(doc: Document, fileName: string): Image =
 proc getVersion*(): string =
   result = nimPDFVersion
 
-proc getVersion*(doc: Document): string =
+proc getVersion*(doc: PDF): string =
   result = nimPDFVersion
 
-proc setUnit*(doc: Document, unit: PageUnitType) =
+proc setUnit*(doc: PDF, unit: PageUnitType) =
   doc.docUnit.setUnit(unit)
 
-proc getUnit*(doc: Document): PageUnitType =
+proc getUnit*(doc: PDF): PageUnitType =
   result = doc.docUnit.unitType
 
-proc setCoordinateMode*(doc: Document, mode: CoordinateMode) =
-  doc.coordinateMode = mode
+proc setCoordinateMode*(doc: PDF, mode: CoordinateMode) =
+  doc.coordMode = mode
 
-proc getCoordinateMode*(doc: Document): CoordinateMode =
-  result = doc.coordinateMode
+proc getCoordinateMode*(doc: PDF): CoordinateMode =
+  result = doc.coordMode
 
-proc vPoint(doc: Document, val: float64): float64 =
-  if doc.coordinateMode == TOP_DOWN:
+proc vPoint(doc: PDF, val: float64): float64 =
+  if doc.coordMode == TOP_DOWN:
     result = doc.size.height.toPT - doc.docUnit.fromUser(val)
   else:
     result = doc.docUnit.fromUser(val)
 
-proc vPointMirror(doc: Document, val: float64): float64 =
-  if doc.coordinateMode == TOP_DOWN:
+proc vPointMirror(doc: PDF, val: float64): float64 =
+  if doc.coordMode == TOP_DOWN:
     result = doc.docUnit.fromUser(-val)
   else:
     result = doc.docUnit.fromUser(val)
 
-proc getSize*(doc: Document): PageSize = doc.size
+proc getSize*(doc: PDF): PageSize = doc.size
 
-proc setFont*(doc: Document, family:string, style: FontStyles, size: float64, enc: EncodingType = ENC_STANDARD) =
+proc setFont*(doc: PDF, family:string, style: FontStyles, size: float64, enc: EncodingType = ENC_STANDARD) =
   var font = doc.fontMan.makeFont(family, style, enc)
   let fontNumber = font.ID
   let fontSize = doc.docUnit.fromUser(size)
   doc.put("BT /F",$fontNumber," ",$fontSize," Tf ET")
   doc.gstate.font = font
   doc.gstate.fontSize = fontSize
-  inc(doc.setFontCall)
+  inc(doc.setFontCount)
 
-proc addPage*(doc: Document, size: PageSize, orient = PGO_PORTRAIT): Page {.discardable.} =
+proc addPage*(doc: PDF, size: PageSize, orient = PGO_PORTRAIT): Page {.discardable.} =
   var p : Page
   new(p)
   p.size.width = size.width
@@ -589,18 +589,17 @@ proc addPage*(doc: Document, size: PageSize, orient = PGO_PORTRAIT): Page {.disc
     p.size.swap()
   doc.pages.add(p)
   doc.size = p.size
-  doc.setFontCall = 0
+  doc.setFontCount = 0
   result = p
 
-proc writePDF*(doc: Document, s: Stream) =
+proc writePDF*(doc: PDF, s: Stream) =
   doc.putCatalog()
-  #s.write(doc.content)
   s.write("%PDF-1.7\x0A")
   var enc = PdfEncrypt(nil)
   if doc.encrypt != nil: enc = doc.encrypt.enc
   doc.xref.writeToStream(s, enc)
 
-proc writePDF*(doc: Document, fileName: string): bool =
+proc writePDF*(doc: PDF, fileName: string): bool =
   result = false
   var file = newFileStream(fileName, fmWrite)
   if file != nil:
@@ -608,11 +607,11 @@ proc writePDF*(doc: Document, fileName: string): bool =
     file.close()
     result = true
 
-proc drawText*(doc: Document; x,y: float64; text: string) =
+proc drawText*(doc: PDF; x,y: float64; text: string) =
   let xx = doc.docUnit.fromUser(x)
   let yy = doc.vPoint(y)
 
-  if doc.gstate.font == nil or doc.setFontCall == 0:
+  if doc.gstate.font == nil or doc.setFontCount == 0:
     doc.setFont(defaultFont, {FS_REGULAR}, 5)
 
   var font = doc.gstate.font
@@ -623,8 +622,8 @@ proc drawText*(doc: Document; x,y: float64; text: string) =
   else:
     doc.put("BT ",f2s(xx)," ",f2s(yy)," Td (",escapeString(text),") Tj ET")
 
-proc drawVText*(doc: Document; x,y: float64; text: string) =
-  if doc.gstate.font == nil or doc.setFontCall == 0:
+proc drawVText*(doc: PDF; x,y: float64; text: string) =
+  if doc.gstate.font == nil or doc.setFontCount == 0:
     doc.setFont(defaultFont, {FS_REGULAR}, 5)
 
   var font = doc.gstate.font
@@ -649,13 +648,13 @@ proc drawVText*(doc: Document; x,y: float64; text: string) =
   doc.put("ET")
 
 
-proc beginText*(doc: Document) =
-  if doc.gstate.font == nil or doc.setFontCall == 0:
+proc beginText*(doc: PDF) =
+  if doc.gstate.font == nil or doc.setFontCount == 0:
     doc.setFont(defaultFont, {FS_REGULAR}, 5)
 
   doc.put("BT")
 
-proc beginText*(doc: Document; x,y: float64) =
+proc beginText*(doc: PDF; x,y: float64) =
   if doc.gstate.font == nil:
     doc.setFont(defaultFont, {FS_REGULAR}, 5)
 
@@ -663,20 +662,20 @@ proc beginText*(doc: Document; x,y: float64) =
   let yy = doc.vPoint(y)
   doc.put("BT ", f2s(xx)," ",f2s(yy)," Td")
 
-proc moveTextPos*(doc: Document; x,y: float64) =
+proc moveTextPos*(doc: PDF; x,y: float64) =
   let xx = doc.docUnit.fromUser(x)
   let yy = doc.vPointMirror(y)
   doc.put(f2s(xx)," ",f2s(yy)," Td")
 
-proc setTextRenderingMode*(doc: Document, rm: TextRenderingMode) =
+proc setTextRenderingMode*(doc: PDF, rm: TextRenderingMode) =
   let trm = cast[int](rm)
   if doc.gstate.rendering_mode != rm: doc.put($trm, " Tr")
   doc.gstate.rendering_mode = rm
 
-proc setTextMatrix*(doc: Document, m: Matrix2d) =
+proc setTextMatrix*(doc: PDF, m: Matrix2d) =
   doc.put(f2s(m.ax)," ", f2s(m.ay), " ", f2s(m.bx), " ", f2s(m.by), " ", f2s(m.tx)," ",f2s(m.ty)," Tm")
 
-proc showText*(doc: Document, text:string) =
+proc showText*(doc: PDF, text:string) =
   var font = doc.gstate.font
 
   if font.subType == FT_TRUETYPE:
@@ -685,60 +684,60 @@ proc showText*(doc: Document, text:string) =
   else:
     doc.put("(",escapeString(text),") Tj")
 
-proc setTextLeading*(doc: Document, val: float64) =
+proc setTextLeading*(doc: PDF, val: float64) =
   let tl = doc.docUnit.fromUser(val)
   doc.put(f2s(tl)," TL")
 
-proc moveToNextLine*(doc: Document) =
+proc moveToNextLine*(doc: PDF) =
   doc.put("T*")
 
-proc endText*(doc: Document) =
+proc endText*(doc: PDF) =
   doc.put("ET")
 
 proc degree_to_radian*(x: float): float =
   result = (x * math.PI) / 180.0
 
-proc setCharSpace*(doc: Document; val: float64) =
+proc setCharSpace*(doc: PDF; val: float64) =
   doc.put(f2s(val)," Tc")
   doc.gstate.charSpace = val
 
-proc setTextHScale*(doc: Document; val: float64) =
+proc setTextHScale*(doc: PDF; val: float64) =
   doc.put(f2s(val)," Th")
   doc.gstate.hScaling = val
 
-proc setWordSpace*(doc: Document; val: float64) =
+proc setWordSpace*(doc: PDF; val: float64) =
   doc.put(f2s(val)," Tw")
   doc.gstate.wordSpace = val
 
-proc setTransform*(doc: Document, m: Matrix2d) =
+proc setTransform*(doc: PDF, m: Matrix2d) =
   doc.put(f2s(m.ax)," ", f2s(m.ay), " ", f2s(m.bx), " ", f2s(m.by), " ", f2s(m.tx)," ",f2s(m.ty)," cm")
   doc.gstate.transMatrix = doc.gstate.transMatrix & m
 
-proc rotate*(doc: Document, angle:float64) =
+proc rotate*(doc: PDF, angle:float64) =
   doc.setTransform(rotate(degree_to_radian(angle)))
 
-proc rotate*(doc: Document, angle, x,y:float64) =
+proc rotate*(doc: PDF, angle, x,y:float64) =
   let xx = doc.docUnit.fromUser(x)
   let yy = doc.vPoint(y)
   doc.setTransform(rotate(degree_to_radian(angle), point2d(xx, yy)))
 
-proc move*(doc: Document, x,y:float64) =
+proc move*(doc: PDF, x,y:float64) =
   let xx = doc.docUnit.fromUser(x)
   let yy = doc.vPointMirror(y)
   doc.setTransform(move(xx,yy))
 
-proc scale*(doc: Document, s:float64) =
+proc scale*(doc: PDF, s:float64) =
   doc.setTransform(scale(s))
 
-proc scale*(doc: Document, s, x,y:float64) =
+proc scale*(doc: PDF, s, x,y:float64) =
   let xx = doc.docUnit.fromUser(x)
   let yy = doc.vPoint(y)
   doc.setTransform(scale(s, point2d(xx, yy)))
 
-proc stretch*(doc: Document, sx,sy:float64) =
+proc stretch*(doc: PDF, sx,sy:float64) =
   doc.setTransform(stretch(sx,sy))
 
-proc stretch*(doc: Document, sx,sy,x,y:float64) =
+proc stretch*(doc: PDF, sx,sy,x,y:float64) =
   let xx = doc.docUnit.fromUser(x)
   let yy = doc.vPoint(y)
   doc.setTransform(stretch(sx, sy, point2d(xx, yy)))
@@ -749,25 +748,25 @@ proc shear(sx,sy,x,y:float64): Matrix2d =
     s = matrix2d(1.0,sx,sy,1.0,0.0,0.0)
   result = m & s & move(x,y)
 
-proc skew*(doc: Document, sx,sy:float64) =
+proc skew*(doc: PDF, sx,sy:float64) =
   let tsx = math.tan(degree_to_radian(sx))
   let tsy = math.tan(degree_to_radian(sy))
   doc.setTransform(matrix2d(1,tsx,tsy,1,0,0))
 
-proc skew*(doc: Document, sx,sy,x,y:float64) =
+proc skew*(doc: PDF, sx,sy,x,y:float64) =
   let xx = doc.docUnit.fromUser(x)
   let yy = doc.vPoint(y)
   let tsx = math.tan(degree_to_radian(sx))
   let tsy = math.tan(degree_to_radian(sy))
   doc.setTransform(shear(tsx, tsy, xx, yy))
 
-proc toUser*(doc: Document, val:float64): float64 =
+proc toUser*(doc: PDF, val:float64): float64 =
   result = doc.docUnit.toUser(val)
 
-proc fromUser*(doc: Document, val:float64): float64 =
+proc fromUser*(doc: PDF, val:float64): float64 =
   result = doc.docUnit.fromUser(val)
 
-proc drawImage*(doc: Document, x:float64, y:float64, source: Image) =
+proc drawImage*(doc: PDF, x:float64, y:float64, source: Image) =
   let size = doc.images.len()
   var found = false
   var img = source
@@ -811,8 +810,8 @@ proc drawImage*(doc: Document, x:float64, y:float64, source: Image) =
   doc.put("/I",$img.ID," Do")
   doc.put("Q")
 
-proc drawRect*(doc: Document, x: float64, y: float64, w: float64, h: float64) =
-  if doc.record_shape:
+proc drawRect*(doc: PDF, x: float64, y: float64, w: float64, h: float64) =
+  if doc.recordShape:
     doc.shapes[doc.shapes.len - 1].addRect(x, y, w, h)
     doc.shapes.add(makePath())
   else:
@@ -822,35 +821,35 @@ proc drawRect*(doc: Document, x: float64, y: float64, w: float64, h: float64) =
     let hh = doc.vPointMirror(h)
     doc.put(f2s(xx)," ",f2s(yy)," ",f2s(ww)," ",f2s(hh)," re")
 
-proc moveTo*(doc: Document, x: float64, y: float64) =
+proc moveTo*(doc: PDF, x: float64, y: float64) =
   let xx = doc.docUnit.fromUser(x)
   let yy = doc.vPoint(y)
   doc.put(f2s(xx)," ",f2s(yy)," m")
-  doc.path_start_x = x
-  doc.path_start_y = y
-  doc.path_end_x = x
-  doc.path_end_y = y
+  doc.pathStartX = x
+  doc.pathStartY = y
+  doc.pathEndX = x
+  doc.pathEndY = y
 
-proc moveTo*(doc: Document, p: Point2d) {.inline.} = doc.moveTo(p.x, p.y)
+proc moveTo*(doc: PDF, p: Point2d) {.inline.} = doc.moveTo(p.x, p.y)
 
-proc lineTo*(doc: Document, x: float64, y: float64) =
-  if doc.record_shape:
-    doc.shapes[doc.shapes.len - 1].addLine(doc.path_start_x, doc.path_start_y, x, y)
-    if x == doc.path_start_x and y == doc.path_start_y:
+proc lineTo*(doc: PDF, x: float64, y: float64) =
+  if doc.recordShape:
+    doc.shapes[doc.shapes.len - 1].addLine(doc.pathStartX, doc.pathStartY, x, y)
+    if x == doc.pathStartX and y == doc.pathStartY:
       doc.shapes.add(makePath())
   else:
     let xx = doc.docUnit.fromUser(x)
     let yy = doc.vPoint(y)
     doc.put(f2s(xx)," ",f2s(yy)," l")
-  doc.path_end_x = x
-  doc.path_end_y = y
+  doc.pathEndX = x
+  doc.pathEndY = y
 
-proc lineTo*(doc: Document, p: Point2d) {.inline.} = doc.lineTo(p.x, p.y)
+proc lineTo*(doc: PDF, p: Point2d) {.inline.} = doc.lineTo(p.x, p.y)
 
-proc bezierCurveTo*(doc: Document; cp1x, cp1y, cp2x, cp2y, x, y: float64) =
-  if doc.record_shape:
-    doc.shapes[doc.shapes.len - 1].addCubicCurve(doc.path_end_x, doc.path_end_y, cp1x,cp1y, cp2x,cp2y, x, y)
-    if x == doc.path_start_x and y == doc.path_start_y:
+proc bezierCurveTo*(doc: PDF; cp1x, cp1y, cp2x, cp2y, x, y: float64) =
+  if doc.recordShape:
+    doc.shapes[doc.shapes.len - 1].addCubicCurve(doc.pathEndX, doc.pathEndY, cp1x,cp1y, cp2x,cp2y, x, y)
+    if x == doc.pathStartX and y == doc.pathStartY:
       doc.shapes.add(makePath())
   else:
     let cp1xx = doc.docUnit.fromUser(cp1x)
@@ -861,15 +860,15 @@ proc bezierCurveTo*(doc: Document; cp1x, cp1y, cp2x, cp2y, x, y: float64) =
     let cp2yy = doc.vPoint(cp2y)
     let yy = doc.vPoint(y)
     doc.put(f2s(cp1xx)," ",f2s(cp1yy)," ",f2s(cp2xx)," ",f2s(cp2yy)," ",f2s(xx)," ",f2s(yy)," c")
-  doc.path_end_x = x
-  doc.path_end_y = y
+  doc.pathEndX = x
+  doc.pathEndY = y
 
-proc bezierCurveTo*(doc: Document; cp1, cp2, p: Point2d) {.inline.}= doc.bezierCurveTo(cp1.x,cp1.y,cp2.x,cp2.y,p.x,p.y)
+proc bezierCurveTo*(doc: PDF; cp1, cp2, p: Point2d) {.inline.}= doc.bezierCurveTo(cp1.x,cp1.y,cp2.x,cp2.y,p.x,p.y)
 
-proc curveTo1*(doc: Document; cpx, cpy, x, y: float64) =
-  if doc.record_shape:
-    doc.shapes[doc.shapes.len - 1].addQuadraticCurve(doc.path_end_x, doc.path_end_y, cpx,cpy, x, y)
-    if x == doc.path_start_x and y == doc.path_start_y:
+proc curveTo1*(doc: PDF; cpx, cpy, x, y: float64) =
+  if doc.recordShape:
+    doc.shapes[doc.shapes.len - 1].addQuadraticCurve(doc.pathEndX, doc.pathEndY, cpx,cpy, x, y)
+    if x == doc.pathStartX and y == doc.pathStartY:
       doc.shapes.add(makePath())
   else:
     let cpxx = doc.docUnit.fromUser(cpx)
@@ -877,15 +876,15 @@ proc curveTo1*(doc: Document; cpx, cpy, x, y: float64) =
     let cpyy = doc.vPoint(cpy)
     let yy = doc.vPoint(y)
     doc.put(f2s(cpxx)," ",f2s(cpyy)," ",f2s(xx)," ",f2s(yy)," v")
-  doc.path_end_x = x
-  doc.path_end_y = y
+  doc.pathEndX = x
+  doc.pathEndY = y
 
-proc curveTo1*(doc: Document; cp, p: Point2d) {.inline.}= doc.curveTo1(cp.x,cp.y,p.x,p.y)
+proc curveTo1*(doc: PDF; cp, p: Point2d) {.inline.}= doc.curveTo1(cp.x,cp.y,p.x,p.y)
 
-proc curveTo2*(doc: Document; cpx, cpy, x, y: float64) =
-  if doc.record_shape:
-    doc.shapes[doc.shapes.len - 1].addQuadraticCurve(doc.path_end_x, doc.path_end_y, cpx,cpy, x, y)
-    if x == doc.path_start_x and y == doc.path_start_y:
+proc curveTo2*(doc: PDF; cpx, cpy, x, y: float64) =
+  if doc.recordShape:
+    doc.shapes[doc.shapes.len - 1].addQuadraticCurve(doc.pathEndX, doc.pathEndY, cpx,cpy, x, y)
+    if x == doc.pathStartX and y == doc.pathStartY:
       doc.shapes.add(makePath())
   else:
     let cpxx = doc.docUnit.fromUser(cpx)
@@ -893,22 +892,22 @@ proc curveTo2*(doc: Document; cpx, cpy, x, y: float64) =
     let cpyy = doc.vPoint(cpy)
     let yy = doc.vPoint(y)
     doc.put(f2s(cpxx)," ",f2s(cpyy)," ",f2s(xx)," ",f2s(yy)," y")
-  doc.path_end_x = x
-  doc.path_end_y = y
+  doc.pathEndX = x
+  doc.pathEndY = y
 
-proc curveTo2*(doc: Document; cp, p: Point2d) {.inline.}= doc.curveTo2(cp.x,cp.y,p.x,p.y)
+proc curveTo2*(doc: PDF; cp, p: Point2d) {.inline.}= doc.curveTo2(cp.x,cp.y,p.x,p.y)
 
-proc closePath*(doc: Document) =
-  if doc.record_shape:
-    doc.shapes[doc.shapes.len - 1].addLine(doc.path_end_x, doc.path_end_y, doc.path_start_x, doc.path_start_y)
+proc closePath*(doc: PDF) =
+  if doc.recordShape:
+    doc.shapes[doc.shapes.len - 1].addLine(doc.pathEndX, doc.pathEndY, doc.pathStartX, doc.pathStartY)
     doc.shapes.add(makePath())
   else:
     doc.put("h")
 
-  doc.path_end_x = doc.path_start_x
-  doc.path_end_y = doc.path_start_y
+  doc.pathEndX = doc.pathStartX
+  doc.pathEndY = doc.pathStartY
 
-proc roundRect*(doc: Document; x, y, w, h: float64; r:float64 = 0.0) =
+proc roundRect*(doc: PDF; x, y, w, h: float64; r:float64 = 0.0) =
   doc.moveTo(x + r, y)
   doc.lineTo(x + w - r, y)
   doc.curveTo1(x + w, y, x + w, y + r)
@@ -919,7 +918,7 @@ proc roundRect*(doc: Document; x, y, w, h: float64; r:float64 = 0.0) =
   doc.lineTo(x, y + r)
   doc.curveTo1(x, y, x + r, y)
 
-proc drawEllipse*(doc: Document; x, y, r1, r2 : float64) =
+proc drawEllipse*(doc: PDF; x, y, r1, r2 : float64) =
   # based on http://stackoverflow.com/questions/2172798/how-to-draw-an-oval-in-html5-canvas/2173084#2173084
   let KAPPA = 4.0 * ((math.sqrt(2.0) - 1.0) / 3.0)
   let xx = x - r1
@@ -938,78 +937,78 @@ proc drawEllipse*(doc: Document; x, y, r1, r2 : float64) =
   doc.bezierCurveTo(xm - ox, ye, xx, ym + oy, xx, ym)
   #doc.closePath()
 
-proc drawCircle*(doc: Document; x, y, radius : float64) =
+proc drawCircle*(doc: PDF; x, y, radius : float64) =
   doc.drawEllipse(x,y,radius,radius)
 
-proc setLineWidth*(doc: Document, lineWidth: float64) =
+proc setLineWidth*(doc: PDF, lineWidth: float64) =
   let lw = doc.docUnit.fromUser(lineWidth)
   if lineWidth != doc.gstate.lineWidth: doc.put(f2s(lw), " w")
   doc.gstate.lineWidth = lineWidth
 
-proc setLineCap*(doc: Document, lineCap: LineCap) =
+proc setLineCap*(doc: PDF, lineCap: LineCap) =
   let lc = cast[int](lineCap)
   if lineCap != doc.gstate.lineCap: doc.put($lc, " J")
   doc.gstate.lineCap = lineCap
 
-proc setLineJoin*(doc: Document, lineJoin: LineJoin) =
+proc setLineJoin*(doc: PDF, lineJoin: LineJoin) =
   let lj = cast[int](lineJoin)
   if doc.gstate.lineJoin != lineJoin: doc.put($lj, " j")
   doc.gstate.lineJoin = lineJoin
 
-proc setMiterLimit*(doc: Document, miterLimit: float64) =
+proc setMiterLimit*(doc: PDF, miterLimit: float64) =
   let ml = doc.docUnit.fromUser(miterLimit)
   if doc.gstate.miterLimit != miterLimit: doc.put(f2s(ml), " M")
   doc.gstate.miterLimit = miterLimit
 
-proc setGrayFill*(doc: Document; g:float64) =
+proc setGrayFill*(doc: PDF; g:float64) =
   doc.put(f2s(g), " g")
   doc.gstate.grayFill = g
   doc.gstate.csFill = CS_DEVICE_GRAY
   doc.shapes = nil
-  doc.record_shape = false
+  doc.recordShape = false
 
-proc setGrayStroke*(doc: Document; g:float64) =
+proc setGrayStroke*(doc: PDF; g:float64) =
   doc.put(f2s(g), " G")
   doc.gstate.grayStroke = g
   doc.gstate.csStroke = CS_DEVICE_GRAY
 
-proc setRGBFill*(doc: Document; r,g,b:float64) =
+proc setRGBFill*(doc: PDF; r,g,b:float64) =
   doc.put(f2s(r), " ",f2s(g), " ",f2s(b), " rg")
   doc.gstate.rgbFill = makeRGB(r,g,b)
   doc.gstate.csFill = CS_DEVICE_RGB
   doc.shapes = nil
-  doc.record_shape = false
+  doc.recordShape = false
 
-proc setRGBStroke*(doc: Document; r,g,b:float64) =
+proc setRGBStroke*(doc: PDF; r,g,b:float64) =
   doc.put(f2s(r), " ",f2s(g), " ",f2s(b), " RG")
   doc.gstate.rgbStroke = makeRGB(r,g,b)
   doc.gstate.csStroke = CS_DEVICE_RGB
 
-proc setRGBFill*(doc: Document; col: RGBColor) =
+proc setRGBFill*(doc: PDF; col: RGBColor) =
   doc.setRGBFill(col.r,col.g,col.b)
 
-proc setRGBStroke*(doc: Document; col: RGBColor) =
+proc setRGBStroke*(doc: PDF; col: RGBColor) =
   doc.setRGBStroke(col.r,col.g,col.b)
 
-proc setCMYKFill*(doc: Document; c,m,y,k:float64) =
+proc setCMYKFill*(doc: PDF; c,m,y,k:float64) =
   doc.put(f2s(c), " ",f2s(m), " ",f2s(y), " ",f2s(k), " k")
   doc.gstate.cmykFill = makeCMYK(c,m,y,k)
   doc.gstate.csFill = CS_DEVICE_CMYK
   doc.shapes = nil
-  doc.record_shape = false
+  doc.recordShape = false
 
-proc setCMYKStroke*(doc: Document; c,m,y,k:float64) =
+proc setCMYKStroke*(doc: PDF; c,m,y,k:float64) =
   doc.put(f2s(c), " ",f2s(m), " ",f2s(y), " ",f2s(k), " K")
   doc.gstate.cmykFill = makeCMYK(c,m,y,k)
   doc.gstate.csFill = CS_DEVICE_CMYK
 
-proc setCMYKFill*(doc: Document; col: CMYKColor) =
+proc setCMYKFill*(doc: PDF; col: CMYKColor) =
   doc.setCMYKFill(col.c,col.m,col.y,col.k)
 
-proc setCMYKStroke*(doc: Document; col: CMYKColor) =
+proc setCMYKStroke*(doc: PDF; col: CMYKColor) =
   doc.setCMYKStroke(col.c,col.m,col.y,col.k)
 
-proc setAlpha*(doc: Document, a: float64) =
+proc setAlpha*(doc: PDF, a: float64) =
   let id = doc.extGStates.len() + 1
   var gs : ExtGState
   gs.init(id, a, a)
@@ -1018,7 +1017,7 @@ proc setAlpha*(doc: Document, a: float64) =
   doc.gstate.alphaFill = a
   doc.gstate.alphaStroke = a
 
-proc setBlendMode*(doc: Document, bm: BlendMode) =
+proc setBlendMode*(doc: PDF, bm: BlendMode) =
   let id = doc.extGStates.len() + 1
   var gs : ExtGState
   var bmid = cast[int](bm)
@@ -1027,15 +1026,15 @@ proc setBlendMode*(doc: Document, bm: BlendMode) =
   doc.put("/GS",$id," gs")
   doc.gstate.blendMode = bm
 
-proc saveState*(doc: Document) =
+proc saveState*(doc: PDF) =
   doc.gstate = newGState(doc.gstate)
   doc.put("q")
 
-proc restoreState*(doc: Document) =
+proc restoreState*(doc: PDF) =
   doc.gstate = freeGState(doc.gstate)
   doc.put("Q")
 
-proc getTextWidth*(doc: Document, text:string): float64 =
+proc getTextWidth*(doc: PDF, text:string): float64 =
   var res = 0.0
   let tw = doc.gstate.font.GetTextWidth(text)
 
@@ -1045,7 +1044,7 @@ proc getTextWidth*(doc: Document, text:string): float64 =
 
   result = doc.docUnit.toUser(res)
 
-proc getTextHeight*(doc: Document, text:string): float64 =
+proc getTextHeight*(doc: PDF, text:string): float64 =
   var res = 0.0
   let tw = doc.gstate.font.GetTextHeight(text)
 
@@ -1055,7 +1054,7 @@ proc getTextHeight*(doc: Document, text:string): float64 =
 
   result = doc.docUnit.toUser(res)
 
-proc setDash*(doc: Document, dash:openArray[int], phase:int) =
+proc setDash*(doc: PDF, dash:openArray[int], phase:int) =
   var ptn = "["
   var num_ptn = 0
 
@@ -1074,10 +1073,10 @@ proc setDash*(doc: Document, dash:openArray[int], phase:int) =
   for i in 0..num_ptn-1:
     doc.gstate.dash.ptn[i] = dash[i]
 
-proc clip*(doc: Document) =
+proc clip*(doc: PDF) =
   doc.put("W")
 
-proc executePath*(doc: Document, p: Path) =
+proc executePath*(doc: PDF, p: Path) =
   let len = p.len()
   var i = 0
   doc.moveTo(p[i+1], p[i+2])
@@ -1096,7 +1095,7 @@ proc executePath*(doc: Document, p: Path) =
       doc.bezierCurveTo(p[i+3],p[i+4],p[i+5],p[i+6],p[i+7],p[i+8])
       inc(i, 9)
 
-proc drawBounds*(doc: Document, p: Path) =
+proc drawBounds*(doc: PDF, p: Path) =
   let len = p.len
   var i = 0
   while i < len:
@@ -1115,14 +1114,14 @@ proc drawBounds*(doc: Document, p: Path) =
       doc.put("S")
       inc(i, 9)
 
-proc drawBounds*(doc: Document) =
-  if doc.record_shape:
-    doc.record_shape = false
+proc drawBounds*(doc: PDF) =
+  if doc.recordShape:
+    doc.recordShape = false
     for p in doc.shapes:
       if p.len > 0: doc.drawBounds(p)
-    doc.record_shape = true
+    doc.recordShape = true
 
-proc applyGradient(doc: Document) =
+proc applyGradient(doc: PDF) =
   for p in doc.shapes:
     if p.len > 0 and p.isClosed():
       doc.put("q")
@@ -1138,37 +1137,37 @@ proc applyGradient(doc: Document) =
       doc.put("/Sh",$doc.gstate.gradientFill.ID," sh") #paint the gradient
       doc.put("Q")
 
-proc fill*(doc: Document) =
-  if doc.record_shape:
-    doc.record_shape = false
+proc fill*(doc: PDF) =
+  if doc.recordShape:
+    doc.recordShape = false
     if doc.gstate.csFill == CS_GRADIENT: doc.applyGradient()
     doc.shapes = @[]
     doc.shapes.add(makePath())
-    doc.record_shape = true
+    doc.recordShape = true
   else:
     doc.put("f")
 
-proc stroke*(doc: Document) =
-  if doc.record_shape:
-    doc.record_shape = false
+proc stroke*(doc: PDF) =
+  if doc.recordShape:
+    doc.recordShape = false
     for p in doc.shapes:
       if p.len > 0:
         doc.executePath(p)
         doc.put("S")
-    doc.record_shape = true
+    doc.recordShape = true
   else:
     doc.put("S")
 
-proc fillAndStroke*(doc: Document) =
-  if doc.record_shape:
-    doc.record_shape = false
+proc fillAndStroke*(doc: PDF) =
+  if doc.recordShape:
+    doc.recordShape = false
     if doc.gstate.csFill == CS_GRADIENT: doc.applyGradient()
-    doc.record_shape = true
+    doc.recordShape = true
     doc.stroke()
   else:
     doc.put("B")
 
-proc setGradientFill*(doc: Document, grad: Gradient) =
+proc setGradientFill*(doc: PDF, grad: Gradient) =
   let size = doc.gradients.len()
   var found = false
   if grad == nil: return
@@ -1183,11 +1182,11 @@ proc setGradientFill*(doc: Document, grad: Gradient) =
 
   doc.shapes = @[]
   doc.shapes.add(makePath())
-  doc.record_shape = true
+  doc.recordShape = true
   doc.gstate.csFill = CS_GRADIENT
   doc.gstate.gradientFill = grad
 
-proc makeXYZDest*(doc: Document, page: Page, x,y,z: float64): Destination =
+proc makeXYZDest*(doc: PDF, page: Page, x,y,z: float64): Destination =
   new(result)
   result.style = DS_XYZ
   result.page  = page
@@ -1195,24 +1194,24 @@ proc makeXYZDest*(doc: Document, page: Page, x,y,z: float64): Destination =
   result.b = doc.vPoint(y)
   result.c = z
 
-proc makeFitDest*(doc: Document, page: Page): Destination =
+proc makeFitDest*(doc: PDF, page: Page): Destination =
   new(result)
   result.style = DS_FIT
   result.page  = page
 
-proc makeFitHDest*(doc: Document, page: Page, top: float64): Destination =
+proc makeFitHDest*(doc: PDF, page: Page, top: float64): Destination =
   new(result)
   result.style = DS_FITH
   result.page  = page
   result.a = doc.vPoint(top)
 
-proc makeFitVDest*(doc: Document, page: Page, left: float64): Destination =
+proc makeFitVDest*(doc: PDF, page: Page, left: float64): Destination =
   new(result)
   result.style = DS_FITV
   result.page  = page
   result.a = doc.docUnit.fromUser(left)
 
-proc makeFitRDest*(doc: Document, page: Page, left,bottom,right,top: float64): Destination =
+proc makeFitRDest*(doc: PDF, page: Page, left,bottom,right,top: float64): Destination =
   new(result)
   result.style = DS_FITR
   result.page  = page
@@ -1221,24 +1220,24 @@ proc makeFitRDest*(doc: Document, page: Page, left,bottom,right,top: float64): D
   result.c = doc.docUnit.fromUser(right)
   result.d = doc.vPoint(top)
 
-proc makeFitBDest*(doc: Document, page: Page): Destination =
+proc makeFitBDest*(doc: PDF, page: Page): Destination =
   new(result)
   result.style = DS_FITB
   result.page  = page
 
-proc makeFitBHDest*(doc: Document, page: Page, top: float64): Destination =
+proc makeFitBHDest*(doc: PDF, page: Page, top: float64): Destination =
   new(result)
   result.style = DS_FITBH
   result.page  = page
   result.a = doc.vPoint(top)
 
-proc makeFitBVDest*(doc: Document, page: Page, left: float64): Destination =
+proc makeFitBVDest*(doc: PDF, page: Page, left: float64): Destination =
   new(result)
   result.style = DS_FITBV
   result.page  = page
   result.a = left
 
-proc makeOutline*(doc: Document, title: string, dest: Destination): Outline =
+proc makeOutline*(doc: PDF, title: string, dest: Destination): Outline =
   new(result)
   result.class = CLASS_DICT
   result.subclass = SUBCLASS_OUTLINE
@@ -1270,7 +1269,7 @@ proc initRect*(x,y,w,h: float64): Rectangle =
   result.w = w
   result.h = h
 
-proc linkAnnot*(doc: Document, rect: Rectangle, src: Page, dest: Destination): Annot =
+proc linkAnnot*(doc: PDF, rect: Rectangle, src: Page, dest: Destination): Annot =
   new(result)
   let xx = doc.docUnit.fromUser(rect.x)
   let yy = doc.vPoint(rect.y)
@@ -1281,7 +1280,7 @@ proc linkAnnot*(doc: Document, rect: Rectangle, src: Page, dest: Destination): A
   result.dest = dest
   src.annots.add(result)
 
-proc textAnnot*(doc: Document, rect: Rectangle, src: Page, content: string): Annot =
+proc textAnnot*(doc: PDF, rect: Rectangle, src: Page, content: string): Annot =
   new(result)
   let xx = doc.docUnit.fromUser(rect.x)
   let yy = doc.vPoint(rect.y)
@@ -1292,12 +1291,12 @@ proc textAnnot*(doc: Document, rect: Rectangle, src: Page, content: string): Ann
   result.content = content
   src.annots.add(result)
 
-proc setPassword*(doc: Document, ownerPass, userPass: string): bool =
+proc setPassword*(doc: PDF, ownerPass, userPass: string): bool =
   doc.encrypt = newEncryptDict()
   result = doc.encrypt.setPassword(ownerPass, userPass)
   doc.xref.add(doc.encrypt)
 
-proc setEncryptionMode*(doc: Document, mode: EncryptMode) =
+proc setEncryptionMode*(doc: PDF, mode: EncryptMode) =
   if doc.encrypt == nil: return
   var enc = doc.encrypt.enc
 
@@ -1306,7 +1305,7 @@ proc setEncryptionMode*(doc: Document, mode: EncryptMode) =
   else: enc.keyLen = 32 # ENCRYPT_R5
   enc.mode = mode
 
-proc initAcroForm*(doc: Document): AcroForm =
+proc initAcroForm*(doc: PDF): AcroForm =
   if doc.acroForm != nil: return doc.acroForm
   new(result)
   result.r = 0.0
@@ -1339,7 +1338,7 @@ proc setFontStyle*(a: AcroForm, style: FontStyles) =
 proc setEncoding*(a: AcroForm, enc: EncodingType) =
   a.encoding = enc
 
-proc textField*(doc: Document, rect: Rectangle, src: Page): Annot =
+proc textField*(doc: PDF, rect: Rectangle, src: Page): Annot =
   var acro = doc.initAcroForm()
   new(result)
   let xx = doc.docUnit.fromUser(rect.x)

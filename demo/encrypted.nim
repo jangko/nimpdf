@@ -2,7 +2,7 @@ import nimPDF, strutils, random
 
 include names
 
-proc drawTitle(doc: Document, text:string) =
+proc drawTitle(doc: PDF, text:string) =
   let size = getSizeFromName("A4")
 
   doc.setFont("Helvetica", {FS_BOLD}, 5)
@@ -35,7 +35,7 @@ proc i2a(val: int, len: int) : string =
   else:
     result = s
 
-proc createPDF(doc: Document) =
+proc createPDF(doc: PDF) =
   let size = getSizeFromName("A4")
   discard doc.addPage(size, PGO_PORTRAIT)
   let text = "TOP SECRET"
@@ -93,10 +93,10 @@ proc createPDF(doc: Document) =
   doc.setEncryptionMode(ENCRYPT_R4_AES)
 
 proc main() =
-  var opts = makeDocOpt()
+  var opts = newPDFOptions()
   opts.addImagesPath("resources")
 
-  var doc = initPDF(opts)
+  var doc = newPDF(opts)
   doc.createPDF()
   if not doc.writePDF("encrypted.pdf"):
     echo "failed"

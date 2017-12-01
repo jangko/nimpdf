@@ -14,9 +14,9 @@ type
     width, height: float64
     cright, cleft, ctop, cbottom: float64
     XTransform, YTransform: TFunction
-    doc: Document
+    doc: PDF
     
-proc draw_title(doc: Document, text:string) = 
+proc draw_title(doc: PDF, text:string) = 
   let size = doc.getSize()
   
   doc.setFont("Helvetica", {FS_BOLD}, 5)
@@ -29,7 +29,7 @@ proc draw_title(doc: Document, text:string) =
   doc.drawRect(10,15,size.width.toMM - 20, size.height.toMM-25)
   doc.stroke()
  
-proc makeCanvas(doc: Document): Canvas =
+proc makeCanvas(doc: PDF): Canvas =
   var res: Canvas
   new(res)
   
@@ -51,10 +51,10 @@ proc makeCanvas(doc: Document): Canvas =
   
   result = res
 
-proc Transform(cnv: Canvas, p: TPoint2d): TPoint2d =
+proc Transform(cnv: Canvas, p: Point2d): Point2d =
   result = point2d(cnv.XTransform.Val(p.x), cnv.YTransform.Val(p.y))
   
-proc drawBBox(doc:Document, p: Path) =
+proc drawBBox(doc: PDF, p: Path) =
   let bounds = p.calculateBounds()
   doc.setDash([3], 1)
   doc.setRGBStroke(makeRGB("skyblue"))
@@ -97,7 +97,7 @@ proc drawFunction(cnv:Canvas, c: TFunction, x, y: float64) =
   cnv.addFunction(c, 0, degree_to_radian(360), 50)
   cnv.doc.restoreState()
   
-proc createPDF(doc: Document) = 
+proc createPDF(doc: PDF) = 
   let size = getSizeFromName("A4")
   doc.addPage(size, PGO_PORTRAIT)
   draw_title(doc, "Bezier Bounding Box Demo")
@@ -154,7 +154,7 @@ proc main(): bool {.discardable.} =
   var file = newFileStream(fileName, fmWrite)
   
   if file != nil:
-    var doc = initPDF()
+    var doc = newPDF()
     doc.createPDF()
     doc.writePDF(file)
     file.close()

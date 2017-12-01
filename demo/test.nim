@@ -1,7 +1,7 @@
 import streams, math, basic2d
 import nimPDF, spline
 
-proc draw_title(doc: Document, text:string) = 
+proc draw_title(doc: PDF, text:string) = 
   let size = getSizeFromName("A4")
   
   doc.setFont("Helvetica", {FS_BOLD}, 5)
@@ -14,7 +14,7 @@ proc draw_title(doc: Document, text:string) =
   doc.drawRect(10,15,size.width.toMM - 20, size.height.toMM-25)
   doc.stroke()
 
-proc createPDF(doc: Document) = 
+proc createPDF(doc: PDF) = 
   let size = getSizeFromName("A4")
   let SAMP_TEXT = "The Quick Brown Fox Jump Over The Lazy Dog"
     
@@ -43,7 +43,7 @@ proc main(): bool {.discardable.} =
   var file = newFileStream(fileName, fmWrite)
   
   if file != nil:
-    var doc = initPDF()    
+    var doc = newPDF()    
     doc.createPDF()
     doc.writePDF(file)
     file.close()

@@ -14,9 +14,9 @@ type
     width, height: float64
     cright, cleft, ctop, cbottom: float64
     XTransform, YTransform: TFunction
-    doc: Document
+    doc: PDF
 
-proc draw_circles(doc: Document, desc: string, x, y: float64) =
+proc draw_circles(doc: PDF, desc: string, x, y: float64) =
   let radius = 10.0
   let r2 = radius / 2
   doc.setLineWidth(0.5)
@@ -34,7 +34,7 @@ proc draw_circles(doc: Document, desc: string, x, y: float64) =
   doc.setRGBFill(0.0, 0.0, 0.0)
   doc.drawText(x + 0.0, y + radius * 4, desc)
 
-proc draw_title(doc: Document, text:string) =
+proc draw_title(doc: PDF, text:string) =
   let size = getSizeFromName("A4")
 
   doc.setFont("Helvetica", {FS_BOLD}, 5)
@@ -47,7 +47,7 @@ proc draw_title(doc: Document, text:string) =
   doc.drawRect(10,15,size.width.toMM - 20, size.height.toMM-25)
   doc.stroke()
 
-proc draw_demo_1(doc: Document) =
+proc draw_demo_1(doc: PDF) =
   let size = getSizeFromName("A4")
 
   doc.addPage(size, PGO_PORTRAIT)
@@ -122,7 +122,7 @@ proc draw_demo_1(doc: Document) =
   draw_circles(doc, "BM_EXCLUSION", 80, 220)
   doc.restoreState()
 
-proc draw_demo_2(doc: Document) =
+proc draw_demo_2(doc: PDF) =
   let size = getSizeFromName("A4")
   doc.addPage(size, PGO_PORTRAIT)
 
@@ -165,7 +165,7 @@ proc draw_demo_2(doc: Document) =
   doc.drawEllipse(100, 230, 20, 40)
   doc.stroke()
 
-proc draw_demo_3(doc: Document) =
+proc draw_demo_3(doc: PDF) =
   let size = getSizeFromName("A4")
   doc.addPage(size, PGO_PORTRAIT)
 
@@ -204,7 +204,7 @@ proc draw_demo_3(doc: Document) =
     doc.drawText(20.0, y, text)
     y += 7.0
 
-proc draw_demo_4(doc: Document) =
+proc draw_demo_4(doc: PDF) =
   let size = getSizeFromName("A4")
   doc.addPage(size, PGO_PORTRAIT)
 
@@ -283,7 +283,7 @@ proc draw_demo_4(doc: Document) =
     x += 5.0
 
 
-proc show_desc(doc: Document; x,y: float; text:string) =
+proc show_desc(doc: PDF; x,y: float; text:string) =
   doc.moveTo(x, y - 10)
   doc.lineTo(x, y + 5)
   doc.moveTo(x - 5, y)
@@ -298,7 +298,7 @@ proc show_desc(doc: Document; x,y: float; text:string) =
   doc.drawText(x + 10 - doc.getTextWidth(buf), y + 15, buf)
   doc.drawText(x + 10 - doc.getTextWidth(text), y + 10, text)
 
-proc draw_demo_5(doc: Document) =
+proc draw_demo_5(doc: PDF) =
   let size = getSizeFromName("A4")
   doc.addPage(size, PGO_PORTRAIT)
   draw_title(doc, "IMAGE DEMO")
@@ -409,23 +409,23 @@ proc draw_demo_5(doc: Document) =
 
   doc.drawText(50, y + 30, "Adjustable Image Transparency")
 
-proc draw_line(doc: Document, x, y: float64, label:string) =
+proc draw_line(doc: PDF, x, y: float64, label:string) =
   doc.drawText(x, y - 10, label)
   doc.moveTo(x, y - 15)
   doc.lineTo(x + 60, y - 15)
   doc.stroke()
 
-proc draw_line2(doc: Document, x, y: float64, label:string) =
+proc draw_line2(doc: PDF, x, y: float64, label:string) =
   doc.drawText(x, y - 10, label)
   doc.moveTo(x + 10, y)
   doc.lineTo(x + 60, y)
   doc.stroke()
 
-proc draw_rect(doc: Document, x, y: float64, label:string) =
+proc draw_rect(doc: PDF, x, y: float64, label:string) =
   doc.drawText(x, y, label)
   doc.drawRect(x, y + 2, 60, 10)
 
-proc drawJoin(doc: Document, x, y: float64, label:string, join: LineJoin) =
+proc drawJoin(doc: PDF, x, y: float64, label:string, join: LineJoin) =
   doc.setLineJoin(join)
   doc.moveTo(x+10, y+10)
   doc.lineTo(x+20, y)
@@ -433,7 +433,7 @@ proc drawJoin(doc: Document, x, y: float64, label:string, join: LineJoin) =
   doc.stroke()
   doc.drawText(x, y - 5, label)
 
-proc draw_demo_6(doc: Document) =
+proc draw_demo_6(doc: PDF) =
   let size = getSizeFromName("A4")
   doc.addPage(size, PGO_PORTRAIT)
 
@@ -591,7 +591,7 @@ proc draw_demo_6(doc: Document) =
   doc.drawText(cp2x+3,cp2y, "(cp2x,cp2y)")
   doc.drawText(x+3,y, "(x,y)")
 
-proc draw_stripe_pattern(doc: Document; x,y:float64) =
+proc draw_stripe_pattern(doc: PDF; x,y:float64) =
   var iy = 0.0
 
   while iy < 10:
@@ -605,7 +605,7 @@ proc draw_stripe_pattern(doc: Document; x,y:float64) =
   doc.setLineWidth(0.4)
 
 
-proc draw_demo_7(doc: Document) =
+proc draw_demo_7(doc: PDF) =
   draw_demo_4(doc)
   draw_title(doc, "TEXT DEMO 1")
 
@@ -743,7 +743,7 @@ proc draw_demo_7(doc: Document) =
   doc.drawText(20, y, "Scaling Text Y Direction")
   doc.drawText(100, y, "Scaling Text X Direction")
 
-proc draw_demo_8(doc: Document) =
+proc draw_demo_8(doc: PDF) =
   draw_demo_4(doc)
   draw_title(doc, "TEXT DEMO 2")
 
@@ -811,44 +811,44 @@ proc draw_demo_8(doc: Document) =
 
 type
   tspec = tuple[x0, y0, w, h: float, num_x, num_y, step_x, step_y: int]
-  tproc = proc(doc: Document, rng, x, y: int)
+  tproc = proc(doc: PDF, rng, x, y: int)
 
-proc rgb1(doc: Document, rng, x, y: int) =
+proc rgb1(doc: PDF, rng, x, y: int) =
   let r = float(rng)
   doc.setRGBFill(float(x)/r, float(y)/r, 0.0)
   doc.setRGBStroke(float(x)/r, float(y)/r, 0.0)
 
-proc rgb2(doc: Document, rng, x, y: int) =
+proc rgb2(doc: PDF, rng, x, y: int) =
   let r = float(rng)
   doc.setRGBFill(float(x)/r, 0.0, float(y)/r)
   doc.setRGBStroke(float(x)/r, 0.0, float(y)/r)
 
-proc rgb3(doc: Document, rng, x, y: int) =
+proc rgb3(doc: PDF, rng, x, y: int) =
   let r = float(rng)
   doc.setRGBFill(0.0,float(x)/r, float(y)/r)
   doc.setRGBStroke(0.0,float(x)/r, float(y)/r)
 
-proc cmyk1(doc: Document, rng, x, y: int) =
+proc cmyk1(doc: PDF, rng, x, y: int) =
   let r = float(rng)
   doc.setCMYKFill(float(x)/r, float(y)/r, 0.0, 0.0)
   doc.setCMYKStroke(float(x)/r, float(y)/r, 0.0, 0.0)
 
-proc cmyk2(doc: Document, rng, x, y: int) =
+proc cmyk2(doc: PDF, rng, x, y: int) =
   let r = float(rng)
   doc.setCMYKFill(float(x)/r, 0.0, float(y)/r, 0.0)
   doc.setCMYKStroke(float(x)/r, 0.0, float(y)/r, 0.0)
 
-proc cmyk3(doc: Document, rng, x, y: int) =
+proc cmyk3(doc: PDF, rng, x, y: int) =
   let r = float(rng)
   doc.setCMYKFill(0.0,float(x)/r, float(y)/r, 0.0)
   doc.setCMYKStroke(0.0,float(x)/r, float(y)/r, 0.0)
 
-proc gray1(doc: Document, rng, x, y: int) =
+proc gray1(doc: PDF, rng, x, y: int) =
   let r = float(rng)
   doc.setGrayFill(float(x)/r)
   doc.setGrayStroke(float(x)/r)
 
-proc draw_rect_grid(doc: Document, spec: tspec, it: tproc) =
+proc draw_rect_grid(doc: PDF, spec: tspec, it: tproc) =
   # spec.x0,y0,w,h,nx,ny,step_x, step_y
   for yc in 0..spec.num_y-1:
     for xc in 0..spec.num_x-1:
@@ -858,7 +858,7 @@ proc draw_rect_grid(doc: Document, spec: tspec, it: tproc) =
       doc.drawRect(x, y, spec.w, spec.h)
       doc.fillAndStroke()
 
-proc draw_demo_9(doc: Document) =
+proc draw_demo_9(doc: PDF) =
   let size = getSizeFromName("A4")
   doc.addPage(size, PGO_PORTRAIT)
   draw_title(doc, "COLOR SPACE DEMO")
@@ -897,7 +897,7 @@ proc draw_demo_9(doc: Document) =
   doc.roundRect(20, spec.y0 + 20, 160.0, 30.0, 7.0)
   doc.stroke()
 
-proc makeCanvas(doc: Document): Canvas =
+proc makeCanvas(doc: PDF): Canvas =
   var res: Canvas
   new(res)
 
@@ -969,7 +969,7 @@ proc drawFunction(cnv:Canvas, c: TFunction, x, y: float64, text:string) =
   cnv.doc.restoreState()
 
 
-proc draw_demo_10(doc: Document) =
+proc draw_demo_10(doc: PDF) =
   let size = getSizeFromName("AA")
   doc.addPage(size, PGO_PORTRAIT)
   draw_title(doc, "Bezier Curve Bounding Box Demo")
@@ -997,7 +997,7 @@ proc draw_demo_10(doc: Document) =
   cnv.cright = 5
   cnv.drawFunction(sine, 70, 150, "SINE WAVE")
 
-proc draw_demo_11(doc: Document) =
+proc draw_demo_11(doc: PDF) =
   let size = getSizeFromName("AA")
   doc.addPage(size, PGO_PORTRAIT)
   draw_title(doc, "Gradient Demo")
@@ -1049,7 +1049,7 @@ proc draw_demo_11(doc: Document) =
   doc.drawCircle(115+25, 200+25, 25)
   doc.fill()
 
-proc draw_demo_12(doc: Document) =
+proc draw_demo_12(doc: PDF) =
   let size = getSizeFromName("A4")
   let SAMP_TEXT = "The Quick Brown Fox Jump Over The Lazy Dog"
 
@@ -1079,7 +1079,7 @@ proc draw_demo_12(doc: Document) =
   doc.setFont("FreeMono", {FS_REGULAR}, 5'f64, ENC_UTF8)
   doc.drawText(15, 110, "Обычный текст в кодировке UTF-8")
 
-proc draw_demo_13(doc: Document) =
+proc draw_demo_13(doc: PDF) =
   let size = getSizeFromName("A1")
   doc.addPage(size, PGO_LANDSCAPE)
   doc.setUnit(PGU_MM)
@@ -1087,7 +1087,7 @@ proc draw_demo_13(doc: Document) =
   let img = doc.loadImage("abc.png")
   doc.drawImage(0,0, img)
   
-proc createPDF(doc: Document) =
+proc createPDF(doc: PDF) =
   draw_demo_1(doc)
   draw_demo_2(doc)
   draw_demo_3(doc)
@@ -1118,7 +1118,7 @@ proc main(): bool {.discardable.} =
     opts.addImagesPath("pngsuite")
     opts.addResourcesPath("resources")
 
-    var doc = initPDF(opts)
+    var doc = newPDF(opts)
     doc.createPDF()
     doc.writePDF(file)
     file.close()

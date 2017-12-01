@@ -1,6 +1,6 @@
 import nimPDF
 
-var doc = initPDF()
+var doc = newPDF()
 doc.addPage(getSizeFromName("A4"), PGO_PORTRAIT)
 doc.drawText(15, 15, "Hello World!")
 if not doc.writePDF("hello.pdf"):
