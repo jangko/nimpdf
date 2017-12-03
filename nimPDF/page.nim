@@ -1,4 +1,4 @@
-import strutils, gstate, objects, fontmanager, image, path
+import strutils, gState, objects, fontmanager, image, path
 import tables, encryptdict, os, resources, times, "subsetter/Font"
 import streams, encryptdict, encrypt, options, wtf8, unicode
 import basic2d, math
@@ -15,9 +15,6 @@ type
 
   PageOrientationType* = enum
     PGO_PORTRAIT, PGO_LANDSCAPE
-
-  CoordinateMode* = enum
-    TOP_DOWN, BOTTOM_UP
 
   PageSize* = object
     width*, height*: SizeUnit
@@ -66,13 +63,12 @@ type
     fields: seq[Annot]
 
   DocState* = ref object
-    docUnit: PageUnit
     size: PageSize
-    extGStates: seq[ExtGState]
+    extgStates: seq[ExtgState]
     images: seq[Image]
     gradients: seq[Gradient]
     fontMan: FontManager
-    gstate: GState
+    gState: GState
     pathStartX, pathStartY, pathEndX, pathEndY: float64
     recordShape: bool
     shapes: seq[Path]
@@ -84,14 +80,17 @@ type
     xref: Pdfxref
     encrypt: EncryptDict
     acroForm: AcroForm
-    coordMode: CoordinateMode
 
-  Page* = ref object
+  ContentRoot* = ref object of RootObj
     content: string
+    state: DocState
+
+  AppearanceStream* = ref object of ContentRoot
+
+  Page* = ref object of ContentRoot
     size: PageSize
     annots: seq[Annot]
     page: DictObj
-    state: DocState
 
 proc escapeString(text: string): string =
   result = ""
@@ -113,6 +112,12 @@ template f2s(a: typed): untyped =
 
 proc f2sn(a: float64): string =
   if a == 0: "null" else: f2s(a)
+
+template fromUser*(doc: DocState, val: float64): float64 =
+  doc.gState.docUnit.fromUser(val)
+
+template toUser*(doc: DocState, val:float64): float64 =
+  doc.gState.docUnit.toUser(val)
 
 proc putDestination(doc: DocState, dict: DictObj, dest: Destination) =
   var arr = newArrayObj()
@@ -201,7 +206,7 @@ proc putPages(doc: DocState, resource: DictObj, pages: seq[Page]): DictObj =
 
 proc putResources(doc: DocState): DictObj =
   let grads = putGradients(doc.xref, doc.gradients)
-  let exts  = putExtGStates(doc.xref, doc.extGStates)
+  let exts  = putExtgStates(doc.xref, doc.extgStates)
   let imgs  = putImages(doc.xref, doc.images)
   let fonts = putFonts(doc.xref, doc.fontMan.fontList)
 
@@ -210,7 +215,7 @@ proc putResources(doc: DocState): DictObj =
 
   #doc.put("<</ProcSet [/PDF /Text /ImageB /ImageC /ImageI]")
   if fonts != nil: result.addElement("Font", fonts)
-  if exts != nil: result.addElement("ExtGState", exts)
+  if exts != nil: result.addElement("ExtgState", exts)
   if imgs != nil: result.addElement("XObject", imgs)
   if grads != nil: result.addElement("Shading", grads)
 
@@ -321,7 +326,7 @@ proc putCatalog(doc: DocState, pages: seq[Page]) =
   #let firstPageID = pageRootID + 1
 
   if doc.acroForm != nil:
-    let fontSize = doc.docunit.fromUser(doc.acroForm.fontSize)
+    let fontSize = doc.fromUser(doc.acroForm.fontSize)
     var acro = newDictObj()
     doc.xref.add(acro)
     var fields = newArrayObj()
@@ -378,13 +383,11 @@ proc setInfo*(doc: DocState, field: DocInfo, info: string) =
 
 proc newDocState*(opts: PDFOptions): DocState =
   new(result)
-  result.extGStates = @[]
+  result.extgStates = @[]
   result.images = @[]
   result.gradients = @[]
-  result.coordMode = TOP_DOWN
-  result.docUnit.setUnit(PGU_MM)
   result.fontMan.init(opts.getFontsPath())
-  result.gstate = newGState()
+  result.gState = newgState()
   result.pathStartX = 0
   result.pathStartY = 0
   result.pathEndX = 0
@@ -397,6 +400,7 @@ proc newDocState*(opts: PDFOptions): DocState =
   result.outlines = @[]
   result.xref = newPdfxref()
   result.setInfo(DI_PRODUCER, "nimPDF")
+  result.setFontCount = 0
 
 proc getOpt*(doc: DocState): PDFOptions =
   result = doc.opts
@@ -432,36 +436,33 @@ proc loadImage*(doc: DocState, fileName: string): Image =
   result = nil
 
 proc setUnit*(doc: DocState, unit: PageUnitType) =
-  doc.docUnit.setUnit(unit)
+  doc.gState.docUnit.setUnit(unit)
 
 proc getUnit*(doc: DocState): PageUnitType =
-  result = doc.docUnit.unitType
+  result = doc.gState.docUnit.unitType
 
 proc setCoordinateMode*(doc: DocState, mode: CoordinateMode) =
-  doc.coordMode = mode
+  doc.gState.coordMode = mode
 
 proc getCoordinateMode*(doc: DocState): CoordinateMode =
-  result = doc.coordMode
+  result = doc.gState.coordMode
+
+template coordMode(doc: DocState): CoordinateMode =
+  doc.gState.coordMode
 
 proc vPoint(doc: DocState, val: float64): float64 =
   if doc.coordMode == TOP_DOWN:
-    result = doc.size.height.toPT - doc.docUnit.fromUser(val)
+    result = doc.size.height.toPT - doc.fromUser(val)
   else:
-    result = doc.docUnit.fromUser(val)
+    result = doc.fromUser(val)
 
 proc vPointMirror(doc: DocState, val: float64): float64 =
   if doc.coordMode == TOP_DOWN:
-    result = doc.docUnit.fromUser(-val)
+    result = doc.fromUser(-val)
   else:
-    result = doc.docUnit.fromUser(val)
+    result = doc.fromUser(val)
 
-proc getSize*(doc: DocState): PageSize = doc.size
-
-proc toUser*(self: DocState, val:float64): float64 =
-  result = self.docUnit.toUser(val)
-
-proc fromUser*(self: DocState, val:float64): float64 =
-  result = self.docUnit.fromUser(val)
+proc getPageSize*(doc: DocState): PageSize = doc.size
 
 proc newOutline*(doc: DocState, title: string, dest: Destination): Outline =
   new(result)
@@ -497,9 +498,9 @@ proc initRect*(x,y,w,h: float64): Rectangle =
 
 proc newLinkAnnot*(doc: DocState, rect: Rectangle, src: Page, dest: Destination): Annot =
   new(result)
-  let xx = doc.docUnit.fromUser(rect.x)
+  let xx = doc.fromUser(rect.x)
   let yy = doc.vPoint(rect.y)
-  let ww = doc.docUnit.fromUser(rect.x + rect.w)
+  let ww = doc.fromUser(rect.x + rect.w)
   let hh = doc.vPoint(rect.y + rect.h)
   result.annotType = ANNOT_LINK
   result.rect = initRect(xx,yy,ww,hh)
@@ -508,9 +509,9 @@ proc newLinkAnnot*(doc: DocState, rect: Rectangle, src: Page, dest: Destination)
 
 proc newTextAnnot*(doc: DocState, rect: Rectangle, src: Page, content: string): Annot =
   new(result)
-  let xx = doc.docUnit.fromUser(rect.x)
+  let xx = doc.fromUser(rect.x)
   let yy = doc.vPoint(rect.y)
-  let ww = doc.docUnit.fromUser(rect.x + rect.w)
+  let ww = doc.fromUser(rect.x + rect.w)
   let hh = doc.vPoint(rect.y + rect.h)
   result.annotType = ANNOT_TEXT
   result.rect = initRect(xx,yy,ww,hh)
@@ -537,7 +538,7 @@ proc newAcroForm*(doc: DocState): AcroForm =
   result.r = 0.0
   result.g = 0.0
   result.b = 0.0
-  result.fontSize = doc.docunit.toUser(12)
+  result.fontSize = doc.toUser(12)
   result.fontFamily = "Helvetica"
   result.fontStyle = {FS_REGULAR}
   result.encoding = ENC_STANDARD
@@ -567,27 +568,18 @@ proc setEncoding*(a: AcroForm, enc: EncodingType) =
 proc newTextField*(doc: DocState, rect: Rectangle, src: Page): Annot =
   var acro = doc.newAcroForm()
   new(result)
-  let xx = doc.docUnit.fromUser(rect.x)
+  let xx = doc.fromUser(rect.x)
   let yy = doc.vPoint(rect.y)
-  let ww = doc.docUnit.fromUser(rect.x + rect.w)
+  let ww = doc.fromUser(rect.x + rect.w)
   let hh = doc.vPoint(rect.y + rect.h)
   result.annotType = ANNOT_WIDGET
   result.rect = initRect(xx,yy,ww,hh)
   src.annots.add(result)
   acro.fields.add(result)
 
-proc put(p: Page, text: varargs[string]) =
-  for s in items(text): p.content.add(s)
-  p.content.add('\x0A')
-
-proc setFont*(self: Page, family:string, style: FontStyles, size: float64, enc: EncodingType = ENC_STANDARD) =
-  var font = self.state.fontMan.makeFont(family, style, enc)
-  let fontNumber = font.ID
-  let fontSize = self.state.docUnit.fromUser(size)
-  self.put("BT /F",$fontNumber," ",$fontSize," Tf ET")
-  self.state.gstate.font = font
-  self.state.gstate.fontSize = fontSize
-  inc(self.state.setFontCount)
+proc put(self: ContentRoot, text: varargs[string]) =
+  for s in items(text): self.content.add(s)
+  self.content.add('\x0A')
 
 proc swap(this: var PageSize) = swap(this.width, this.height)
 
@@ -601,16 +593,35 @@ proc newPage*(state: DocState, size: PageSize, orient = PGO_PORTRAIT): Page =
     result.size.swap()
   result.state = state
   state.size = result.size
-  state.setFontCount = 0
 
-proc drawText*(self: Page; x,y: float64; text: string) =
-  let xx = self.state.docUnit.fromUser(x)
+proc newAppearanceStream*(state: DocState): AppearanceStream =
+  new(result)
+  result.content = ""
+  result.state = state
+
+template fromUser(self: ContentRoot, val: float64): float64 =
+  self.state.gState.docUnit.fromUser(val)
+
+template toUser(self: ContentRoot, val: float64): float64 =
+  self.state.gState.docUnit.toUser(val)
+
+proc setFont*(self: ContentRoot, family:string, style: FontStyles, size: float64, enc: EncodingType = ENC_STANDARD) =
+  var font = self.state.fontMan.makeFont(family, style, enc)
+  let fontNumber = font.ID
+  let fontSize = self.fromUser(size)
+  self.put("BT /F",$fontNumber," ",$fontSize," Tf ET")
+  self.state.gState.font = font
+  self.state.gState.fontSize = fontSize
+  inc(self.state.setFontCount)
+
+proc drawText*(self: ContentRoot; x,y: float64; text: string) =
+  let xx = self.fromUser(x)
   let yy = self.state.vPoint(y)
 
-  if self.state.gstate.font == nil or self.state.setFontCount == 0:
+  if self.state.gState.font == nil or self.state.setFontCount == 0:
     self.setFont(defaultFont, {FS_REGULAR}, 5)
 
-  var font = self.state.gstate.font
+  var font = self.state.gState.font
 
   if font.subType == FT_TRUETYPE:
     var utf8 = replace_invalid(text)
@@ -618,17 +629,17 @@ proc drawText*(self: Page; x,y: float64; text: string) =
   else:
     self.put("BT ",f2s(xx)," ",f2s(yy)," Td (",escapeString(text),") Tj ET")
 
-proc drawVText*(self: Page; x,y: float64; text: string) =
-  if self.state.gstate.font == nil or self.state.setFontCount == 0:
+proc drawVText*(self: ContentRoot; x,y: float64; text: string) =
+  if self.state.gState.font == nil or self.state.setFontCount == 0:
     self.setFont(defaultFont, {FS_REGULAR}, 5)
 
-  var font = self.state.gstate.font
+  var font = self.state.gState.font
 
   if not font.CanWriteVertical():
     self.drawText(x, y, text)
     return
 
-  var xx = self.state.docUnit.fromUser(x)
+  var xx = self.fromUser(x)
   var yy = self.state.vPoint(y)
   let utf8 = replace_invalid(text)
   let cid = font.EscapeString(utf8)
@@ -637,40 +648,40 @@ proc drawVText*(self: Page; x,y: float64; text: string) =
   var i = 0
   for b in runes(utf8):
     self.put(f2s(xx)," ",f2s(yy)," Td <", substr(cid, i, i + 3),"> Tj")
-    yy = -float(TTFont(font).GetCharHeight(int(b))) * self.state.gstate.fontSize / 1000
+    yy = -float(TTFont(font).GetCharHeight(int(b))) * self.state.gState.fontSize / 1000
     xx = 0
     inc(i, 4)
   self.put("ET")
 
-proc beginText*(self: Page) =
-  if self.state.gstate.font == nil or self.state.setFontCount == 0:
+proc beginText*(self: ContentRoot) =
+  if self.state.gState.font == nil or self.state.setFontCount == 0:
     self.setFont(defaultFont, {FS_REGULAR}, 5)
 
   self.put("BT")
 
-proc beginText*(self: Page; x,y: float64) =
-  if self.state.gstate.font == nil:
+proc beginText*(self: ContentRoot; x,y: float64) =
+  if self.state.gState.font == nil:
     self.setFont(defaultFont, {FS_REGULAR}, 5)
 
-  let xx = self.state.docUnit.fromUser(x)
+  let xx = self.fromUser(x)
   let yy = self.state.vPoint(y)
   self.put("BT ", f2s(xx)," ",f2s(yy)," Td")
 
-proc moveTextPos*(self: Page; x,y: float64) =
-  let xx = self.state.docUnit.fromUser(x)
+proc moveTextPos*(self: ContentRoot; x,y: float64) =
+  let xx = self.fromUser(x)
   let yy = self.state.vPointMirror(y)
   self.put(f2s(xx)," ",f2s(yy)," Td")
 
-proc setTextRenderingMode*(self: Page, rm: TextRenderingMode) =
+proc setTextRenderingMode*(self: ContentRoot, rm: TextRenderingMode) =
   let trm = cast[int](rm)
-  if self.state.gstate.renderingMode != rm: self.put($trm, " Tr")
-  self.state.gstate.renderingMode = rm
+  if self.state.gState.renderingMode != rm: self.put($trm, " Tr")
+  self.state.gState.renderingMode = rm
 
-proc setTextMatrix*(self: Page, m: Matrix2d) =
+proc setTextMatrix*(self: ContentRoot, m: Matrix2d) =
   self.put(f2s(m.ax)," ", f2s(m.ay), " ", f2s(m.bx), " ", f2s(m.by), " ", f2s(m.tx)," ",f2s(m.ty)," Tm")
 
-proc showText*(self: Page, text:string) =
-  var font = self.state.gstate.font
+proc showText*(self: ContentRoot, text:string) =
+  var font = self.state.gState.font
 
   if font.subType == FT_TRUETYPE:
     var utf8 = replace_invalid(text)
@@ -678,61 +689,61 @@ proc showText*(self: Page, text:string) =
   else:
     self.put("(",escapeString(text),") Tj")
 
-proc setTextLeading*(self: Page, val: float64) =
-  let tl = self.state.docUnit.fromUser(val)
+proc setTextLeading*(self: ContentRoot, val: float64) =
+  let tl = self.fromUser(val)
   self.put(f2s(tl)," TL")
 
-proc moveToNextLine*(self: Page) =
+proc moveToNextLine*(self: ContentRoot) =
   self.put("T*")
 
-proc endText*(self: Page) =
+proc endText*(self: ContentRoot) =
   self.put("ET")
 
 proc degree_to_radian*(x: float): float =
   result = (x * math.PI) / 180.0
 
-proc setCharSpace*(self: Page; val: float64) =
+proc setCharSpace*(self: ContentRoot; val: float64) =
   self.put(f2s(val)," Tc")
-  self.state.gstate.charSpace = val
+  self.state.gState.charSpace = val
 
-proc setTextHScale*(self: Page; val: float64) =
+proc setTextHScale*(self: ContentRoot; val: float64) =
   self.put(f2s(val)," Th")
-  self.state.gstate.hScaling = val
+  self.state.gState.hScaling = val
 
-proc setWordSpace*(self: Page; val: float64) =
+proc setWordSpace*(self: ContentRoot; val: float64) =
   self.put(f2s(val)," Tw")
-  self.state.gstate.wordSpace = val
+  self.state.gState.wordSpace = val
 
-proc setTransform*(self: Page, m: Matrix2d) =
+proc setTransform*(self: ContentRoot, m: Matrix2d) =
   self.put(f2s(m.ax)," ", f2s(m.ay), " ", f2s(m.bx), " ", f2s(m.by), " ", f2s(m.tx)," ",f2s(m.ty)," cm")
-  self.state.gstate.transMatrix = self.state.gstate.transMatrix & m
+  self.state.gState.transMatrix = self.state.gState.transMatrix & m
 
-proc rotate*(self: Page, angle:float64) =
+proc rotate*(self: ContentRoot, angle:float64) =
   self.setTransform(rotate(degree_to_radian(angle)))
 
-proc rotate*(self: Page, angle, x,y:float64) =
-  let xx = self.state.docUnit.fromUser(x)
+proc rotate*(self: ContentRoot, angle, x,y:float64) =
+  let xx = self.fromUser(x)
   let yy = self.state.vPoint(y)
   self.setTransform(rotate(degree_to_radian(angle), point2d(xx, yy)))
 
-proc move*(self: Page, x,y:float64) =
-  let xx = self.state.docUnit.fromUser(x)
+proc move*(self: ContentRoot, x,y:float64) =
+  let xx = self.fromUser(x)
   let yy = self.state.vPointMirror(y)
   self.setTransform(move(xx,yy))
 
-proc scale*(self: Page, s:float64) =
+proc scale*(self: ContentRoot, s:float64) =
   self.setTransform(scale(s))
 
-proc scale*(self: Page, s, x,y:float64) =
-  let xx = self.state.docUnit.fromUser(x)
+proc scale*(self: ContentRoot, s, x,y:float64) =
+  let xx = self.fromUser(x)
   let yy = self.state.vPoint(y)
   self.setTransform(scale(s, point2d(xx, yy)))
 
-proc stretch*(self: Page, sx,sy:float64) =
+proc stretch*(self: ContentRoot, sx,sy:float64) =
   self.setTransform(stretch(sx,sy))
 
-proc stretch*(self: Page, sx,sy,x,y:float64) =
-  let xx = self.state.docUnit.fromUser(x)
+proc stretch*(self: ContentRoot, sx,sy,x,y:float64) =
+  let xx = self.fromUser(x)
   let yy = self.state.vPoint(y)
   self.setTransform(stretch(sx, sy, point2d(xx, yy)))
 
@@ -742,19 +753,19 @@ proc shear(sx,sy,x,y:float64): Matrix2d =
     s = matrix2d(1.0,sx,sy,1.0,0.0,0.0)
   result = m & s & move(x,y)
 
-proc skew*(self: Page, sx,sy:float64) =
+proc skew*(self: ContentRoot, sx,sy:float64) =
   let tsx = math.tan(degree_to_radian(sx))
   let tsy = math.tan(degree_to_radian(sy))
   self.setTransform(matrix2d(1,tsx,tsy,1,0,0))
 
-proc skew*(self: Page, sx,sy,x,y:float64) =
-  let xx = self.state.docUnit.fromUser(x)
+proc skew*(self: ContentRoot, sx,sy,x,y:float64) =
+  let xx = self.fromUser(x)
   let yy = self.state.vPoint(y)
   let tsx = math.tan(degree_to_radian(sx))
   let tsy = math.tan(degree_to_radian(sy))
   self.setTransform(shear(tsx, tsy, xx, yy))
 
-proc drawImage*(self: Page, x:float64, y:float64, source: Image) =
+proc drawImage*(self: ContentRoot, x:float64, y:float64, source: Image) =
   let size = self.state.images.len()
   var found = false
   var img = source
@@ -766,9 +777,9 @@ proc drawImage*(self: Page, x:float64, y:float64, source: Image) =
       found = true
       break
 
-  if self.state.gstate.alphaFill > 0.0 and self.state.gstate.alphaFill < 1.0:
+  if self.state.gState.alphaFill > 0.0 and self.state.gState.alphaFill < 1.0:
     img = img.clone()
-    img.adjustTransparency(self.state.gstate.alphaFill)
+    img.adjustTransparency(self.state.gState.alphaFill)
     found = false
 
   if not found:
@@ -790,7 +801,7 @@ proc drawImage*(self: Page, x:float64, y:float64, source: Image) =
     #self.put("Q")
 
   self.put("q")
-  var xx = self.state.docUnit.fromUser(x)
+  var xx = self.fromUser(x)
   var yy = self.state.vPoint(y)
 
   self.put(f2s(ww)," 0 0 ",f2s(hh)," ",f2s(xx)," ",f2s(yy)," cm")
@@ -798,19 +809,19 @@ proc drawImage*(self: Page, x:float64, y:float64, source: Image) =
   self.put("/I",$img.ID," Do")
   self.put("Q")
 
-proc drawRect*(self: Page, x: float64, y: float64, w: float64, h: float64) =
+proc drawRect*(self: ContentRoot, x: float64, y: float64, w: float64, h: float64) =
   if self.state.recordShape:
     self.state.shapes[self.state.shapes.len - 1].addRect(x, y, w, h)
     self.state.shapes.add(makePath())
   else:
-    let xx = self.state.docUnit.fromUser(x)
+    let xx = self.fromUser(x)
     let yy = self.state.vPoint(y)
-    let ww = self.state.docUnit.fromUser(w)
+    let ww = self.fromUser(w)
     let hh = self.state.vPointMirror(h)
     self.put(f2s(xx)," ",f2s(yy)," ",f2s(ww)," ",f2s(hh)," re")
 
-proc moveTo*(self: Page, x: float64, y: float64) =
-  let xx = self.state.docUnit.fromUser(x)
+proc moveTo*(self: ContentRoot, x: float64, y: float64) =
+  let xx = self.fromUser(x)
   let yy = self.state.vPoint(y)
   self.put(f2s(xx)," ",f2s(yy)," m")
   self.state.pathStartX = x
@@ -818,31 +829,31 @@ proc moveTo*(self: Page, x: float64, y: float64) =
   self.state.pathEndX = x
   self.state.pathEndY = y
 
-proc moveTo*(self: Page, p: Point2d) {.inline.} = self.moveTo(p.x, p.y)
+proc moveTo*(self: ContentRoot, p: Point2d) {.inline.} = self.moveTo(p.x, p.y)
 
-proc lineTo*(self: Page, x: float64, y: float64) =
+proc lineTo*(self: ContentRoot, x: float64, y: float64) =
   if self.state.recordShape:
     self.state.shapes[self.state.shapes.len - 1].addLine(self.state.pathStartX, self.state.pathStartY, x, y)
     if x == self.state.pathStartX and y == self.state.pathStartY:
       self.state.shapes.add(makePath())
   else:
-    let xx = self.state.docUnit.fromUser(x)
+    let xx = self.fromUser(x)
     let yy = self.state.vPoint(y)
     self.put(f2s(xx)," ",f2s(yy)," l")
   self.state.pathEndX = x
   self.state.pathEndY = y
 
-proc lineTo*(self: Page, p: Point2d) {.inline.} = self.lineTo(p.x, p.y)
+proc lineTo*(self: ContentRoot, p: Point2d) {.inline.} = self.lineTo(p.x, p.y)
 
-proc bezierCurveTo*(self: Page; cp1x, cp1y, cp2x, cp2y, x, y: float64) =
+proc bezierCurveTo*(self: ContentRoot; cp1x, cp1y, cp2x, cp2y, x, y: float64) =
   if self.state.recordShape:
     self.state.shapes[self.state.shapes.len - 1].addCubicCurve(self.state.pathEndX, self.state.pathEndY, cp1x,cp1y, cp2x,cp2y, x, y)
     if x == self.state.pathStartX and y == self.state.pathStartY:
       self.state.shapes.add(makePath())
   else:
-    let cp1xx = self.state.docUnit.fromUser(cp1x)
-    let cp2xx = self.state.docUnit.fromUser(cp2x)
-    let xx = self.state.docUnit.fromUser(x)
+    let cp1xx = self.fromUser(cp1x)
+    let cp2xx = self.fromUser(cp2x)
+    let xx = self.fromUser(x)
 
     let cp1yy = self.state.vPoint(cp1y)
     let cp2yy = self.state.vPoint(cp2y)
@@ -851,41 +862,41 @@ proc bezierCurveTo*(self: Page; cp1x, cp1y, cp2x, cp2y, x, y: float64) =
   self.state.pathEndX = x
   self.state.pathEndY = y
 
-proc bezierCurveTo*(self: Page; cp1, cp2, p: Point2d) {.inline.} = self.bezierCurveTo(cp1.x,cp1.y,cp2.x,cp2.y,p.x,p.y)
+proc bezierCurveTo*(self: ContentRoot; cp1, cp2, p: Point2d) {.inline.} = self.bezierCurveTo(cp1.x,cp1.y,cp2.x,cp2.y,p.x,p.y)
 
-proc curveTo1*(self: Page; cpx, cpy, x, y: float64) =
+proc curveTo1*(self: ContentRoot; cpx, cpy, x, y: float64) =
   if self.state.recordShape:
     self.state.shapes[self.state.shapes.len - 1].addQuadraticCurve(self.state.pathEndX, self.state.pathEndY, cpx,cpy, x, y)
     if x == self.state.pathStartX and y == self.state.pathStartY:
       self.state.shapes.add(makePath())
   else:
-    let cpxx = self.state.docUnit.fromUser(cpx)
-    let xx = self.state.docUnit.fromUser(x)
+    let cpxx = self.fromUser(cpx)
+    let xx = self.fromUser(x)
     let cpyy = self.state.vPoint(cpy)
     let yy = self.state.vPoint(y)
     self.put(f2s(cpxx)," ",f2s(cpyy)," ",f2s(xx)," ",f2s(yy)," v")
   self.state.pathEndX = x
   self.state.pathEndY = y
 
-proc curveTo1*(self: Page; cp, p: Point2d) {.inline.} = self.curveTo1(cp.x,cp.y,p.x,p.y)
+proc curveTo1*(self: ContentRoot; cp, p: Point2d) {.inline.} = self.curveTo1(cp.x,cp.y,p.x,p.y)
 
-proc curveTo2*(self: Page; cpx, cpy, x, y: float64) =
+proc curveTo2*(self: ContentRoot; cpx, cpy, x, y: float64) =
   if self.state.recordShape:
     self.state.shapes[self.state.shapes.len - 1].addQuadraticCurve(self.state.pathEndX, self.state.pathEndY, cpx,cpy, x, y)
     if x == self.state.pathStartX and y == self.state.pathStartY:
       self.state.shapes.add(makePath())
   else:
-    let cpxx = self.state.docUnit.fromUser(cpx)
-    let xx = self.state.docUnit.fromUser(x)
+    let cpxx = self.fromUser(cpx)
+    let xx = self.fromUser(x)
     let cpyy = self.state.vPoint(cpy)
     let yy = self.state.vPoint(y)
     self.put(f2s(cpxx)," ",f2s(cpyy)," ",f2s(xx)," ",f2s(yy)," y")
   self.state.pathEndX = x
   self.state.pathEndY = y
 
-proc curveTo2*(self: Page; cp, p: Point2d) {.inline.} = self.curveTo2(cp.x,cp.y,p.x,p.y)
+proc curveTo2*(self: ContentRoot; cp, p: Point2d) {.inline.} = self.curveTo2(cp.x,cp.y,p.x,p.y)
 
-proc closePath*(self: Page) =
+proc closePath*(self: ContentRoot) =
   if self.state.recordShape:
     self.state.shapes[self.state.shapes.len - 1].addLine(self.state.pathEndX, self.state.pathEndY, self.state.pathStartX, self.state.pathStartY)
     self.state.shapes.add(makePath())
@@ -895,7 +906,7 @@ proc closePath*(self: Page) =
   self.state.pathEndX = self.state.pathStartX
   self.state.pathEndY = self.state.pathStartY
 
-proc roundRect*(self: Page; x, y, w, h: float64; r: float64 = 0.0) =
+proc roundRect*(self: ContentRoot; x, y, w, h: float64; r: float64 = 0.0) =
   self.moveTo(x + r, y)
   self.lineTo(x + w - r, y)
   self.curveTo1(x + w, y, x + w, y + r)
@@ -906,7 +917,7 @@ proc roundRect*(self: Page; x, y, w, h: float64; r: float64 = 0.0) =
   self.lineTo(x, y + r)
   self.curveTo1(x, y, x + r, y)
 
-proc drawEllipse*(self: Page; x, y, r1, r2 : float64) =
+proc drawEllipse*(self: ContentRoot; x, y, r1, r2 : float64) =
   # based on http://stackoverflow.com/questions/2172798/how-to-draw-an-oval-in-html5-canvas/2173084#2173084
   let KAPPA = 4.0 * ((math.sqrt(2.0) - 1.0) / 3.0)
   let xx = x - r1
@@ -924,130 +935,130 @@ proc drawEllipse*(self: Page; x, y, r1, r2 : float64) =
   self.bezierCurveTo(xe, ym + oy, xm + ox, ye, xm, ye)
   self.bezierCurveTo(xm - ox, ye, xx, ym + oy, xx, ym)
 
-proc drawCircle*(self: Page; x, y, radius : float64) =
+proc drawCircle*(self: ContentRoot; x, y, radius : float64) =
   self.drawEllipse(x,y,radius,radius)
 
-proc setLineWidth*(self: Page, lineWidth: float64) =
-  let lw = self.state.docUnit.fromUser(lineWidth)
-  if lineWidth != self.state.gstate.lineWidth: self.put(f2s(lw), " w")
-  self.state.gstate.lineWidth = lineWidth
+proc setLineWidth*(self: ContentRoot, lineWidth: float64) =
+  let lw = self.fromUser(lineWidth)
+  if lineWidth != self.state.gState.lineWidth: self.put(f2s(lw), " w")
+  self.state.gState.lineWidth = lineWidth
 
-proc setLineCap*(self: Page, lineCap: LineCap) =
+proc setLineCap*(self: ContentRoot, lineCap: LineCap) =
   let lc = cast[int](lineCap)
-  if lineCap != self.state.gstate.lineCap: self.put($lc, " J")
-  self.state.gstate.lineCap = lineCap
+  if lineCap != self.state.gState.lineCap: self.put($lc, " J")
+  self.state.gState.lineCap = lineCap
 
-proc setLineJoin*(self: Page, lineJoin: LineJoin) =
+proc setLineJoin*(self: ContentRoot, lineJoin: LineJoin) =
   let lj = cast[int](lineJoin)
-  if self.state.gstate.lineJoin != lineJoin: self.put($lj, " j")
-  self.state.gstate.lineJoin = lineJoin
+  if self.state.gState.lineJoin != lineJoin: self.put($lj, " j")
+  self.state.gState.lineJoin = lineJoin
 
-proc setMiterLimit*(self: Page, miterLimit: float64) =
-  let ml = self.state.docUnit.fromUser(miterLimit)
-  if self.state.gstate.miterLimit != miterLimit: self.put(f2s(ml), " M")
-  self.state.gstate.miterLimit = miterLimit
+proc setMiterLimit*(self: ContentRoot, miterLimit: float64) =
+  let ml = self.fromUser(miterLimit)
+  if self.state.gState.miterLimit != miterLimit: self.put(f2s(ml), " M")
+  self.state.gState.miterLimit = miterLimit
 
-proc setGrayFill*(self: Page; g: float64) =
+proc setGrayFill*(self: ContentRoot; g: float64) =
   self.put(f2s(g), " g")
-  self.state.gstate.grayFill = g
-  self.state.gstate.csFill = CS_DEVICE_GRAY
+  self.state.gState.grayFill = g
+  self.state.gState.csFill = CS_DEVICE_GRAY
   self.state.shapes = nil
   self.state.recordShape = false
 
-proc setGrayStroke*(self: Page; g: float64) =
+proc setGrayStroke*(self: ContentRoot; g: float64) =
   self.put(f2s(g), " G")
-  self.state.gstate.grayStroke = g
-  self.state.gstate.csStroke = CS_DEVICE_GRAY
+  self.state.gState.grayStroke = g
+  self.state.gState.csStroke = CS_DEVICE_GRAY
 
-proc setRGBFill*(self: Page; r,g,b: float64) =
+proc setRGBFill*(self: ContentRoot; r,g,b: float64) =
   self.put(f2s(r), " ",f2s(g), " ",f2s(b), " rg")
-  self.state.gstate.rgbFill = initRGB(r,g,b)
-  self.state.gstate.csFill = CS_DEVICE_RGB
+  self.state.gState.rgbFill = initRGB(r,g,b)
+  self.state.gState.csFill = CS_DEVICE_RGB
   self.state.shapes = nil
   self.state.recordShape = false
 
-proc setRGBStroke*(self: Page; r,g,b: float64) =
+proc setRGBStroke*(self: ContentRoot; r,g,b: float64) =
   self.put(f2s(r), " ",f2s(g), " ",f2s(b), " RG")
-  self.state.gstate.rgbStroke = initRGB(r,g,b)
-  self.state.gstate.csStroke = CS_DEVICE_RGB
+  self.state.gState.rgbStroke = initRGB(r,g,b)
+  self.state.gState.csStroke = CS_DEVICE_RGB
 
-proc setRGBFill*(self: Page; col: RGBColor) =
+proc setRGBFill*(self: ContentRoot; col: RGBColor) =
   self.setRGBFill(col.r,col.g,col.b)
 
-proc setRGBStroke*(self: Page; col: RGBColor) =
+proc setRGBStroke*(self: ContentRoot; col: RGBColor) =
   self.setRGBStroke(col.r,col.g,col.b)
 
-proc setCMYKFill*(self: Page; c,m,y,k: float64) =
+proc setCMYKFill*(self: ContentRoot; c,m,y,k: float64) =
   self.put(f2s(c), " ",f2s(m), " ",f2s(y), " ",f2s(k), " k")
-  self.state.gstate.cmykFill = initCMYK(c,m,y,k)
-  self.state.gstate.csFill = CS_DEVICE_CMYK
+  self.state.gState.cmykFill = initCMYK(c,m,y,k)
+  self.state.gState.csFill = CS_DEVICE_CMYK
   self.state.shapes = nil
   self.state.recordShape = false
 
-proc setCMYKStroke*(self: Page; c,m,y,k: float64) =
+proc setCMYKStroke*(self: ContentRoot; c,m,y,k: float64) =
   self.put(f2s(c), " ",f2s(m), " ",f2s(y), " ",f2s(k), " K")
-  self.state.gstate.cmykFill = initCMYK(c,m,y,k)
-  self.state.gstate.csFill = CS_DEVICE_CMYK
+  self.state.gState.cmykFill = initCMYK(c,m,y,k)
+  self.state.gState.csFill = CS_DEVICE_CMYK
 
-proc setCMYKFill*(self: Page; col: CMYKColor) =
+proc setCMYKFill*(self: ContentRoot; col: CMYKColor) =
   self.setCMYKFill(col.c,col.m,col.y,col.k)
 
-proc setCMYKStroke*(self: Page; col: CMYKColor) =
+proc setCMYKStroke*(self: ContentRoot; col: CMYKColor) =
   self.setCMYKStroke(col.c,col.m,col.y,col.k)
 
-proc init(gs: var ExtGState; id: int; sA, nsA: float64, bm: string = "Normal") =
+proc init(gs: var ExtgState; id: int; sA, nsA: float64, bm: string = "Normal") =
   gs.ID = id
   gs.strokingAlpha = sA
   gs.nonstrokingAlpha = nsA
   gs.blendMode = bm
 
-proc setAlpha*(self: Page, a: float64) =
-  let id = self.state.extGStates.len() + 1
-  var gs : ExtGState
+proc setAlpha*(self: ContentRoot, a: float64) =
+  let id = self.state.extgStates.len() + 1
+  var gs : ExtgState
   gs.init(id, a, a)
-  self.state.extGStates.add(gs)
+  self.state.extgStates.add(gs)
   self.put("/GS",$id," gs")
-  self.state.gstate.alphaFill = a
-  self.state.gstate.alphaStroke = a
+  self.state.gState.alphaFill = a
+  self.state.gState.alphaStroke = a
 
-proc setBlendMode*(self: Page, bm: BlendMode) =
-  let id = self.state.extGStates.len() + 1
-  var gs : ExtGState
+proc setBlendMode*(self: ContentRoot, bm: BlendMode) =
+  let id = self.state.extgStates.len() + 1
+  var gs : ExtgState
   var bmid = cast[int](bm)
   gs.init(id, -1.0, -1.0, BM_NAMES[bmid])
-  self.state.extGStates.add(gs)
+  self.state.extgStates.add(gs)
   self.put("/GS",$id," gs")
-  self.state.gstate.blendMode = bm
+  self.state.gState.blendMode = bm
 
-proc saveState*(self: Page) =
-  self.state.gstate = newGState(self.state.gstate)
+proc saveState*(self: ContentRoot) =
+  self.state.gState = newgState(self.state.gState)
   self.put("q")
 
-proc restoreState*(self: Page) =
-  self.state.gstate = freeGState(self.state.gstate)
+proc restoreState*(self: ContentRoot) =
+  self.state.gState = freegState(self.state.gState)
   self.put("Q")
 
-proc getTextWidth*(self: Page, text:string): float64 =
+proc getTextWidth*(self: ContentRoot, text:string): float64 =
   var res = 0.0
-  let tw = self.state.gstate.font.GetTextWidth(text)
+  let tw = self.state.gState.font.GetTextWidth(text)
 
-  res += self.state.gstate.wordSpace * float64(tw.numspace)
-  res += float64(tw.width) * self.state.gstate.fontSize / 1000
-  res += self.state.gstate.charSpace * float64(tw.numchars)
+  res += self.state.gState.wordSpace * float64(tw.numspace)
+  res += float64(tw.width) * self.state.gState.fontSize / 1000
+  res += self.state.gState.charSpace * float64(tw.numchars)
 
-  result = self.state.docUnit.toUser(res)
+  result = self.toUser(res)
 
-proc getTextHeight*(self: Page, text:string): float64 =
+proc getTextHeight*(self: ContentRoot, text:string): float64 =
   var res = 0.0
-  let tw = self.state.gstate.font.GetTextHeight(text)
+  let tw = self.state.gState.font.GetTextHeight(text)
 
-  res += self.state.gstate.wordSpace * float64(tw.numspace)
-  res += float64(tw.width) * self.state.gstate.fontSize / 1000
-  res += self.state.gstate.charSpace * float64(tw.numchars)
+  res += self.state.gState.wordSpace * float64(tw.numspace)
+  res += float64(tw.width) * self.state.gState.fontSize / 1000
+  res += self.state.gState.charSpace * float64(tw.numchars)
 
-  result = self.state.docUnit.toUser(res)
+  result = self.toUser(res)
 
-proc setDash*(self: Page, dash:openArray[int], phase:int) =
+proc setDash*(self: ContentRoot, dash:openArray[int], phase:int) =
   var ptn = "["
   var num_ptn = 0
 
@@ -1060,16 +1071,16 @@ proc setDash*(self: Page, dash:openArray[int], phase:int) =
   ptn.add("] " & $phase & " d")
   self.put(ptn)
 
-  self.state.gstate.dash.num_ptn = num_ptn
-  self.state.gstate.dash.phase = phase
+  self.state.gState.dash.num_ptn = num_ptn
+  self.state.gState.dash.phase = phase
 
   for i in 0..num_ptn-1:
-    self.state.gstate.dash.ptn[i] = dash[i]
+    self.state.gState.dash.ptn[i] = dash[i]
 
-proc clip*(self: Page) =
+proc clip*(self: ContentRoot) =
   self.put("W")
 
-proc executePath*(self: Page, p: Path) =
+proc executePath*(self: ContentRoot, p: Path) =
   let len = p.len()
   var i = 0
   self.moveTo(p[i+1], p[i+2])
@@ -1088,7 +1099,7 @@ proc executePath*(self: Page, p: Path) =
       self.bezierCurveTo(p[i+3],p[i+4],p[i+5],p[i+6],p[i+7],p[i+8])
       inc(i, 9)
 
-proc drawBounds*(self: Page, p: Path) =
+proc drawBounds*(self: ContentRoot, p: Path) =
   let len = p.len
   var i = 0
   while i < len:
@@ -1107,40 +1118,40 @@ proc drawBounds*(self: Page, p: Path) =
       self.put("S")
       inc(i, 9)
 
-proc drawBounds*(self: Page) =
+proc drawBounds*(self: ContentRoot) =
   if self.state.recordShape:
     self.state.recordShape = false
     for p in self.state.shapes:
       if p.len > 0: self.drawBounds(p)
     self.state.recordShape = true
 
-proc applyGradient(self: Page) =
+proc applyGradient(self: ContentRoot) =
   for p in self.state.shapes:
     if p.len > 0 and p.isClosed():
       self.put("q")
       self.executePath(p)
       self.put("W n") #set gradient clipping area
       let bb = calculateBounds(p)
-      let xx = self.state.docUnit.fromUser(bb.xmin)
+      let xx = self.fromUser(bb.xmin)
       let yy = self.state.vPoint(bb.ymin + bb.ymax - bb.ymin)
-      let ww = self.state.docUnit.fromUser(bb.xmax - bb.xmin)
-      let hh = self.state.docUnit.fromUser(bb.ymax - bb.ymin)
+      let ww = self.fromUser(bb.xmax - bb.xmin)
+      let hh = self.fromUser(bb.ymax - bb.ymin)
       #set up transformation matrix for gradient
       self.put(f2s(ww)," 0 0 ", f2s(hh), " ", f2s(xx), " ", f2s(yy), " cm")
-      self.put("/Sh",$self.state.gstate.gradientFill.ID," sh") #paint the gradient
+      self.put("/Sh",$self.state.gState.gradientFill.ID," sh") #paint the gradient
       self.put("Q")
 
-proc fill*(self: Page) =
+proc fill*(self: ContentRoot) =
   if self.state.recordShape:
     self.state.recordShape = false
-    if self.state.gstate.csFill == CS_GRADIENT: self.applyGradient()
+    if self.state.gState.csFill == CS_GRADIENT: self.applyGradient()
     self.state.shapes = @[]
     self.state.shapes.add(makePath())
     self.state.recordShape = true
   else:
     self.put("f")
 
-proc stroke*(self: Page) =
+proc stroke*(self: ContentRoot) =
   if self.state.recordShape:
     self.state.recordShape = false
     for p in self.state.shapes:
@@ -1151,16 +1162,16 @@ proc stroke*(self: Page) =
   else:
     self.put("S")
 
-proc fillAndStroke*(self: Page) =
+proc fillAndStroke*(self: ContentRoot) =
   if self.state.recordShape:
     self.state.recordShape = false
-    if self.state.gstate.csFill == CS_GRADIENT: self.applyGradient()
+    if self.state.gState.csFill == CS_GRADIENT: self.applyGradient()
     self.state.recordShape = true
     self.stroke()
   else:
     self.put("B")
 
-proc setGradientFill*(self: Page, grad: Gradient) =
+proc setGradientFill*(self: ContentRoot, grad: Gradient) =
   let size = self.state.gradients.len()
   var found = false
   if grad == nil: return
@@ -1176,14 +1187,14 @@ proc setGradientFill*(self: Page, grad: Gradient) =
   self.state.shapes = @[]
   self.state.shapes.add(makePath())
   self.state.recordShape = true
-  self.state.gstate.csFill = CS_GRADIENT
-  self.state.gstate.gradientFill = grad
+  self.state.gState.csFill = CS_GRADIENT
+  self.state.gState.gradientFill = grad
 
 proc newXYZDest*(page: Page, x,y,z: float64): Destination =
   new(result)
   result.style = DS_XYZ
   result.page  = page
-  result.a = page.state.docUnit.fromUser(x)
+  result.a = page.fromUSer(x)
   result.b = page.state.vPoint(y)
   result.c = z
 
@@ -1202,15 +1213,15 @@ proc newFitVDest*(page: Page, left: float64): Destination =
   new(result)
   result.style = DS_FITV
   result.page  = page
-  result.a = page.state.docUnit.fromUser(left)
+  result.a = page.fromUSer(left)
 
 proc newFitRDest*(page: Page, left,bottom,right,top: float64): Destination =
   new(result)
   result.style = DS_FITR
   result.page  = page
-  result.a = page.state.docUnit.fromUser(left)
+  result.a = page.fromUSer(left)
   result.b = page.state.vPoint(bottom)
-  result.c = page.state.docUnit.fromUser(right)
+  result.c = page.fromUSer(right)
   result.d = page.state.vPoint(top)
 
 proc newFitBDest*(page: Page): Destination =

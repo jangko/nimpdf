@@ -116,7 +116,7 @@ proc setCoordinateMode*(doc: PDF, mode: CoordinateMode) =
 proc getCoordinateMode*(doc: PDF): CoordinateMode =
   result = doc.state.getCoordinateMode()
 
-proc getSize*(doc: PDF): PageSize = doc.state.getSize()
+proc getPageSize*(doc: PDF): PageSize = doc.state.getPageSize()
 
 proc toUser*(doc: PDF, val: float64): float64 =
   doc.state.toUser(val)
@@ -439,4 +439,3 @@ proc newAcroForm*(doc: PDF): AcroForm =
 
 proc textField*(doc: PDF, rect: Rectangle, src: Page): Annot =
   result = doc.state.newTextField(rect, src)
-

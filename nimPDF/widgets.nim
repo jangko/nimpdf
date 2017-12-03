@@ -3,10 +3,10 @@ import objects
 const
   FIELD_TYPE_BUTTON = "Btn"
   FIELD_TYPE_TEXT = "Tx"
+  FIELD_TYPE_COMBO = "Ch"
 
 type
   MapRoot = ref object of RootObj
-
 
   ANNOT_FLAGS = enum
     Invisible = 1
@@ -61,6 +61,13 @@ type
  #  page: proxyObj
  #  annotationFlags: ANNOT_FLAGS
 
+  PushButton = ref object of Widget
+  ComboBox = ref object of Widget
+  RadioButton = ref object of Widget
+  CheckBox = ref object of Widget
+  TextField = ref object of Widget
+  ListBox = ref object of Widget
+
   BUTTON_FLAGS = enum
     NoToggleToOff = 15
     Radio = 16
@@ -76,12 +83,12 @@ type
     Comb = 25
     RichText = 26
 
-
- #streamobject
- #  |-----xobject
- #  |-----Pages
- #  |-----appearance stream
- #acroform fonts
+  COMBO_BOX_FLAGS = enum
+    Combo = 18
+    Edit = 19
+    Sort = 20
+    MultiSelect = 22
+    CommitOnSelChange = 27
 
 method createObject(self: MapRoot): PdfObject {.base.} = discard
 

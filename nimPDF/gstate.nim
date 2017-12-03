@@ -60,6 +60,9 @@ type
     unitType*: PageUnitType
     k*: float64
 
+  CoordinateMode* = enum
+    TOP_DOWN, BOTTOM_UP
+
   LineCap* = enum
     BUTT_END, ROUND_END, SQUARE_END
 
@@ -139,6 +142,8 @@ type
     font*: Font
     fontSize*: float64
     writingMode*: WritingMode
+    docUnit*: PageUnit
+    coordMode*: CoordinateMode
     prev: GState
 
 proc init*(c: var RGBColor; r,g,b: float64) =
@@ -233,33 +238,36 @@ proc newGState*(): GState =
   result.lineJoin    = MITER_JOIN
   result.miterLimit  = fromMM(10).toPT
   result.dash.init()
-  result.flatness     = fromMM(1.0).toPT
+  result.flatness    = fromMM(1.0).toPT
 
   result.charSpace   = 0
   result.wordSpace   = 0
   result.hScaling    = 100
-  result.textLeading   = 0
+  result.textLeading = 0
   result.rendering_mode = TR_FILL
   result.textRise    = 0
 
   result.csStroke    = CS_DEVICE_RGB
-  result.csFill    = CS_DEVICE_RGB
+  result.csFill      = CS_DEVICE_RGB
   result.rgbFill     = black
   result.rgbStroke   = black
   result.cmykFill    = cmyk_black
   result.cmykStroke  = cmyk_black
   result.alphaFill   = 1.0
-  result.alphaStroke   = 1.0
+  result.alphaStroke = 1.0
   result.grayFill    = 0.0
   result.grayStroke  = 0.0
   result.blendMode   = BM_NORMAL
-  result.gradientFill  = nil
+  result.gradientFill= nil
   result.imageFill   = nil
 
-  result.font       = nil
+  result.font        = nil
   result.fontSize    = fromMM(10).toPT
-  result.writingMode   = WMODE_HORIZONTAL
-  result.prev       = nil
+  result.writingMode = WMODE_HORIZONTAL
+  result.coordMode   = TOP_DOWN
+  result.docUnit.setUnit(PGU_MM)
+
+  result.prev        = nil
 
 proc newGState*(gs: GState): GState =
   new(result)
@@ -269,8 +277,8 @@ proc newGState*(gs: GState): GState =
   result.lineCap     = gs.lineCap
   result.lineJoin    = gs.lineJoin
   result.miterLimit  = gs.miterLimit
-  result.dash         = gs.dash
-  result.flatness     = gs.flatness
+  result.dash        = gs.dash
+  result.flatness    = gs.flatness
 
   result.charSpace     = gs.charSpace
   result.wordSpace     = gs.wordSpace
@@ -293,10 +301,12 @@ proc newGState*(gs: GState): GState =
   result.gradientFill= gs.gradientFill
   result.imageFill   = gs.imageFill
 
-  result.font         = gs.font
+  result.font        = gs.font
   result.fontSize    = gs.fontSize
   result.writingMode = gs.writingMode
-  result.prev         = gs
+  result.coordMode   = gs.coordMode
+  result.docUnit     = gs.docUnit
+  result.prev        = gs
 
 proc freeGState*(gs: GState): GState =
   result = gs
