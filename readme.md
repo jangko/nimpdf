@@ -49,6 +49,7 @@ nimPDF implements the following features(see [demo.pdf](https://github.com/jangk
     - Radio
     - Push Button
     - List Box
+    - Check Box
 
 * **Coordinate Space**
   - top-down mode
