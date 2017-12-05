@@ -8,9 +8,9 @@
 
 import strutils, streams, sequtils, math, basic2d, algorithm, tables
 import image, wtf8, "subsetter/Font", gstate, path, fontmanager, unicode
-import objects, resources, encryptdict, encrypt, os, page, options
+import objects, resources, encryptdict, encrypt, os, page, options, widgets
 
-export encryptdict.DocInfo, encrypt.EncryptMode
+export encryptdict.DocInfo, encrypt.EncryptMode, widgets
 export path, gstate, image, fontmanager, page, options
 
 const
@@ -439,3 +439,21 @@ proc newAcroForm*(doc: PDF): AcroForm =
 
 proc textField*(doc: PDF, rect: Rectangle, src: Page): Annot =
   result = doc.state.newTextField(rect, src)
+
+proc newTextField*(doc: PDF, x,y,w,h: float64): TextField =
+  result = newTextField(doc.state, x, y, w, h)
+  
+proc newCheckBox*(doc: PDF, x,y,w,h: float64): CheckBox =
+  result = newCheckBox(doc.state, x, y, w, h)
+
+proc newRadioButton*(doc: PDF, x,y,w,h: float64): RadioButton =
+  result = newRadioButton(doc.state, x, y, w, h)
+  
+proc newComboBox*(doc: PDF, x,y,w,h: float64): ComboBox =
+  result = newComboBox(doc.state, x, y, w, h)
+  
+proc newListBox*(doc: PDF, x,y,w,h: float64): ListBox =
+  result = newListBox(doc.state, x, y, w, h)
+  
+proc newPushButton*(doc: PDF, x,y,w,h: float64): PushButton =
+  result = newPushButton(doc.state, x, y, w, h)

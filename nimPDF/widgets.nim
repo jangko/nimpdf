@@ -196,6 +196,7 @@ type
 
   Widget = ref object of MapRoot
     kind: WidgetKind
+    state: DocState
     border: Border
     rect: Rectangle
     toolTip: string
@@ -218,30 +219,30 @@ type
     calculateScript: string
     format: FormatObject
 
-  TextField = ref object of Widget
+  TextField* = ref object of Widget
     align: TextFieldAlignment
     maxChars: int
     defaultValue: string
     flags: set[TextFieldFlags]
 
-  CheckBox = ref object of Widget
+  CheckBox* = ref object of Widget
     shape: string
     checkedByDefault: bool
 
-  RadioButton = ref object of Widget
+  RadioButton* = ref object of Widget
     shape: string
     checkedByDefault: bool
     allowUnchecked: bool
 
-  ComboBox = ref object of Widget
+  ComboBox* = ref object of Widget
     keyVal: Table[string, string]
     editable: bool
 
-  ListBox = ref object of Widget
+  ListBox* = ref object of Widget
     keyVal: Table[string, string]
     multipleSelect: bool
 
-  PushButton = ref object of Widget
+  PushButton* = ref object of Widget
     flags: set[PushButtonFlags]
     caption: string
 
@@ -289,10 +290,11 @@ method createObject(self: Border): PdfObject =
   of bsUnderline: dict.addName("S", "U")
   result = dict
 
-method createObject(self: Widget): PdfObject =
+proc createPDFObject(self: Widget): DictObj =
   discard
 
-proc init(self: Widget) =
+proc init(self: Widget, doc: DocState) =
+  self.state = doc
   self.toolTip = ""
   self.visibility = Visible
   self.rotation = 0.0
@@ -610,9 +612,9 @@ proc setCalculateScript*(self: Widget, script: string) =
   self.calculateScript = script
 
 #----------------------TEXT FIELD
-proc newTextField*(x,y,w,h: float64): TextField =
+proc newTextField*(doc: DocState, x,y,w,h: float64): TextField =
   new(result)
-  result.init()
+  result.init(doc)
   result.rect = initRect(x,y,w,h)
   result.kind = wkTextField
   result.align = tfaLeft
@@ -641,10 +643,13 @@ proc removeFlag*(self: TextField, flag: TextFieldFlags) =
 proc removeFlags*(self: TextField, flags: set[TextFieldFlags]) =
   self.flags.excl flags
 
+method createObject(self: TextField): PdfObject =
+  discard
+
 #----------------------CHECK BOX
-proc newCheckBox*(x,y,w,h: float64): CheckBox =
+proc newCheckBox*(doc: DocState, x,y,w,h: float64): CheckBox =
   new(result)
-  result.init()
+  result.init(doc)
   result.rect = initRect(x,y,w,h)
   result.kind = wkCheckBox
   result.shape = "\x35"
@@ -656,10 +661,13 @@ proc setShape*(self: CheckBox, val: string) =
 proc setCheckedByDefault*(self: CheckBox, val: bool) =
   self.checkedByDefault = val
 
+method createObject(self: CheckBox): PdfObject =
+  discard
+
 #----------------------RADIO BUTTON
-proc newRadioButton*(x,y,w,h: float64): RadioButton =
+proc newRadioButton*(doc: DocState, x,y,w,h: float64): RadioButton =
   new(result)
-  result.init()
+  result.init(doc)
   result.rect = initRect(x,y,w,h)
   result.kind = wkRadioButton
   result.shape = "\6C"
@@ -675,10 +683,13 @@ proc setCheckedByDefault*(self: RadioButton, val: bool) =
 proc setAllowUnchecked*(self: RadioButton, val: bool) =
   self.allowUnchecked = val
 
+method createObject(self: RadioButton): PdfObject =
+  discard
+
 #---------------------COMBO BOX
-proc newComboBox*(x,y,w,h: float64): ComboBox =
+proc newComboBox*(doc: DocState, x,y,w,h: float64): ComboBox =
   new(result)
-  result.init()
+  result.init(doc)
   result.rect = initRect(x,y,w,h)
   result.kind = wkComboBox
   result.editable = false
@@ -690,10 +701,13 @@ proc addKeyVal*(self: ComboBox, key, val: string) =
 proc setEditable*(self: ComboBox, val: bool) =
   self.editable = val
 
+method createObject(self: ComboBox): PdfObject =
+  discard
+
 #---------------------LIST BOX
-proc newListBox*(x,y,w,h: float64): ListBox =
+proc newListBox*(doc: DocState, x,y,w,h: float64): ListBox =
   new(result)
-  result.init()
+  result.init(doc)
   result.rect = initRect(x,y,w,h)
   result.kind = wkListBox
   result.multipleSelect = false
@@ -705,10 +719,13 @@ proc addKeyVal*(self: ListBox, key, val: string) =
 proc setMultipleSelect*(self: ListBox, val: bool) =
   self.multipleSelect = val
 
+method createObject(self: ListBox): PdfObject =
+  discard
+
 #---------------------PUSH BUTTON
-proc newPushButton*(x,y,w,h: float64): PushButton =
+proc newPushButton*(doc: DocState, x,y,w,h: float64): PushButton =
   new(result)
-  result.init()
+  result.init(doc)
   result.rect = initRect(x,y,w,h)
   result.kind = wkPushButton
   result.caption = ""
@@ -728,3 +745,6 @@ proc removeFlag*(self: PushButton, flag: PushButtonFlags) =
 
 proc removeFlags*(self: PushButton, flags: set[PushButtonFlags]) =
   self.flags.excl flags
+
+method createObject(self: PushButton): PdfObject =
+  discard
