@@ -1,4 +1,4 @@
-import objects, fontmanager, gstate
+import objects, fontmanager, gstate, page, tables
 
 const
   FIELD_TYPE_BUTTON = "Btn"
@@ -6,8 +6,6 @@ const
   FIELD_TYPE_COMBO = "Ch"
 
 type
-  MapRoot = ref object of RootObj
-
   AnnotFlags = enum
     afInvisible = 1
     afHidden = 2
@@ -21,66 +19,33 @@ type
     afLockedContents = 10
 
   WidgetKind = enum
-    wkButton
     wkTextField
+    wkCheckBox
+    wkRadioButton
     wkComboBox
     wkListBox
-    wkRadio
-    wkCheckBox
+    wkPushButton
 
-  BorderStyle = enum
+  BorderStyle* = enum
     bsSolid
     bsDashed
     bsBeveled
     bsInset
     bsUnderline
 
-  Border = ref object of MapRoot
-    style: BorderStyle
-    width: int
-    dashPattern: seq[int]
-
-  Visibility = enum
+  Visibility* = enum
     Visible
     Hidden
     VisibleNotPrintable
     HiddenButPrintable
 
-  Widget = ref object of MapRoot
-    kind: WidgetKind
-    border: Border
-
- #  dict: dictObj
- #  appearanceStream: proxyObj
- #  appearanceState: string
- #  bordeStyle: dictObj
- #  name: string
- #  value: string
- #  opt: arrayObj
- #  kind: nameObj
- #  defaultAppearance: string
- #  parent: proxyObj
- #  fieldType: nameObj
- #  subType: nameObj
- #  defaultValue: string
- #  rect: arrayObj
- #  page: proxyObj
- #  annotationFlags: ANNOT_FLAGS
-
-  TextField = ref object of Widget
-  CheckBox = ref object of Widget
-  RadioButton = ref object of Widget
-  ComboBox = ref object of Widget
-  ListBox = ref object of Widget
-  PushButton = ref object of Widget
-
-  ButtonFlags = enum
+  ButtonFlags* = enum
     bfNoToggleToOff = 15
     bfRadio = 16
     bfPushButton = 17
     bfRadiosInUnison = 26
 
-  TextFieldFlags = enum
+  TextFieldFlags* = enum
     tfMultiline = 13
     tfPassWord = 14
     tfFileSelect = 21
@@ -88,6 +53,11 @@ type
     tfDoNoScroll = 24
     tfComb = 25
     tfRichText = 26
+
+  TextFieldAlignment* = enum
+    tfaLeft
+    tfaCenter
+    tfaRight
 
   ComboBoxFlags = enum
     cfCombo = 18
@@ -97,19 +67,213 @@ type
     cfDoNotSpellCheck = 23
     cfCommitOnSelChange = 27
 
+  FormActionTrigger* = enum
+    MouseUp
+    MouseDown
+    MouseEnter
+    MouseExit
+    GetFocus
+    LostFocus
+
+  FormSubmitFormat* = enum
+    EmailFormData
+    PDF_Format
+    HTML_Format
+    XFDF_Format
+
+  NamedAction* = enum
+    naFirstPage
+    naNextPage
+    naPrevPage
+    naLastPage
+    naPrintDialog
+
+  SepStyle* = enum
+    ssCommaDot   # 1,234.56
+    ssDotOnly    # 1234.56
+    ssDotComma   # 1.234,56
+    ssCommaOnly  # 1234,56
+
+  NegStyle* = enum
+    nsDash       # '-'
+    nsRedText
+    nsParenBlack
+    nsParenRed
+
+  PushButtonFlags* = enum
+    pbfCaptionOnly
+    pbfIconOnly
+    pbfCaptionBelowIcon
+    pbfCaptionAboveIcon
+    pbfCaptionRightToTheIcon
+    pbfCaptionLeftToTheIcon
+    pbfCaptionOverlaidIcon
+
+  ColorType = enum
+    ColorRGB
+    ColorCMYK
+
+  FormActionKind = enum
+    fakOpenWebLink
+    fakResetForm
+    fakSubmitForm
+    fakEmailEntirePDF
+    fakRunJS
+    fakNamedAction
+    fakGotoLocalPage
+    fakGotoAnotherPDF
+    fakLaunchApp
+
+  FormAction = ref object
+    trigger: FormActionTrigger
+    case kind: FormActionKind
+    of fakOpenWebLink:
+      url: string
+    of fakResetForm:
+      discard
+    of fakSubmitForm:
+      format: FormSubmitFormat
+      uri: string
+    of fakEmailEntirePDF:
+      to, cc, bcc, title, body: string
+    of fakRunJS:
+      script: string
+    of fakNamedAction:
+      namedAction: NamedAction
+    of fakGotoLocalPage:
+      pageNo: int
+      x,y,zoom: float64
+    of fakGotoAnotherPDF:
+      destinationPage: int
+      path: string
+    of fakLaunchApp:
+      app, params, operation, defaultDir: string
+
+  MapRoot = ref object of RootObj
+
+  Border = ref object of MapRoot
+    style: BorderStyle
+    width: int
+    dashPattern: seq[int]
+    colorRGB: RGBColor
+    colorCMYK: CMYKColor
+    colorType: ColorType
+
+  SpecialFormat = enum
+    sfZipCode
+    sfZipCode4
+    sfPhoneNumber
+    sfSSN
+    sfMask
+
+  FormatKind = enum
+    FormatNone
+    FormatNumber
+    FormatCurrency
+    FormatPercent
+    FormatDate
+    FormatTime
+    FormatSpecial
+    FormatCustom
+
+  FormatObject = ref object
+    case kind: FormatKind
+    of FormatNone: discard
+    of FormatNumber, FormatPercent:
+      decimalNumber: int
+      sepStyle: SepStyle
+      negStyle: NegStyle
+    of FormatCurrency:
+      strCurrency: string
+      currencyPrepend: bool
+    of FormatDate, FormatTime:
+      strFmt: string
+    of FormatSpecial:
+      style: SpecialFormat
+      mask: string
+    of FormatCustom:
+      JSfmt, keyStroke: string
+
+  Widget = ref object of MapRoot
+    kind: WidgetKind
+    border: Border
+    rect: Rectangle
+    toolTip: string
+    visibility: Visibility
+    rotation: float64
+    readOnly: bool
+    required: bool
+    fontFamily: string
+    fontStyle: FontStyles
+    fontSize: float64
+    fontEncoding: EncodingType
+    fontColorRGB: RGBColor
+    fontColorCMYK: CMYKColor
+    fontColorType: ColorType
+    fillColorRGB: RGBColor
+    fillColorCMYK: CMYKColor
+    fillColorType: ColorType
+    actions: seq[FormAction]
+    validateScript: string
+    calculateScript: string
+    format: FormatObject
+
+  TextField = ref object of Widget
+    align: TextFieldAlignment
+    maxChars: int
+    defaultValue: string
+    flags: set[TextFieldFlags]
+
+  CheckBox = ref object of Widget
+    shape: string
+    checkedByDefault: bool
+
+  RadioButton = ref object of Widget
+    shape: string
+    checkedByDefault: bool
+    allowUnchecked: bool
+
+  ComboBox = ref object of Widget
+    keyVal: Table[string, string]
+    editable: bool
+
+  ListBox = ref object of Widget
+    keyVal: Table[string, string]
+    multipleSelect: bool
+
+  PushButton = ref object of Widget
+    flags: set[PushButtonFlags]
+    caption: string
+
 method createObject(self: MapRoot): PdfObject {.base.} = discard
 
-proc setWidth*(self: Border, w: int) =
+proc newBorder(): Border =
+  new(result)
+  result.style = bsSolid
+  result.width = 1
+  result.dashPattern = nil
+  result.colorRGB = initRGB(0,0,0)
+  result.colorType = ColorRGB
+
+proc setWidth(self: Border, w: int) =
   self.width = w
 
-proc setStyle*(self: Border, s: BorderStyle) =
+proc setStyle(self: Border, s: BorderStyle) =
   self.style = s
   if s == bsDashed:
     self.dashPattern = @[1, 0]
 
-proc setDash*(self: Border, dash: openArray[int]) =
+proc setDash(self: Border, dash: openArray[int]) =
   self.style = bsDashed
   self.dashPattern = @dash
+
+proc setColor(self: Border, col: RGBColor) =
+  self.colorType = ColorRGB
+  self.colorRGB = col
+
+proc setColor(self: Border, col: CMYKColor) =
+  self.colorType = ColorCMYK
+  self.colorCMYK = col
 
 method createObject(self: Border): PdfObject =
   var dict = newDictObj()
@@ -128,140 +292,215 @@ method createObject(self: Border): PdfObject =
 method createObject(self: Widget): PdfObject =
   discard
 
+proc init(self: Widget) =
+  self.toolTip = ""
+  self.visibility = Visible
+  self.rotation = 0.0
+  self.readOnly = false
+  self.required = true
+  self.fontFamily = "Helvetica"
+  self.fontStyle = {FS_REGULAR}
+  self.fontSize = 10.0
+  self.fontEncoding = ENC_STANDARD
+  self.fontColorType = ColorRGB
+  self.fontColorRGB = initRGB(0, 0, 0)
+  self.fillColorType = ColorRGB
+  self.fillColorRGB = initRGB(0, 0, 0)
+  self.actions = nil
+  self.validateScript = nil
+  self.calculateScript = nil
+  self.format = nil
 
 proc setToolTip*(self: Widget, toolTip: string) =
-  discard
+  self.toolTip = toolTip
 
 proc setVisibility*(self: Widget, val: Visibility) =
-  discard
+  self.visibility = val
 
 proc setRotation*(self: Widget, angle: float64) =
-  discard
+  self.rotation = angle
 
 proc setReadOnly*(self: Widget, readOnly: bool) =
-  discard
+  self.readOnly = readOnly
 
 proc setRequired*(self: Widget, required: bool) =
-  discard
+  self.required = required
 
-proc setFont*(self: Widget, family: string, style: FontStyles, size: float64, enc: EncodingType = ENC_STANDARD) =
-  discard
+proc setFont*(self: Widget, family: string) =
+  self.fontFamily = family
+
+proc setFontStyle*(self: Widget, style: FontStyles) =
+  self.fontStyle = style
+
+proc setFontSize*(self: Widget, size: float64) =
+  self.fontSize = size
+
+proc setFontEncoding(self: Widget, enc: EncodingType) =
+  self.fontEncoding = enc
 
 proc setFontColor*(self: Widget, r,g,b: float64) =
-  discard
+  self.fontColorType = ColorRGB
+  self.fontColorRGB = initRGB(r,g,b)
 
 proc setFontColor*(self: Widget, c,m,y,k: float64) =
-  discard
+  self.fontColorType = ColorCMYK
+  self.fontColorCMYK = initCMYK(c,m,y,k)
 
 proc setFontColor*(self: Widget, col: RGBColor) =
-  discard
+  self.fontColorType = ColorRGB
+  self.fontColorRGB = col
 
 proc setFontColor*(self: Widget, col: CMYKColor) =
-  discard
+  self.fontColorType = ColorCMYK
+  self.fontColorCMYK = col
 
 proc setFillColor*(self: Widget, r,g,b: float64) =
-  discard
+  self.fillColorType = ColorRGB
+  self.fillColorRGB = initRGB(r,g,b)
 
 proc setFillColor*(self: Widget, c,m,y,k: float64) =
-  discard
+  self.fillColorType = ColorCMYK
+  self.fillColorCMYK = initCMYK(c,m,y,k)
 
 proc setFillColor*(self: Widget, col: RGBColor) =
-  discard
+  self.fillColorType = ColorRGB
+  self.fillColorRGB = col
 
 proc setFillColor*(self: Widget, col: CMYKColor) =
-  discard
+  self.fillColorType = ColorCMYK
+  self.fillColorCMYK = col
 
 proc setBorderColor*(self: Widget, r,g,b: float64) =
-  discard
+  if self.border.isNil: self.border = newBorder()
+  self.border.setColor(initRGB(r,g,b))
 
 proc setBorderColor*(self: Widget, c,m,y,k: float64) =
-  discard
+  if self.border.isNil: self.border = newBorder()
+  self.border.setColor(initCMYK(c,m,y,k))
 
 proc setBorderColor*(self: Widget, col: RGBColor) =
-  discard
+  if self.border.isNil: self.border = newBorder()
+  self.border.setColor(col)
 
 proc setBorderColor*(self: Widget, col: CMYKColor) =
-  discard
+  if self.border.isNil: self.border = newBorder()
+  self.border.setColor(col)
 
-proc setBorderWidth*(self: Widget, w: float64) =
-  discard
+proc setBorderWidth*(self: Widget, w: int) =
+  if self.border.isNil: self.border = newBorder()
+  self.border.setWidth(w)
 
 proc setBorderStyle*(self: Widget, style: BorderStyle) =
-  discard
+  if self.border.isNil: self.border = newBorder()
+  self.border.setStyle(style)
 
 proc setBorderDash*(self: Widget, dash: openArray[int]) =
-  discard
-
-type
-  FormActionTrigger = enum
-    MouseUp
-    MouseDown
-    MouseEnter
-    MouseExit
-    GetFocus
-    LostFocus
-
-  FormSubmitFormat = enum
-    EmailFormData
-    PDF_Format
-    HTML_Format
-    XFDF_Format
-
-  NamedAction = enum
-    naFirstPage
-    naNextPage
-    naPrevPage
-    naLastPage
-    naPrintDialog
+  if self.border.isNil: self.border = newBorder()
+  self.border.setDash(dash)
 
 proc addActionOpenWebLink*(self: Widget, trigger: FormActionTrigger, url: string) =
-  discard
+  if self.actions.isNil: self.actions = @[]
+  var action = new(FormAction)
+  action.trigger = trigger
+  action.kind = fakOpenWebLink
+  action.url = url
+  self.actions.add action
 
 proc addActionResetForm*(self: Widget, trigger: FormActionTrigger) =
-  discard
+  if self.actions.isNil: self.actions = @[]
+  var action = new(FormAction)
+  action.trigger = trigger
+  action.kind = fakResetForm
+  self.actions.add action
 
-proc addActionSubmitForm*(self: Widget, trigger: FormActionTrigger, format: FormSubmitFormat, url: string) =
-  discard
+proc addActionSubmitForm*(self: Widget, trigger: FormActionTrigger, format: FormSubmitFormat, uri: string) =
+  if self.actions.isNil: self.actions = @[]
+  var action = new(FormAction)
+  action.trigger = trigger
+  action.kind = fakSubmitForm
+  action.uri = uri
+  self.actions.add action
 
 proc addActionEmailEntirePDF*(self: Widget, trigger: FormActionTrigger; to, cc, bcc, title, body: string) =
-  discard
+  if self.actions.isNil: self.actions = @[]
+  var action = new(FormAction)
+  action.trigger = trigger
+  action.kind = fakEmailEntirePDF
+  action.to = to
+  action.cc = cc
+  action.bcc = bcc
+  action.title = title
+  action.body = body
+  self.actions.add action
 
 proc addActionRunJS*(self: Widget, trigger: FormActionTrigger, script: string) =
-  discard
+  if self.actions.isNil: self.actions = @[]
+  var action = new(FormAction)
+  action.trigger = trigger
+  action.kind = fakRunJS
+  action.script = script
+  self.actions.add action
 
 proc addActionNamed*(self: Widget, trigger: FormActionTrigger, name: NamedAction) =
-  discard
+  if self.actions.isNil: self.actions = @[]
+  var action = new(FormAction)
+  action.trigger = trigger
+  action.kind = fakNamedAction
+  action.namedAction = name
+  self.actions.add action
 
 proc addActionGotoLocalPage*(self: Widget, trigger: FormActionTrigger, pageNo: int, x, y, zoom: float64) =
-  discard
+  if self.actions.isNil: self.actions = @[]
+  var action = new(FormAction)
+  action.trigger = trigger
+  action.kind = fakGotoLocalPage
+  action.pageNo = pageNo
+  action.x = x
+  action.y = y
+  action.zoom = zoom
+  self.actions.add action
 
 proc addActionGotoAnotherPDF*(self: Widget, trigger: FormActionTrigger, pageNo: int, path: string) =
-  discard
+  if self.actions.isNil: self.actions = @[]
+  var action = new(FormAction)
+  action.trigger = trigger
+  action.kind = fakGotoAnotherPDF
+  action.destinationPage = pageNo
+  action.path = path
+  self.actions.add action
 
 proc addActionLaunchApp*(self: Widget, trigger: FormActionTrigger; app, params, operation, defaultDir: string) =
-  discard
-
-type
-  SepStyle = enum
-    ssCommaDot   # 1,234.56
-    ssDotOnly    # 1234.56
-    ssDotComma   # 1.234,56
-    ssCommaOnly  # 1234,56
-
-  NegStyle = enum
-    nsDash       # '-'
-    nsRedText
-    nsParenBlack
-    nsParenRed
+  if self.actions.isNil: self.actions = @[]
+  var action = new(FormAction)
+  action.trigger = trigger
+  action.kind = fakLaunchApp
+  action.app = app
+  action.params = params
+  action.operation = operation
+  action.defaultDir = defaultDir
+  self.actions.add action
 
 proc formatNumber*(self: Widget, decimalNumber: int, sepStyle: SepStyle, negStyle: NegStyle) =
-  discard
+  var fmt = new(FormatObject)
+  fmt.kind = FormatNumber
+  fmt.decimalNumber = decimalNumber
+  fmt.sepStyle = sepStyle
+  fmt.negStyle = negStyle
+  self.format = fmt
 
 proc formatCurrency*(self: Widget, strCurrency: string, currencyPrepend: bool) =
-  discard
+  var fmt = new(FormatObject)
+  fmt.kind = FormatCurrency
+  fmt.strCurrency = strCurrency
+  fmt.currencyPrepend = currencyPrepend
+  self.format = fmt
 
 proc formatPercent*(self: Widget, decimalNumber: int, sepStyle: SepStyle) =
-  discard
+  var fmt = new(FormatObject)
+  fmt.kind = FormatPercent
+  fmt.decimalNumber = decimalNumber
+  fmt.sepStyle = sepStyle
+  self.format = fmt
 
 #[
 m/d
@@ -291,7 +530,10 @@ m/d/yyyy HH MM
 ]#
 
 proc formatDate*(self: Widget, strFmt: string) =
-  discard
+  var fmt = new(FormatObject)
+  fmt.kind = FormatDate
+  fmt.strFmt = strFmt
+  self.format = fmt
 
 #[
 HH:MM
@@ -301,21 +543,24 @@ h:MM:ss tt
 ]#
 
 proc formatTime*(self: Widget, strFmt: string) =
-  discard
-
-type
-  SpecialFormat = enum
-    sfZipCode
-    sfZipCode4
-    sfPhoneNumber
-    sfSSN
-    sfMask
+  var fmt = new(FormatObject)
+  fmt.kind = FormatTime
+  fmt.strFmt = strFmt
+  self.format = fmt
 
 proc formatSpecial*(self: Widget, style: SpecialFormat, mask: string = nil) =
-  discard
+  var fmt = new(FormatObject)
+  fmt.kind = FormatSpecial
+  fmt.style = style
+  fmt.mask = mask
+  self.format = fmt
 
 proc formatCustom*(self: Widget, JSfmt, keyStroke: string) =
-  discard
+  var fmt = new(FormatObject)
+  fmt.kind = FormatCustom
+  fmt.JSfmt = JSfmt
+  fmt.keyStroke = keyStroke
+  self.format = fmt
 
 #[
 // 0 <= N <= 100
@@ -337,7 +582,7 @@ if(event.value >100)
 ]#
 
 proc setValidateScript*(self: Widget, script: string) =
-  discard
+  self.validateScript = script
 
 #[
 //Please add and update the field names
@@ -362,64 +607,124 @@ this.getField( "Text3" ).value = 10 * a - b /10;
 ]#
 
 proc setCalculateScript*(self: Widget, script: string) =
-  discard
+  self.calculateScript = script
 
-type
-  TextFieldAlignment = enum
-    tfaLeft
-    tfaCenter
-    tfaRight
+#----------------------TEXT FIELD
+proc newTextField*(x,y,w,h: float64): TextField =
+  new(result)
+  result.init()
+  result.rect = initRect(x,y,w,h)
+  result.kind = wkTextField
+  result.align = tfaLeft
+  result.maxChars = 0
+  result.defaultValue = ""
+  result.flags = {}
 
 proc setAlignment*(self: TextField, align: TextFieldAlignment) =
-  discard
+  self.align = align
 
 proc setMaxChars*(self: TextField, maxChars: int) =
-  discard
+  self.maxChars = maxChars
 
 proc setDefaultValue*(self: TextField, val: string) =
-  discard
+  self.defaultValue = val
 
-proc setFlags*(self: TextField, flags: TextFieldFlags) =
-  discard
+proc setFlag*(self: TextField, flag: TextFieldFlags) =
+  self.flags.incl flag
+
+proc setFlags*(self: TextField, flags: set[TextFieldFlags]) =
+  self.flags.incl flags
+
+proc removeFlag*(self: TextField, flag: TextFieldFlags) =
+  self.flags.excl flag
+
+proc removeFlags*(self: TextField, flags: set[TextFieldFlags]) =
+  self.flags.excl flags
+
+#----------------------CHECK BOX
+proc newCheckBox*(x,y,w,h: float64): CheckBox =
+  new(result)
+  result.init()
+  result.rect = initRect(x,y,w,h)
+  result.kind = wkCheckBox
+  result.shape = "\x35"
+  result.checkedByDefault = false
 
 proc setShape*(self: CheckBox, val: string) =
-  discard
-
-proc setExportValue*(self: CheckBox, val: string) =
-  discard
+  self.shape = val
 
 proc setCheckedByDefault*(self: CheckBox, val: bool) =
-  discard
+  self.checkedByDefault = val
+
+#----------------------RADIO BUTTON
+proc newRadioButton*(x,y,w,h: float64): RadioButton =
+  new(result)
+  result.init()
+  result.rect = initRect(x,y,w,h)
+  result.kind = wkRadioButton
+  result.shape = "\6C"
+  result.checkedByDefault = false
+  result.allowUnchecked = false
 
 proc setShape*(self: RadioButton, val: string) =
-  discard
-
-proc setExportValue*(self: RadioButton, val: string) =
-  discard
+  self.shape = val
 
 proc setCheckedByDefault*(self: RadioButton, val: bool) =
-  discard
+  self.checkedByDefault = val
 
 proc setAllowUnchecked*(self: RadioButton, val: bool) =
-  discard
+  self.allowUnchecked = val
+
+#---------------------COMBO BOX
+proc newComboBox*(x,y,w,h: float64): ComboBox =
+  new(result)
+  result.init()
+  result.rect = initRect(x,y,w,h)
+  result.kind = wkComboBox
+  result.editable = false
+  result.keyVal = initTable[string, string]()
 
 proc addKeyVal*(self: ComboBox, key, val: string) =
-  discard
+  self.keyVal[key] = val
 
 proc setEditable*(self: ComboBox, val: bool) =
-  discard
+  self.editable = val
 
-proc setDefaultExportValue*(self: ComboBox, val: string) =
-  discard
+#---------------------LIST BOX
+proc newListBox*(x,y,w,h: float64): ListBox =
+  new(result)
+  result.init()
+  result.rect = initRect(x,y,w,h)
+  result.kind = wkListBox
+  result.multipleSelect = false
+  result.keyVal = initTable[string, string]()
 
 proc addKeyVal*(self: ListBox, key, val: string) =
-  discard
+  self.keyVal[key] = val
 
-proc setMultipleSelect*(self: ComboBox, val: bool) =
-  discard
+proc setMultipleSelect*(self: ListBox, val: bool) =
+  self.multipleSelect = val
 
-proc setDefaultExportValue*(self: ListBox, val: string) =
-  discard
+#---------------------PUSH BUTTON
+proc newPushButton*(x,y,w,h: float64): PushButton =
+  new(result)
+  result.init()
+  result.rect = initRect(x,y,w,h)
+  result.kind = wkPushButton
+  result.caption = ""
+  result.flags = {}
 
 proc setCaption*(self: PushButton, val: string) =
-  discard
+  self.caption = val
+
+proc setFlag*(self: PushButton, flag: PushButtonFlags) =
+  self.flags.incl flag
+
+proc setFlags*(self: PushButton, flags: set[PushButtonFlags]) =
+  self.flags.incl flags
+
+proc removeFlag*(self: PushButton, flag: PushButtonFlags) =
+  self.flags.excl flag
+
+proc removeFlags*(self: PushButton, flags: set[PushButtonFlags]) =
+  self.flags.excl flags
