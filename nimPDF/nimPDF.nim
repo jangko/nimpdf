@@ -440,20 +440,32 @@ proc newAcroForm*(doc: PDF): AcroForm =
 proc textField*(doc: PDF, rect: Rectangle, src: Page): Annot =
   result = doc.state.newTextField(rect, src)
 
-proc newTextField*(doc: PDF, x,y,w,h: float64): TextField =
-  result = newTextField(doc.state, x, y, w, h)
-  
-proc newCheckBox*(doc: PDF, x,y,w,h: float64): CheckBox =
-  result = newCheckBox(doc.state, x, y, w, h)
+proc newTextField*(doc: PDF, x,y,w,h: float64, id: string): TextField =
+  assert(doc.curPage != nil)
+  result = newTextField(doc.state, x, y, w, h, id)
+  doc.curPage.addWidget result
 
-proc newRadioButton*(doc: PDF, x,y,w,h: float64): RadioButton =
-  result = newRadioButton(doc.state, x, y, w, h)
-  
-proc newComboBox*(doc: PDF, x,y,w,h: float64): ComboBox =
-  result = newComboBox(doc.state, x, y, w, h)
-  
-proc newListBox*(doc: PDF, x,y,w,h: float64): ListBox =
-  result = newListBox(doc.state, x, y, w, h)
-  
-proc newPushButton*(doc: PDF, x,y,w,h: float64): PushButton =
-  result = newPushButton(doc.state, x, y, w, h)
+proc newCheckBox*(doc: PDF, x,y,w,h: float64, id: string): CheckBox =
+  assert(doc.curPage != nil)
+  result = newCheckBox(doc.state, x, y, w, h, id)
+  doc.curPage.addWidget result
+
+proc newRadioButton*(doc: PDF, x,y,w,h: float64, id: string): RadioButton =
+  assert(doc.curPage != nil)
+  result = newRadioButton(doc.state, x, y, w, h, id)
+  doc.curPage.addWidget result
+
+proc newComboBox*(doc: PDF, x,y,w,h: float64, id: string): ComboBox =
+  assert(doc.curPage != nil)
+  result = newComboBox(doc.state, x, y, w, h, id)
+  doc.curPage.addWidget result
+
+proc newListBox*(doc: PDF, x,y,w,h: float64, id: string): ListBox =
+  assert(doc.curPage != nil)
+  result = newListBox(doc.state, x, y, w, h, id)
+  doc.curPage.addWidget result
+
+proc newPushButton*(doc: PDF, x,y,w,h: float64, id: string): PushButton =
+  assert(doc.curPage != nil)
+  result = newPushButton(doc.state, x, y, w, h, id)
+  doc.curPage.addWidget result

@@ -1,4 +1,4 @@
-import objects, fontmanager, gstate, page, tables
+import objects, fontmanager, gstate, page, tables, image
 
 const
   FIELD_TYPE_BUTTON = "Btn"
@@ -149,8 +149,6 @@ type
     of fakLaunchApp:
       app, params, operation, defaultDir: string
 
-  MapRoot = ref object of RootObj
-
   Border = ref object of MapRoot
     style: BorderStyle
     width: int
@@ -194,9 +192,17 @@ type
     of FormatCustom:
       JSfmt, keyStroke: string
 
+  HighLightMode* = enum
+    hmNone
+    hmInvert
+    hmOutline
+    hmPush
+    hmToggle
+
   Widget = ref object of MapRoot
     kind: WidgetKind
     state: DocState
+    id: string
     border: Border
     rect: Rectangle
     toolTip: string
@@ -218,6 +224,7 @@ type
     validateScript: string
     calculateScript: string
     format: FormatObject
+    highLightMode: HighLightMode
 
   TextField* = ref object of Widget
     align: TextFieldAlignment
@@ -242,9 +249,28 @@ type
     keyVal: Table[string, string]
     multipleSelect: bool
 
+  IconScaleMode* = enum
+    ismAlwaysScale
+    ismScaleIfBigger
+    ismScaleIfSmaller
+    ismNeverScale
+
+  IconScalingType* = enum
+    istAnamorphic
+    istProportional
+
   PushButton* = ref object of Widget
     flags: set[PushButtonFlags]
     caption: string
+    rollOverCaption: string
+    alternateCaption: string
+    icon: Image
+    rollOverIcon: Image
+    alternateIcon: Image
+    iconScaleMode: IconScaleMode
+    iconScalingType: IconScalingType
+    iconFitToBorder: bool
+    iconLeftOver: array[2, float64]
 
 method createObject(self: MapRoot): PdfObject {.base.} = discard
 
@@ -291,10 +317,12 @@ method createObject(self: Border): PdfObject =
   result = dict
 
 proc createPDFObject(self: Widget): DictObj =
-  discard
+  var dict = newDictObj()
+  result = dict
 
-proc init(self: Widget, doc: DocState) =
+proc init(self: Widget, doc: DocState, id: string) =
   self.state = doc
+  self.id = id
   self.toolTip = ""
   self.visibility = Visible
   self.rotation = 0.0
@@ -312,6 +340,7 @@ proc init(self: Widget, doc: DocState) =
   self.validateScript = nil
   self.calculateScript = nil
   self.format = nil
+  self.highLightMode = hmNone
 
 proc setToolTip*(self: Widget, toolTip: string) =
   self.toolTip = toolTip
@@ -319,6 +348,7 @@ proc setToolTip*(self: Widget, toolTip: string) =
 proc setVisibility*(self: Widget, val: Visibility) =
   self.visibility = val
 
+# multiple of 90 degree
 proc setRotation*(self: Widget, angle: float64) =
   self.rotation = angle
 
@@ -611,16 +641,20 @@ this.getField( "Text3" ).value = 10 * a - b /10;
 proc setCalculateScript*(self: Widget, script: string) =
   self.calculateScript = script
 
+proc setHighLightMode*(self: Widget, mode: HighLightMode) =
+  self.highLightMode = mode
+
 #----------------------TEXT FIELD
-proc newTextField*(doc: DocState, x,y,w,h: float64): TextField =
+proc newTextField*(doc: DocState, x,y,w,h: float64, id: string): TextField =
   new(result)
-  result.init(doc)
+  result.init(doc, id)
   result.rect = initRect(x,y,w,h)
   result.kind = wkTextField
   result.align = tfaLeft
   result.maxChars = 0
   result.defaultValue = ""
   result.flags = {}
+  doc.addWidget(result)
 
 proc setAlignment*(self: TextField, align: TextFieldAlignment) =
   self.align = align
@@ -644,16 +678,18 @@ proc removeFlags*(self: TextField, flags: set[TextFieldFlags]) =
   self.flags.excl flags
 
 method createObject(self: TextField): PdfObject =
-  discard
+  var dict = self.createPDFObject()
+  result = dict
 
 #----------------------CHECK BOX
-proc newCheckBox*(doc: DocState, x,y,w,h: float64): CheckBox =
+proc newCheckBox*(doc: DocState, x,y,w,h: float64, id: string): CheckBox =
   new(result)
-  result.init(doc)
+  result.init(doc, id)
   result.rect = initRect(x,y,w,h)
   result.kind = wkCheckBox
   result.shape = "\x35"
   result.checkedByDefault = false
+  doc.addWidget(result)
 
 proc setShape*(self: CheckBox, val: string) =
   self.shape = val
@@ -662,17 +698,19 @@ proc setCheckedByDefault*(self: CheckBox, val: bool) =
   self.checkedByDefault = val
 
 method createObject(self: CheckBox): PdfObject =
-  discard
+  var dict = self.createPDFObject()
+  result = dict
 
 #----------------------RADIO BUTTON
-proc newRadioButton*(doc: DocState, x,y,w,h: float64): RadioButton =
+proc newRadioButton*(doc: DocState, x,y,w,h: float64, id: string): RadioButton =
   new(result)
-  result.init(doc)
+  result.init(doc, id)
   result.rect = initRect(x,y,w,h)
   result.kind = wkRadioButton
   result.shape = "\6C"
   result.checkedByDefault = false
   result.allowUnchecked = false
+  doc.addWidget(result)
 
 proc setShape*(self: RadioButton, val: string) =
   self.shape = val
@@ -684,16 +722,18 @@ proc setAllowUnchecked*(self: RadioButton, val: bool) =
   self.allowUnchecked = val
 
 method createObject(self: RadioButton): PdfObject =
-  discard
+  var dict = self.createPDFObject()
+  result = dict
 
 #---------------------COMBO BOX
-proc newComboBox*(doc: DocState, x,y,w,h: float64): ComboBox =
+proc newComboBox*(doc: DocState, x,y,w,h: float64, id: string): ComboBox =
   new(result)
-  result.init(doc)
+  result.init(doc, id)
   result.rect = initRect(x,y,w,h)
   result.kind = wkComboBox
   result.editable = false
   result.keyVal = initTable[string, string]()
+  doc.addWidget(result)
 
 proc addKeyVal*(self: ComboBox, key, val: string) =
   self.keyVal[key] = val
@@ -702,16 +742,18 @@ proc setEditable*(self: ComboBox, val: bool) =
   self.editable = val
 
 method createObject(self: ComboBox): PdfObject =
-  discard
+  var dict = self.createPDFObject()
+  result = dict
 
 #---------------------LIST BOX
-proc newListBox*(doc: DocState, x,y,w,h: float64): ListBox =
+proc newListBox*(doc: DocState, x,y,w,h: float64, id: string): ListBox =
   new(result)
-  result.init(doc)
+  result.init(doc, id)
   result.rect = initRect(x,y,w,h)
   result.kind = wkListBox
   result.multipleSelect = false
   result.keyVal = initTable[string, string]()
+  doc.addWidget(result)
 
 proc addKeyVal*(self: ListBox, key, val: string) =
   self.keyVal[key] = val
@@ -720,19 +762,58 @@ proc setMultipleSelect*(self: ListBox, val: bool) =
   self.multipleSelect = val
 
 method createObject(self: ListBox): PdfObject =
-  discard
+  var dict = self.createPDFObject()
+  result = dict
 
 #---------------------PUSH BUTTON
-proc newPushButton*(doc: DocState, x,y,w,h: float64): PushButton =
+proc newPushButton*(doc: DocState, x,y,w,h: float64, id: string): PushButton =
   new(result)
-  result.init(doc)
+  result.init(doc, id)
   result.rect = initRect(x,y,w,h)
   result.kind = wkPushButton
   result.caption = ""
+  result.rollOverCaption = nil
+  result.alternateCaption = nil
   result.flags = {}
+  result.icon = nil
+  result.rollOverIcon = nil
+  result.alternateIcon = nil
+  result.iconScaleMode = ismAlwaysScale
+  result.iconScalingType = istProportional
+  result.iconFitToBorder = false
+  result.iconLeftOver = [0.5, 0.5]
+
+  doc.addWidget(result)
 
 proc setCaption*(self: PushButton, val: string) =
   self.caption = val
+
+proc setRollOverCaption*(self: PushButton, val: string) =
+  self.rollOverCaption = val
+
+proc setAlternateCaption*(self: PushButton, val: string) =
+  self.alternateCaption = val
+
+proc setIcon*(self: PushButton, img: Image) =
+  self.icon = img
+
+proc setRollOverIcon*(self: PushButton, img: Image) =
+  self.rollOverIcon = img
+
+proc setAlternateIcon*(self: PushButton, img: Image) =
+  self.alternateIcon = img
+
+proc setIconScaleMode*(self: PushButton, mode: IconScaleMode) =
+  self.iconScaleMode = mode
+
+proc setIconScalingType*(self: PushButton, mode = IconScalingType) =
+  self.iconScalingType = mode
+
+proc setIconFitBorder*(self: PushButton, mode: bool) =
+  self.iconFitToBorder = mode
+
+proc setIconLeftOver*(self: PushButton, left, bottom: float64) =
+  self.iconLeftOver = [left, bottom]
 
 proc setFlag*(self: PushButton, flag: PushButtonFlags) =
   self.flags.incl flag
@@ -747,4 +828,5 @@ proc removeFlags*(self: PushButton, flags: set[PushButtonFlags]) =
   self.flags.excl flags
 
 method createObject(self: PushButton): PdfObject =
-  discard
+  var dict = self.createPDFObject()
+  result = dict

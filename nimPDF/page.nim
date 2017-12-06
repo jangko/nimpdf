@@ -62,6 +62,9 @@ type
     encoding: EncodingType
     fields: seq[Annot]
 
+  MapRoot* = ref object of RootObj
+    dictObj*: DictObj
+    
   DocState* = ref object
     size: PageSize
     extgStates: seq[ExtgState]
@@ -80,6 +83,7 @@ type
     xref: Pdfxref
     encrypt: EncryptDict
     acroForm: AcroForm
+    widgets: seq[MapRoot]
 
   ContentRoot* = ref object of RootObj
     content: string
@@ -91,6 +95,7 @@ type
     size: PageSize
     annots: seq[Annot]
     page: DictObj
+    widgets: seq[MapRoot]
 
 proc escapeString(text: string): string =
   result = ""
@@ -371,6 +376,9 @@ proc putCatalog(doc: DocState, pages: seq[Page]) =
 
     trailer.addElement("Encrypt", doc.encrypt)
 
+proc addWidget*(doc: DocState, w: MapRoot) =
+  doc.widgets.add w
+
 proc writePDF*(doc: DocState, s: Stream, pages: seq[Page]) =
   doc.putCatalog(pages)
   s.write("%PDF-1.7\x0A")
@@ -401,6 +409,7 @@ proc newDocState*(opts: PDFOptions): DocState =
   result.xref = newPdfxref()
   result.setInfo(DI_PRODUCER, "nimPDF")
   result.setFontCount = 0
+  result.widgets = @[]
 
 proc getOpt*(doc: DocState): PDFOptions =
   result = doc.opts
@@ -589,6 +598,7 @@ proc newPage*(state: DocState, size: PageSize, orient = PGO_PORTRAIT): Page =
   result.size.height = size.height
   result.content = ""
   result.annots = @[]
+  result.widgets = @[]
   if orient == PGO_LANDSCAPE:
     result.size.swap()
   result.state = state
@@ -1190,6 +1200,9 @@ proc setGradientFill*(self: ContentRoot, grad: Gradient) =
   self.state.gState.csFill = CS_GRADIENT
   self.state.gState.gradientFill = grad
 
+proc addWidget*(page: Page, w: MapRoot) =
+  page.widgets.add w
+  
 proc newXYZDest*(page: Page, x,y,z: float64): Destination =
   new(result)
   result.style = DS_XYZ
