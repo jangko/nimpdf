@@ -64,7 +64,7 @@ type
 
   MapRoot* = ref object of RootObj
     dictObj*: DictObj
-    
+
   DocState* = ref object
     size: PageSize
     extgStates: seq[ExtgState]
@@ -112,7 +112,7 @@ proc escapeString(text: string): string =
       else: add(result, c)
     else: add(result, "\\" & toOctal(c))
 
-template f2s(a: typed): untyped =
+template f2s*(a: typed): untyped =
   formatFloat(a,ffDecimal,4)
 
 proc f2sn(a: float64): string =
@@ -411,6 +411,9 @@ proc newDocState*(opts: PDFOptions): DocState =
   result.setFontCount = 0
   result.widgets = @[]
 
+proc makeFont*(doc: DocState, family: string, style: FontStyles, enc: EncodingType = ENC_STANDARD): Font =
+  result = doc.fontMan.makeFont(family, style, enc)
+
 proc getOpt*(doc: DocState): PDFOptions =
   result = doc.opts
 
@@ -504,6 +507,9 @@ proc initRect*(x,y,w,h: float64): Rectangle =
   result.y = y
   result.w = w
   result.h = h
+
+proc newArray*(rc: Rectangle): ArrayObj =
+  result = newArray(rc.x, rc.y, rc.w, rc.h)
 
 proc newLinkAnnot*(doc: DocState, rect: Rectangle, src: Page, dest: Destination): Annot =
   new(result)
@@ -1202,7 +1208,7 @@ proc setGradientFill*(self: ContentRoot, grad: Gradient) =
 
 proc addWidget*(page: Page, w: MapRoot) =
   page.widgets.add w
-  
+
 proc newXYZDest*(page: Page, x,y,z: float64): Destination =
   new(result)
   result.style = DS_XYZ

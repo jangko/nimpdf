@@ -1,4 +1,4 @@
-import objects, fontmanager, gstate, page, tables, image
+import objects, fontmanager, gstate, page, tables, image, strutils
 
 const
   FIELD_TYPE_BUTTON = "Btn"
@@ -157,7 +157,7 @@ type
     colorCMYK: CMYKColor
     colorType: ColorType
 
-  SpecialFormat = enum
+  SpecialFormat* = enum
     sfZipCode
     sfZipCode4
     sfPhoneNumber
@@ -207,7 +207,7 @@ type
     rect: Rectangle
     toolTip: string
     visibility: Visibility
-    rotation: float64
+    rotation: int
     readOnly: bool
     required: bool
     fontFamily: string
@@ -316,31 +316,106 @@ method createObject(self: Border): PdfObject =
   of bsUnderline: dict.addName("S", "U")
   result = dict
 
+proc newArray(c: RGBColor): ArrayObj =
+  result = newArray(c.r, c.g, c.b)
+
+proc newArray(c: CMYKColor): ArrayObj =
+  result = newArray(c.c, c.m, c.y, c.k)
+
+proc newColorArray(colorType: ColorType, rgb: RGBColor, cmyk: CMYKColor): ArrayObj =
+  if colorType == ColorRGB: result = newArray(rgb)
+  else: result = newArray(cmyk)
+
+proc setBit[T: enum](x: var int, bit: T) =
+  x = x or (1 shr ord(bit))
+
 proc createPDFObject(self: Widget): DictObj =
+  const
+    hmSTR: array[HighLightMode, char] = ['N', 'I', 'O', 'P', 'T']
+
   var dict = newDictObj()
+  dict.addName("Type", "Annot")
+  dict.addName("Subtype", "Widget")
+  dict.addName("H", $hmSTR[self.highLightMode])
+  dict.addString("T", self.id)
+  dict.addString("TU", self.toolTip)
+
+  var annotFlags = 0
+
+  case self.visibility:
+  of Visible: annotFlags.setBit(afPrint)
+  of Hidden: annotFlags.setBit(afHidden)
+  of VisibleNotPrintable: discard
+  of HiddenButPrintable:
+    annotFlags.setBit(afPrint)
+    annotFlags.setBit(afHidden)
+
+  if self.readOnly:
+    annotFlags.setBit(afReadOnly)
+
+  dict.addNumber("F", annotFlags)
+
+  var mk = newDictObj()
+  let bg = newColorArray(self.fillColorType, self.fillColorRGB, self.fillColorCMYK)
+  mk.addElement("BG", bg)
+  mk.addNumber("R", self.rotation)
+  dict.addElement("MK", mk)
+
+  if self.border != nil:
+    let border = self.border
+    let bs = border.createObject()
+    let bc = newColorArray(border.colorType, border.colorRGB, border.colorCMYK)
+    dict.addElement("BS", bs)
+    mk.addElement("BC", bc)
+
+  var rc = newArray(self.rect)
+  dict.addElement("Rect", rc)
+
+  var font = self.state.makeFont(self.fontFamily, self.fontStyle, self.fontEncoding)
+  let fontID = $font.ID
+
+  if self.fontColorType == ColorRGB:
+    let c = self.fontColorRGB
+    dict.addString("DA", "/F$1 $2 Tf $3 $4 $5 rg" % [fontID, f2s(self.fontSize), f2s(c.r), f2s(c.g), f2s(c.b)])
+  else:
+    let c = self.fontColorCMYK
+    dict.addString("DA", "/F$1 $2 Tf $3 $4 $5 $6 k" % [fontID, f2s(self.fontSize), f2s(c.c), f2s(c.m), f2s(c.y), f2s(c.k)])
+
+  #var dr = newDictObj()
+  #var ft = newDictObj()
+  #ft.addElement("")
+  #dr.addElement("Font", ft)
+  #dict.addElement("DR", dr)
+
+  #DR
+  #AP
+  #P
+  #Parent
+
   result = dict
 
 proc init(self: Widget, doc: DocState, id: string) =
-  self.state = doc
-  self.id = id
-  self.toolTip = ""
-  self.visibility = Visible
-  self.rotation = 0.0
-  self.readOnly = false
-  self.required = true
-  self.fontFamily = "Helvetica"
-  self.fontStyle = {FS_REGULAR}
-  self.fontSize = 10.0
-  self.fontEncoding = ENC_STANDARD
-  self.fontColorType = ColorRGB
-  self.fontColorRGB = initRGB(0, 0, 0)
-  self.fillColorType = ColorRGB
-  self.fillColorRGB = initRGB(0, 0, 0)
-  self.actions = nil
-  self.validateScript = nil
-  self.calculateScript = nil
-  self.format = nil
-  self.highLightMode = hmNone
+  self.state = doc                      #
+  self.id = id                          # ok
+  self.border = nil                     # ok
+  self.toolTip = ""                     # ok
+  self.visibility = Visible             # ok
+  self.rotation = 0                     # ok
+  self.readOnly = false                 # ok
+  self.required = true                  #
+  self.fontFamily = "Helvetica"         # ok
+  self.fontStyle = {FS_REGULAR}         # ok
+  self.fontSize = 10.0                  # ok
+  self.fontEncoding = ENC_STANDARD      # ok
+  self.fontColorType = ColorRGB         # ok
+  self.fontColorRGB = initRGB(0, 0, 0)  # ok
+  self.fillColorType = ColorRGB         # ok
+  self.fillColorRGB = initRGB(0, 0, 0)  # ok
+  self.actions = nil                    #
+  self.validateScript = nil             #
+  self.calculateScript = nil            #
+  self.format = nil                     #
+  self.highLightMode = hmNone           # ok
 
 proc setToolTip*(self: Widget, toolTip: string) =
   self.toolTip = toolTip
@@ -349,7 +424,7 @@ proc setVisibility*(self: Widget, val: Visibility) =
   self.visibility = val
 
 # multiple of 90 degree
-proc setRotation*(self: Widget, angle: float64) =
+proc setRotation*(self: Widget, angle: int) =
   self.rotation = angle
 
 proc setReadOnly*(self: Widget, readOnly: bool) =
@@ -365,7 +440,7 @@ proc setFontStyle*(self: Widget, style: FontStyles) =
   self.fontStyle = style
 
 proc setFontSize*(self: Widget, size: float64) =
-  self.fontSize = size
+  self.fontSize = self.state.fromUser(size)
 
 proc setFontEncoding(self: Widget, enc: EncodingType) =
   self.fontEncoding = enc
