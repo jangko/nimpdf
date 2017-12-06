@@ -3,7 +3,7 @@ import objects, fontmanager, gstate, page, tables, image, strutils
 const
   FIELD_TYPE_BUTTON = "Btn"
   FIELD_TYPE_TEXT = "Tx"
-  FIELD_TYPE_COMBO = "Ch"
+  FIELD_TYPE_CHOICE = "Ch"
 
 type
   AnnotFlags = enum
@@ -141,10 +141,9 @@ type
     of fakNamedAction:
       namedAction: NamedAction
     of fakGotoLocalPage:
-      pageNo: int
-      x,y,zoom: float64
+      localDest: Destination
     of fakGotoAnotherPDF:
-      destinationPage: int
+      remoteDest: Destination
       path: string
     of fakLaunchApp:
       app, params, operation, defaultDir: string
@@ -199,6 +198,11 @@ type
     hmPush
     hmToggle
 
+  FieldFlags = enum
+    ffReadOnly = 1
+    ffRequired = 2
+    ffNoExport = 3
+
   Widget = ref object of MapRoot
     kind: WidgetKind
     state: DocState
@@ -208,8 +212,6 @@ type
     toolTip: string
     visibility: Visibility
     rotation: int
-    readOnly: bool
-    required: bool
     fontFamily: string
     fontStyle: FontStyles
     fontSize: float64
@@ -225,6 +227,7 @@ type
     calculateScript: string
     format: FormatObject
     highLightMode: HighLightMode
+    fieldFlags: int
 
   TextField* = ref object of Widget
     align: TextFieldAlignment
@@ -329,6 +332,9 @@ proc newColorArray(colorType: ColorType, rgb: RGBColor, cmyk: CMYKColor): ArrayO
 proc setBit[T: enum](x: var int, bit: T) =
   x = x or (1 shr ord(bit))
 
+proc removeBit[T: enum](x: var int, bit: T) =
+  x = x and (not (1 shr ord(bit)))
+
 proc createPDFObject(self: Widget): DictObj =
   const
     hmSTR: array[HighLightMode, char] = ['N', 'I', 'O', 'P', 'T']
@@ -349,9 +355,6 @@ proc createPDFObject(self: Widget): DictObj =
   of HiddenButPrintable:
     annotFlags.setBit(afPrint)
     annotFlags.setBit(afHidden)
-
-  if self.readOnly:
-    annotFlags.setBit(afReadOnly)
 
   dict.addNumber("F", annotFlags)
 
@@ -381,6 +384,10 @@ proc createPDFObject(self: Widget): DictObj =
     let c = self.fontColorCMYK
     dict.addString("DA", "/F$1 $2 Tf $3 $4 $5 $6 k" % [fontID, f2s(self.fontSize), f2s(c.c), f2s(c.m), f2s(c.y), f2s(c.k)])
 
+  if self.actions.isNil: self.actions = @[]
+
+
+
   #var dr = newDictObj()
   #var ft = newDictObj()
   #ft.addElement("")
@@ -401,8 +408,6 @@ proc init(self: Widget, doc: DocState, id: string) =
   self.toolTip = ""                     # ok
   self.visibility = Visible             # ok
   self.rotation = 0                     # ok
-  self.readOnly = false                 # ok
-  self.required = true                  #
   self.fontFamily = "Helvetica"         # ok
   self.fontStyle = {FS_REGULAR}         # ok
   self.fontSize = 10.0                  # ok
@@ -416,6 +421,7 @@ proc init(self: Widget, doc: DocState, id: string) =
   self.calculateScript = nil            #
   self.format = nil                     #
   self.highLightMode = hmNone           # ok
+  self.fieldFlags = 0                   #
 
 proc setToolTip*(self: Widget, toolTip: string) =
   self.toolTip = toolTip
@@ -427,11 +433,17 @@ proc setVisibility*(self: Widget, val: Visibility) =
 proc setRotation*(self: Widget, angle: int) =
   self.rotation = angle
 
-proc setReadOnly*(self: Widget, readOnly: bool) =
-  self.readOnly = readOnly
+proc setReadOnly*(self: Widget, val: bool) =
+  if val: self.fieldFlags.setBit(ffReadOnly)
+  else: self.fieldFlags.removeBit(ffReadOnly)
 
-proc setRequired*(self: Widget, required: bool) =
-  self.required = required
+proc setRequired*(self: Widget, val: bool) =
+  if val: self.fieldFlags.setBit(ffRequired)
+  else: self.fieldFlags.removeBit(ffRequired)
+
+proc setNoExport*(self: Widget, val: bool) =
+  if val: self.fieldFlags.setBit(ffNoExport)
+  else: self.fieldFlags.removeBit(ffNoExport)
 
 proc setFont*(self: Widget, family: string) =
   self.fontFamily = family
@@ -442,7 +454,7 @@ proc setFontStyle*(self: Widget, style: FontStyles) =
 proc setFontSize*(self: Widget, size: float64) =
   self.fontSize = self.state.fromUser(size)
 
-proc setFontEncoding(self: Widget, enc: EncodingType) =
+proc setFontEncoding*(self: Widget, enc: EncodingType) =
   self.fontEncoding = enc
 
 proc setFontColor*(self: Widget, r,g,b: float64) =
@@ -556,23 +568,20 @@ proc addActionNamed*(self: Widget, trigger: FormActionTrigger, name: NamedAction
   action.namedAction = name
   self.actions.add action
 
-proc addActionGotoLocalPage*(self: Widget, trigger: FormActionTrigger, pageNo: int, x, y, zoom: float64) =
+proc addActionGotoLocalPage*(self: Widget, trigger: FormActionTrigger, dest: Destination) =
   if self.actions.isNil: self.actions = @[]
   var action = new(FormAction)
   action.trigger = trigger
   action.kind = fakGotoLocalPage
-  action.pageNo = pageNo
-  action.x = x
-  action.y = y
-  action.zoom = zoom
+  action.localDest = dest
   self.actions.add action
 
-proc addActionGotoAnotherPDF*(self: Widget, trigger: FormActionTrigger, pageNo: int, path: string) =
+proc addActionGotoAnotherPDF*(self: Widget, trigger: FormActionTrigger, path: string, dest: Destination) =
   if self.actions.isNil: self.actions = @[]
   var action = new(FormAction)
   action.trigger = trigger
   action.kind = fakGotoAnotherPDF
-  action.destinationPage = pageNo
+  action.remoteDest = dest
   action.path = path
   self.actions.add action
 
@@ -754,6 +763,7 @@ proc removeFlags*(self: TextField, flags: set[TextFieldFlags]) =
 
 method createObject(self: TextField): PdfObject =
   var dict = self.createPDFObject()
+  dict.addName("FT", FIELD_TYPE_TEXT)
   result = dict
 
 #----------------------CHECK BOX
@@ -774,6 +784,7 @@ proc setCheckedByDefault*(self: CheckBox, val: bool) =
 
 method createObject(self: CheckBox): PdfObject =
   var dict = self.createPDFObject()
+  dict.addName("FT", FIELD_TYPE_BUTTON)
   result = dict
 
 #----------------------RADIO BUTTON
@@ -798,6 +809,7 @@ proc setAllowUnchecked*(self: RadioButton, val: bool) =
 
 method createObject(self: RadioButton): PdfObject =
   var dict = self.createPDFObject()
+  dict.addName("FT", FIELD_TYPE_BUTTON)
   result = dict
 
 #---------------------COMBO BOX
@@ -818,6 +830,7 @@ proc setEditable*(self: ComboBox, val: bool) =
 
 method createObject(self: ComboBox): PdfObject =
   var dict = self.createPDFObject()
+  dict.addName("FT", FIELD_TYPE_CHOICE)
   result = dict
 
 #---------------------LIST BOX
@@ -838,6 +851,7 @@ proc setMultipleSelect*(self: ListBox, val: bool) =
 
 method createObject(self: ListBox): PdfObject =
   var dict = self.createPDFObject()
+  dict.addName("FT", FIELD_TYPE_CHOICE)
   result = dict
 
 #---------------------PUSH BUTTON
@@ -904,4 +918,5 @@ proc removeFlags*(self: PushButton, flags: set[PushButtonFlags]) =
 
 method createObject(self: PushButton): PdfObject =
   var dict = self.createPDFObject()
+  dict.addName("FT", FIELD_TYPE_BUTTON)
   result = dict
