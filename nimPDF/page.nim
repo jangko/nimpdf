@@ -422,6 +422,9 @@ proc makeFont*(doc: DocState, family: string, style: FontStyles, enc: EncodingTy
 proc getOpt*(doc: DocState): PDFOptions =
   result = doc.opts
 
+proc getObjectById*(doc: DocState, objID: int): PdfObject =
+  result = doc.xref.getObjectById(objID)
+
 proc setLabel*(doc: DocState, style: LabelStyle, prefix: string, start, pageIndex: int) =
   var label: PageLabel
   label.pageIndex = pageIndex

@@ -39,7 +39,7 @@ type
     VisibleNotPrintable
     HiddenButPrintable
 
-  ButtonFlags* = enum
+  ButtonFlags = enum
     bfNoToggleToOff = 15
     bfRadio = 16
     bfPushButton = 17
@@ -104,14 +104,14 @@ type
     nsParenBlack
     nsParenRed
 
-  PushButtonFlags* = enum
-    pbfCaptionOnly
-    pbfIconOnly
-    pbfCaptionBelowIcon
-    pbfCaptionAboveIcon
-    pbfCaptionRightToTheIcon
-    pbfCaptionLeftToTheIcon
-    pbfCaptionOverlaidIcon
+  PushButtonLook* = enum
+    pblCaptionOnly
+    pblIconOnly
+    pblCaptionBelowIcon
+    pblCaptionAboveIcon
+    pblCaptionRightToTheIcon
+    pblCaptionLeftToTheIcon
+    pblCaptionOverlaidIcon
 
   ColorType = enum
     ColorRGB
@@ -288,10 +288,16 @@ type
   ComboBox* = ref object of Widget
     keyVal: Table[string, string]
     editable: bool
+    sortItem: bool
+    spellCheck: bool
+    commitOnSelChange: bool
 
   ListBox* = ref object of Widget
     keyVal: Table[string, string]
     multipleSelect: bool
+    sortItem: bool
+    spellCheck: bool
+    commitOnSelChange: bool
 
   IconScaleMode* = enum
     ismAlwaysScale
@@ -304,7 +310,7 @@ type
     istProportional
 
   PushButton* = ref object of Widget
-    flags: set[PushButtonFlags]
+    look: PushButtonLook
     caption: string
     rollOverCaption: string
     alternateCaption: string
@@ -578,16 +584,21 @@ method finalizeObject(self: Widget; page, parent, resourceDict: DictObj) =
         action.addElement("Win", dict)
 
   let ap = self.appearance
-  var apDict = ap.newDictStream()
-  apDict.addName("Type", "XObject")
-  apDict.addName("SubType", "Form")
-  apDict.addNumber("FormType", 1)
-  apDict.addElement("Resources", resourceDict)
+  var normalAP = ap.newDictStream()
+  normalAP.addName("Type", "XObject")
+  normalAP.addName("SubType", "Form")
+  normalAP.addNumber("FormType", 1)
+  normalAP.addElement("Resources", resourceDict)
   var r = newArray(self.rect)
-  apDict.addElement("BBox", r)
+  normalAP.addElement("BBox", r)
   var m = newArray(self.matrix.ax, self.matrix.ay, self.matrix.bx, self.matrix.by, self.matrix.tx, self.matrix.ty)
-  apDict.addElement("Matrix", m)
+  normalAP.addElement("Matrix", m)
+
+  var apDict = newDictObj()
+  apDict.addElement("N", normalAP) # or APsubdir
   self.dictObj.addElement("AP", apDict)
+
+  self.dictObj.addNumber("Ff", self.fieldFlags)
 
 method needCalculateOrder*(self: Widget): bool =
   result = self.calculateScript != nil
@@ -612,7 +623,7 @@ proc init(self: Widget, doc: DocState, id: string) =
   self.calculateScript = nil            # ok
   self.format = nil                     # ok
   self.highLightMode = hmNone           # ok
-  self.fieldFlags = 0                   #
+  self.fieldFlags = 0                   # ok
   self.appearance = newAppearanceStream(doc)
   self.matrix = IDMATRIX
 
@@ -948,6 +959,7 @@ proc removeFlags*(self: TextField, flags: set[TextFieldFlags]) =
 method createObject(self: TextField): PdfObject =
   var dict = self.createPDFObject()
   dict.addName("FT", FIELD_TYPE_TEXT)
+  self.fieldFlags = self.fieldFlags or ord(self.flags)
   result = dict
 
 #----------------------CHECK BOX
@@ -994,6 +1006,8 @@ proc setAllowUnchecked*(self: RadioButton, val: bool) =
 method createObject(self: RadioButton): PdfObject =
   var dict = self.createPDFObject()
   dict.addName("FT", FIELD_TYPE_BUTTON)
+  self.fieldFlags.setBit(bfRadio)
+  self.fieldFlags.setBit(bfNoToggleToOff)
   result = dict
 
 #---------------------COMBO BOX
@@ -1003,6 +1017,9 @@ proc newComboBox*(doc: DocState, x,y,w,h: float64, id: string): ComboBox =
   result.rect = initRect(x,y,w,h)
   result.kind = wkComboBox
   result.editable = false
+  result.sortItem = false
+  result.spellCheck = false
+  result.commitOnSelChange = false
   result.keyVal = initTable[string, string]()
   doc.addWidget(result)
 
@@ -1015,6 +1032,11 @@ proc setEditable*(self: ComboBox, val: bool) =
 method createObject(self: ComboBox): PdfObject =
   var dict = self.createPDFObject()
   dict.addName("FT", FIELD_TYPE_CHOICE)
+  self.fieldFlags.setBit(cfCombo)
+  if self.editable: self.fieldFlags.setBit(cfEdit)
+  if self.sortItem: self.fieldFlags.setBit(cfSort)
+  if not self.spellCheck: self.fieldFlags.setBit(cfDoNotSpellCheck)
+  if self.commitOnSelChange: self.fieldFlags.setBit(cfCommitOnSelChange)
   result = dict
 
 #---------------------LIST BOX
@@ -1024,6 +1046,9 @@ proc newListBox*(doc: DocState, x,y,w,h: float64, id: string): ListBox =
   result.rect = initRect(x,y,w,h)
   result.kind = wkListBox
   result.multipleSelect = false
+  result.sortItem = false
+  result.spellCheck = false
+  result.commitOnSelChange = false
   result.keyVal = initTable[string, string]()
   doc.addWidget(result)
 
@@ -1036,6 +1061,10 @@ proc setMultipleSelect*(self: ListBox, val: bool) =
 method createObject(self: ListBox): PdfObject =
   var dict = self.createPDFObject()
   dict.addName("FT", FIELD_TYPE_CHOICE)
+  if self.multipleSelect: self.fieldFlags.setBit(cfMultiSelect)
+  if self.sortItem: self.fieldFlags.setBit(cfSort)
+  if not self.spellCheck: self.fieldFlags.setBit(cfDoNotSpellCheck)
+  if self.commitOnSelChange: self.fieldFlags.setBit(cfCommitOnSelChange)
   result = dict
 
 #---------------------PUSH BUTTON
@@ -1047,7 +1076,7 @@ proc newPushButton*(doc: DocState, x,y,w,h: float64, id: string): PushButton =
   result.caption = ""
   result.rollOverCaption = nil
   result.alternateCaption = nil
-  result.flags = {}
+  result.look = pblCaptionOnly
   result.icon = nil
   result.rollOverIcon = nil
   result.alternateIcon = nil
@@ -1088,19 +1117,47 @@ proc setIconFitBorder*(self: PushButton, mode: bool) =
 proc setIconLeftOver*(self: PushButton, left, bottom: float64) =
   self.iconLeftOver = [left, bottom]
 
-proc setFlag*(self: PushButton, flag: PushButtonFlags) =
-  self.flags.incl flag
-
-proc setFlags*(self: PushButton, flags: set[PushButtonFlags]) =
-  self.flags.incl flags
-
-proc removeFlag*(self: PushButton, flag: PushButtonFlags) =
-  self.flags.excl flag
-
-proc removeFlags*(self: PushButton, flags: set[PushButtonFlags]) =
-  self.flags.excl flags
+proc setFlag*(self: PushButton, look: PushButtonLook) =
+  self.look = look
 
 method createObject(self: PushButton): PdfObject =
   var dict = self.createPDFObject()
   dict.addName("FT", FIELD_TYPE_BUTTON)
+  self.fieldFlags.setBit(bfPushButton)
+
+  var mk = DictObj(self.dictObj.getItem("MK", CLASS_DICT))
+
+  mk.addString("CA", self.caption)
+  if self.rollOverCaption != nil:
+    mk.addString("RC", self.rollOverCaption)
+  if self.alternateCaption != nil:
+    mk.addString("AC", self.alternateCaption)
+
+  mk.addNumber("TP", ord(self.look))
+
+  if self.icon != nil:
+    var icon = self.state.getObjectById(self.icon.objID)
+    mk.addElement("I", icon)
+
+  if self.rollOverIcon != nil:
+    var icon = self.state.getObjectById(self.rollOverIcon.objID)
+    mk.addElement("RI", icon)
+
+  if self.alternateIcon != nil:
+    var icon = self.state.getObjectById(self.alternateIcon.objID)
+    mk.addElement("IX", icon)
+
+  if self.icon != nil or self.rollOverIcon != nil or self. alternateIcon != nil:
+    const
+      IconScaleModeStr: array[IconScaleMode, string] = ["A", "B", "S", "N"]
+      IconScaleTypeStr: array[IconScalingType, string] = ["A", "P"]
+
+    var dict = newDictObj()
+    dict.addName("SW", IconScaleModeStr[self.iconScaleMode])
+    dict.addName("S", IconScaleTypeStr[self.iconScalingType])
+    dict.addBoolean("FB", self.iconFitToBorder)
+    var arr = newArray(self.iconLeftOver)
+    dict.addElement("A", arr)
+    mk.addElement("IF", dict)
+
   result = dict

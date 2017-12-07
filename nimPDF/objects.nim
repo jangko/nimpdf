@@ -585,6 +585,9 @@ proc getEntryObjectById*(x: PdfXref, objID: int): XrefEntry =
 
     tmp = tmp.prev
 
+proc getObjectById*(x: PdfXref, objID: int): PdfObject =
+  result = x.getEntryObjectById(objID).obj
+
 proc i2string(val: int, len: int) : string =
   let s = $val
   let blank = len - s.len()

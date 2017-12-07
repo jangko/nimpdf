@@ -22,6 +22,7 @@ type
   Image* = ref object
     width*, height*, ID*: int
     data*, mask*: string
+    objID*: int
   ujImage = pointer
 
 proc ujCreate() : ujImage {.cdecl, importc: "ujCreate".}
@@ -47,7 +48,7 @@ proc loadImagePNG(fileName: string): Image =
     result.data[i * 3 + 1] = png.data[i*4 + 1]
     result.data[i * 3 + 2] = png.data[i*4 + 2]
     result.mask[i] = png.data[i*4 + 3]
-  
+
 proc loadImageJPG(fileName:string): Image =
   var jpg = ujCreate()
   if jpg == nil: return nil
