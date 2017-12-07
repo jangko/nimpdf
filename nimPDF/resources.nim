@@ -50,7 +50,7 @@ proc putImages*(xref: Pdfxref, images: seq[Image]): DictObj =
     pic.addName("ColorSpace", "DeviceRGB")
     pic.addNumber("BitsPerComponent", 8)
     result.addElement("I" & $img.ID, pic)
-    img.objID = pic.objID
+    img.dictObj = pic
 
     if img.haveMask():
       var mask = xref.newDictStream(img.mask)

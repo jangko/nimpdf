@@ -331,10 +331,6 @@ const
     "mmm d, yyyy", "mmmm d, yyyy", "m/d/yy h:MM tt",
     "m/d/yyyy h:MM tt", "m/d/yy HH:MM", "m/d/yyyy HH MM"]
 
-method createObject*(self: MapRoot): PdfObject {.base.} = discard
-method finalizeObject*(self: MapRoot; page, parent, resourceDict: DictObj) {.base.} = discard
-method needCalculateOrder*(self: MapRoot): bool {.base.} = discard
-
 proc newBorder(): Border =
   new(result)
   result.style = bsSolid
@@ -414,7 +410,7 @@ proc createPDFObject(self: Widget): DictObj =
   const
     hmSTR: array[HighLightMode, char] = ['N', 'I', 'O', 'P', 'T']
 
-  var dict = newDictObj()
+  var dict = self.dictObj  
   dict.addName("Type", "Annot")
   dict.addName("Subtype", "Widget")
   dict.addName("H", $hmSTR[self.highLightMode])
@@ -493,9 +489,7 @@ proc createPDFObject(self: Widget): DictObj =
     aa.addElement("C", c)
 
   if aa != nil: dict.addElement("AA", aa)
-
-  self.dictObj = dict
-  result = dict
+  result = self.dictObj
 
 method finalizeObject(self: Widget; page, parent, resourceDict: DictObj) =
   self.dictObj.addElement("DR", resourceDict)
@@ -604,26 +598,27 @@ method needCalculateOrder*(self: Widget): bool =
   result = self.calculateScript != nil
 
 proc init(self: Widget, doc: DocState, id: string) =
-  self.state = doc                      #
-  self.id = id                          # ok
-  self.border = nil                     # ok
-  self.toolTip = ""                     # ok
-  self.visibility = Visible             # ok
-  self.rotation = 0                     # ok
-  self.fontFamily = "Helvetica"         # ok
-  self.fontStyle = {FS_REGULAR}         # ok
-  self.fontSize = 10.0                  # ok
-  self.fontEncoding = ENC_STANDARD      # ok
-  self.fontColorType = ColorRGB         # ok
-  self.fontColorRGB = initRGB(0, 0, 0)  # ok
-  self.fillColorType = ColorRGB         # ok
-  self.fillColorRGB = initRGB(0, 0, 0)  # ok
-  self.actions = nil                    # ok
-  self.validateScript = nil             # ok
-  self.calculateScript = nil            # ok
-  self.format = nil                     # ok
-  self.highLightMode = hmNone           # ok
-  self.fieldFlags = 0                   # ok
+  self.state = doc
+  self.dictObj = newDictObj()
+  self.id = id
+  self.border = nil
+  self.toolTip = ""
+  self.visibility = Visible
+  self.rotation = 0
+  self.fontFamily = "Helvetica"
+  self.fontStyle = {FS_REGULAR}
+  self.fontSize = 10.0
+  self.fontEncoding = ENC_STANDARD
+  self.fontColorType = ColorRGB
+  self.fontColorRGB = initRGB(0, 0, 0)
+  self.fillColorType = ColorRGB
+  self.fillColorRGB = initRGB(0, 0, 0)
+  self.actions = nil
+  self.validateScript = nil
+  self.calculateScript = nil
+  self.format = nil
+  self.highLightMode = hmNone
+  self.fieldFlags = 0
   self.appearance = newAppearanceStream(doc)
   self.matrix = IDMATRIX
 
@@ -1136,16 +1131,13 @@ method createObject(self: PushButton): PdfObject =
   mk.addNumber("TP", ord(self.look))
 
   if self.icon != nil:
-    var icon = self.state.getObjectById(self.icon.objID)
-    mk.addElement("I", icon)
+    mk.addElement("I", self.icon.dictObj)
 
   if self.rollOverIcon != nil:
-    var icon = self.state.getObjectById(self.rollOverIcon.objID)
-    mk.addElement("RI", icon)
+    mk.addElement("RI", self.rollOverIcon.dictObj)
 
   if self.alternateIcon != nil:
-    var icon = self.state.getObjectById(self.alternateIcon.objID)
-    mk.addElement("IX", icon)
+    mk.addElement("IX", self.alternateIcon.dictObj)
 
   if self.icon != nil or self.rollOverIcon != nil or self. alternateIcon != nil:
     const

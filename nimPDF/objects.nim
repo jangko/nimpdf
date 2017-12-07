@@ -1,4 +1,4 @@
-import encrypt, tables, streams, strutils, image
+import encrypt, tables, streams, strutils, private.nimz
 
 const
   NeedEscape = {'\x00'..'\x20', '\\', '%', '#',
@@ -106,6 +106,10 @@ type
     address: int
     prev: PdfXref
     trailer: DictObj
+
+proc zcompress*(data: string): string =
+  var nz = nzDeflateInit(data)
+  result = nz.zlib_compress()
 
 method write*(obj: PdfObject, s: Stream, enc: PdfEncrypt) {.base.} =
   assert(false)
@@ -584,9 +588,6 @@ proc getEntryObjectById*(x: PdfXref, objID: int): XrefEntry =
       if (tmp.startOffset + i) == objID: return tmp.getEntry(i)
 
     tmp = tmp.prev
-
-proc getObjectById*(x: PdfXref, objID: int): PdfObject =
-  result = x.getEntryObjectById(objID).obj
 
 proc i2string(val: int, len: int) : string =
   let s = $val

@@ -444,28 +444,34 @@ proc newTextField*(doc: PDF, x,y,w,h: float64, id: string): TextField =
   assert(doc.curPage != nil)
   result = newTextField(doc.state, x, y, w, h, id)
   doc.curPage.addWidget result
+  discard doc.state.newAcroForm()
 
 proc newCheckBox*(doc: PDF, x,y,w,h: float64, id: string): CheckBox =
   assert(doc.curPage != nil)
   result = newCheckBox(doc.state, x, y, w, h, id)
   doc.curPage.addWidget result
+  discard doc.state.newAcroForm()
 
 proc newRadioButton*(doc: PDF, x,y,w,h: float64, id: string): RadioButton =
   assert(doc.curPage != nil)
   result = newRadioButton(doc.state, x, y, w, h, id)
   doc.curPage.addWidget result
+  discard doc.state.newAcroForm()
 
 proc newComboBox*(doc: PDF, x,y,w,h: float64, id: string): ComboBox =
   assert(doc.curPage != nil)
   result = newComboBox(doc.state, x, y, w, h, id)
   doc.curPage.addWidget result
+  discard doc.state.newAcroForm()
 
 proc newListBox*(doc: PDF, x,y,w,h: float64, id: string): ListBox =
   assert(doc.curPage != nil)
   result = newListBox(doc.state, x, y, w, h, id)
   doc.curPage.addWidget result
+  discard doc.state.newAcroForm()
 
 proc newPushButton*(doc: PDF, x,y,w,h: float64, id: string): PushButton =
   assert(doc.curPage != nil)
   result = newPushButton(doc.state, x, y, w, h, id)
   doc.curPage.addWidget result
+  discard doc.state.newAcroForm()

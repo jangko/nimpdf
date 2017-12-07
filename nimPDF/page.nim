@@ -97,6 +97,10 @@ type
     page: DictObj
     widgets: seq[MapRoot]
 
+method createObject*(self: MapRoot): PdfObject {.base.} = discard
+method finalizeObject*(self: MapRoot; page, parent, resourceDict: DictObj) {.base.} = discard
+method needCalculateOrder*(self: MapRoot): bool {.base.} = discard
+
 proc escapeString(text: string): string =
   result = ""
   for c in items(text):
@@ -173,9 +177,7 @@ proc putPages(doc: DocState, resource: DictObj, pages: seq[Page]): DictObj =
 
   for p in pages:
     let content = doc.xref.newDictStream(p.content)
-    var page = newDictObj()
-    p.page = page
-    doc.xref.add(page)
+    var page = p.page
     kids.add(page)
     page.addName("Type", "Page")
     page.addElement("Parent", root)
@@ -189,7 +191,7 @@ proc putPages(doc: DocState, resource: DictObj, pages: seq[Page]): DictObj =
   #the page.page must be initialized first to prevent crash
   var i = 1
   for p in pages:
-    if p.annots.len == 0: continue
+    if p.annots.len == 0 and p.widgets.len == 0: continue
     var annots = newArrayObj()
     p.page.addElement("Annots", annots)
     for a in p.annots:
@@ -212,6 +214,11 @@ proc putPages(doc: DocState, resource: DictObj, pages: seq[Page]): DictObj =
       annot.addElement("Border", newArray(16, 16, 1))
       annot.addPlain("BS", "<</W 0>>")
       inc i
+    for x in p.widgets:
+      var annot = x.createObject()
+      doc.xref.add(annot)
+      annots.add(annot)
+
   result = root
 
 proc putResources(doc: DocState): DictObj =
@@ -342,6 +349,16 @@ proc putCatalog(doc: DocState, pages: seq[Page]) =
     var fields = newArrayObj()
     for a in doc.acroForm.fields:
       fields.add a.annot
+
+    var co: ArrayObj
+    for page in pages:
+      for w in page.widgets:
+        w.finalizeObject(page.page, acro, resource)
+        if w.needCalculateOrder():
+          if co.isNil: co = newArrayObj()
+          co.add w.dictObj
+
+    if co != nil: acro.addElement("CO", co)
     catalog.addElement("AcroForm", acro)
     acro.addElement("DR", resource)
     let fontColor = "(" & f2s(doc.acroForm.r) & " " & f2s(doc.acroForm.g) & " " & f2s(doc.acroForm.b) & " rg /F"
@@ -421,9 +438,6 @@ proc makeFont*(doc: DocState, family: string, style: FontStyles, enc: EncodingTy
 
 proc getOpt*(doc: DocState): PDFOptions =
   result = doc.opts
-
-proc getObjectById*(doc: DocState, objID: int): PdfObject =
-  result = doc.xref.getObjectById(objID)
 
 proc setLabel*(doc: DocState, style: LabelStyle, prefix: string, start, pageIndex: int) =
   var label: PageLabel
@@ -620,6 +634,8 @@ proc newPage*(state: DocState, size: PageSize, orient = PGO_PORTRAIT): Page =
     result.size.swap()
   result.state = state
   state.size = result.size
+  result.page = newDictObj()
+  state.xref.add(result.page)
 
 proc newAppearanceStream*(state: DocState): AppearanceStream =
   new(result)

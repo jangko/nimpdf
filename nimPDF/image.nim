@@ -10,7 +10,7 @@
 # currently, identify file format only by it's file name extension
 # eg: .png, .jpg, .jpeg, .bmp
 
-import nimBMP, os, strutils, nimPNG, private.nimz
+import nimBMP, os, strutils, nimPNG, objects
 
 #{.deadCodeElim: on.}
 #{.passC: "-D LODEPNG_NO_COMPILE_CPP".}
@@ -22,7 +22,7 @@ type
   Image* = ref object
     width*, height*, ID*: int
     data*, mask*: string
-    objID*: int
+    dictObj*: DictObj
   ujImage = pointer
 
 proc ujCreate() : ujImage {.cdecl, importc: "ujCreate".}
@@ -103,16 +103,3 @@ proc adjustTransparency*(img: Image, alpha:float) =
     img.mask = newString(img.width*img.height)
     for i in 0..high(img.mask):
       img.mask[i] = char(255.0 * alpha)
-
-proc zcompress*(data: string): string =
-  var nz = nzDeflateInit(data)
-  result = nz.zlib_compress()
-
-when isMainModule:
-  var img = loadImage("pngbar.png")
-  var x = loadImage("24bit.bmp")
-  if img != nil : echo "width: ", img.width
-  if x != nil : echo "width: ", x.width
-  let sss = "mau kemana dong? engk ink engk? weleh weleh mmmmmm sangkamu aku mau kemana sih gitu aja ngedumel, weleh weleh, sinting"
-  var res = zcompress(sss)
-  echo "ori: ", sss.len(), " len: ", res.len()
