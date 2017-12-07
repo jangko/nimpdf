@@ -1,4 +1,4 @@
-import objects, fontmanager, gstate, page, tables, image, strutils
+import objects, fontmanager, gstate, page, tables, image, strutils, basic2d
 
 const
   FIELD_TYPE_BUTTON = "Btn"
@@ -68,12 +68,16 @@ type
     cfCommitOnSelChange = 27
 
   FormActionTrigger* = enum
-    MouseUp
-    MouseDown
-    MouseEnter
-    MouseExit
-    GetFocus
-    LostFocus
+    fatMouseUp
+    fatMouseDown
+    fatMouseEnter
+    fatMouseExit
+    fatGetFocus
+    fatLostFocus
+    fatPageOpen
+    fatPageClose
+    fatPageVisible
+    fatPageInvisible
 
   FormSubmitFormat* = enum
     EmailFormData
@@ -128,27 +132,31 @@ type
     trigger: FormActionTrigger
     case kind: FormActionKind
     of fakOpenWebLink:
-      url: string
+      uri: string
+      isMap: bool
     of fakResetForm:
-      discard
+      rfFields: seq[Widget]
+      rfExclude: bool
     of fakSubmitForm:
       format: FormSubmitFormat
-      uri: string
+      url: string
+      sfFields: seq[Widget]
+      sfExclude: bool
     of fakEmailEntirePDF:
       to, cc, bcc, title, body: string
     of fakRunJS:
-      script: string
+      jsScript: string
     of fakNamedAction:
       namedAction: NamedAction
     of fakGotoLocalPage:
       localDest: Destination
     of fakGotoAnotherPDF:
-      remoteDest: Destination
+      remotePage: int
       path: string
     of fakLaunchApp:
       app, params, operation, defaultDir: string
 
-  Border = ref object of MapRoot
+  Border = ref object
     style: BorderStyle
     width: int
     dashPattern: seq[int]
@@ -166,12 +174,43 @@ type
   FormatKind = enum
     FormatNone
     FormatNumber
-    FormatCurrency
     FormatPercent
     FormatDate
     FormatTime
     FormatSpecial
     FormatCustom
+
+  FormatTimeType* = enum
+    FTT_0 # HH:MM
+    FTT_1 # h:MM tt
+    FTT_2 # HH:MM:ss
+    FTT_3 # h:MM:ss tt
+
+  FormatDateType* = enum
+    FDT_0 # m/d
+    FDT_1 # m/d/yy
+    FDT_2 # m/d/yyyy
+    FDT_3 # mm/dd/yy
+    FDT_4 # mm/dd/yyyy
+    FDT_5 # mm/yy
+    FDT_6 # mm/yyyy
+    FDT_7 # d-mmm
+    FDT_8 # d-mmm-yy
+    FDT_9 # d-mmm-yyyy
+    FDT_10 # dd-mmm-yy
+    FDT_11 # dd-mmm-yyy
+    FDT_12 # yy-mm-dd
+    FDT_13 # yyyy-mm-dd
+    FDT_14 # mmm-yy
+    FDT_15 # mmm-yyyy
+    FDT_16 # mmmm-yy
+    FDT_17 # mmmm-yyyy
+    FDT_18 # mmm d, yyyy
+    FDT_19 # mmmm d, yyyy
+    FDT_20 # m/d/yy h:MM tt
+    FDT_21 # m/d/yyyy h:MM tt
+    FDT_22 # m/d/yy HH:MM
+    FDT_23 # m/d/yyyy HH MM
 
   FormatObject = ref object
     case kind: FormatKind
@@ -180,14 +219,14 @@ type
       decimalNumber: int
       sepStyle: SepStyle
       negStyle: NegStyle
-    of FormatCurrency:
       strCurrency: string
       currencyPrepend: bool
-    of FormatDate, FormatTime:
-      strFmt: string
+    of FormatDate:
+      formatDateType: FormatDateType
+    of FormatTime:
+      formatTimeType: FormatTimeType
     of FormatSpecial:
-      style: SpecialFormat
-      mask: string
+      special: SpecialFormat
     of FormatCustom:
       JSfmt, keyStroke: string
 
@@ -228,6 +267,8 @@ type
     format: FormatObject
     highLightMode: HighLightMode
     fieldFlags: int
+    appearance: AppearanceStream
+    matrix: Matrix2d
 
   TextField* = ref object of Widget
     align: TextFieldAlignment
@@ -275,7 +316,18 @@ type
     iconFitToBorder: bool
     iconLeftOver: array[2, float64]
 
-method createObject(self: MapRoot): PdfObject {.base.} = discard
+const
+  FormatDateStr: array[FormatDateType, string] = [
+    "m/d", "m/d/yy", "m/d/yyyy", "mm/dd/yy", "mm/dd/yyyy",
+    "mm/yy", "mm/yyyy", "d-mmm", "d-mmm-yy", "d-mmm-yyyy",
+    "dd-mmm-yy", "dd-mmm-yyy", "yy-mm-dd", "yyyy-mm-dd",
+    "mmm-yy", "mmm-yyyy", "mmmm-yy", "mmmm-yyyy",
+    "mmm d, yyyy", "mmmm d, yyyy", "m/d/yy h:MM tt",
+    "m/d/yyyy h:MM tt", "m/d/yy HH:MM", "m/d/yyyy HH MM"]
+
+method createObject*(self: MapRoot): PdfObject {.base.} = discard
+method finalizeObject*(self: MapRoot; page, parent, resourceDict: DictObj) {.base.} = discard
+method needCalculateOrder*(self: MapRoot): bool {.base.} = discard
 
 proc newBorder(): Border =
   new(result)
@@ -305,7 +357,7 @@ proc setColor(self: Border, col: CMYKColor) =
   self.colorType = ColorCMYK
   self.colorCMYK = col
 
-method createObject(self: Border): PdfObject =
+proc createObject(self: Border): PdfObject =
   var dict = newDictObj()
   dict.addNumber("W", self.width)
   case self.style
@@ -334,6 +386,23 @@ proc setBit[T: enum](x: var int, bit: T) =
 
 proc removeBit[T: enum](x: var int, bit: T) =
   x = x and (not (1 shr ord(bit)))
+
+proc getJSCode(fmt: FormatObject, fn: string): string =
+  case fmt.kind
+  of FormatNone: result = ""
+  of FormatPercent: result = "AFPercent_$1($2,$3);" % [fn, $fmt.decimalNumber, $ord(fmt.sepStyle)]
+  of FormatNumber:
+    result = "AFNumber_$1($2,$3,$4,0,\"$5\",$6);" % [fn, $fmt.decimalNumber, $ord(fmt.sepStyle),
+      $ord(fmt.negStyle), fmt.strCurrency, $fmt.currencyPrepend]
+  of FormatTime:
+    result = "AFTime_$1($2);" % [fn, $ord(fmt.formatTimeType)]
+  of FormatDate:
+    result = "AFDate_$1Ex(\"$1\");" % [fn, FormatDateStr[fmt.formatDateType]]
+  of FormatSpecial:
+    result = "AFSpecial_$1(\"$1\");" % [fn, $ord(fmt.special)]
+  of FormatCustom:
+    if fn == "Keystroke": result = fmt.keyStroke
+    else: result = fmt.JSfmt
 
 proc createPDFObject(self: Widget): DictObj =
   const
@@ -384,22 +453,144 @@ proc createPDFObject(self: Widget): DictObj =
     let c = self.fontColorCMYK
     dict.addString("DA", "/F$1 $2 Tf $3 $4 $5 $6 k" % [fontID, f2s(self.fontSize), f2s(c.c), f2s(c.m), f2s(c.y), f2s(c.k)])
 
-  if self.actions.isNil: self.actions = @[]
+  var aa: DictObj
 
+  if self.format != nil:
+    var k = newDictObj()
+    var f = newDictObj()
+    if aa.isNil: aa = newDictObj()
+    k.addName("S", "JavaScript")
+    f.addName("S", "JavaScript")
+    f.addString("JS", self.format.getJSCode("Keystroke"))
+    k.addString("JS", self.format.getJSCode("Format"))
+    aa.addElement("K", k)
+    aa.addElement("F", f)
 
+  if self.validateScript != nil:
+    if aa.isNil: aa = newDictObj()
+    var v = newDictObj()
+    v.addName("S", "JavaScript")
+    if self.validateScript.len > 80:
+      v.addElement("JS", self.state.newDictStream(self.validateScript))
+    else:
+      v.addString("JS", self.validateScript)
+    aa.addElement("V", v)
 
-  #var dr = newDictObj()
-  #var ft = newDictObj()
-  #ft.addElement("")
-  #dr.addElement("Font", ft)
-  #dict.addElement("DR", dr)
+  if self.calculateScript != nil:
+    if aa.isNil: aa = newDictObj()
+    var c = newDictObj()
+    c.addName("S", "JavaScript")
+    if self.calculateScript.len > 80:
+      c.addElement("JS", self.state.newDictStream(self.calculateScript))
+    else:
+      c.addString("JS", self.calculateScript)
+    aa.addElement("C", c)
 
-  #DR
-  #AP
-  #P
-  #Parent
+  if aa != nil: dict.addElement("AA", aa)
 
+  self.dictObj = dict
   result = dict
+
+method finalizeObject(self: Widget; page, parent, resourceDict: DictObj) =
+  self.dictObj.addElement("DR", resourceDict)
+  self.dictObj.addElement("P", page)
+  self.dictObj.addElement("Parent", parent)
+
+  var aa: DictObj
+
+  const FormActionTriggerStr: array[FormActionTrigger, string] =
+    ["U", "D", "E", "X", "Fo", "Bl", "PO", "PC", "PV", "PI"]
+
+  const FormActionKindStr: array[FormActionKind, string] =
+    ["URI", "ResetForm", "SubmitForm", "JavaScript", "JavaScript", "Named", "GoTo", "GoToR", "Launch"]
+
+  if self.actions != nil:
+    aa = DictObj(self.dictObj.getItem("AA", CLASS_DICT))
+    if aa.isNil:
+      aa = newDictObj()
+      self.dictObj.addElement("AA", aa)
+
+    for x in self.actions:
+      var action = newDictObj()
+      action.addName("S", FormActionKindStr[x.kind])
+      aa.addElement(FormActionTriggerStr[x.trigger], action)
+
+      case x.kind
+      of fakOpenWebLink:
+        action.addString("URI", x.uri)
+        action.addBoolean("IsMap", x.isMap)
+      of fakResetForm:
+        if x.rfFields != nil:
+          action.addNumber("Flags", int(x.rfExclude))
+          var arr = newArrayObj()
+          for c in x.rfFields:
+            arr.add(c.dictObj)
+          action.addElement("Fields", arr)
+      of fakSubmitForm:
+        action.addString("F", x.url)
+        var flags: int = 0
+        if x.sfFields != nil:
+          if x.sfExclude: flags = flags and (1 shr 1)
+          var arr = newArrayObj()
+          for c in x.sfFields:
+            arr.add(c.dictObj)
+          action.addElement("Fields", arr)
+
+        case x.format
+        of EmailFormData: discard
+        of PDF_Format: flags = flags and (1 shr 9)
+        of HTML_Format: flags = flags and (1 shr 3)
+        of XFDF_Format: flags = flags and (1 shr 6)
+
+        action.addNumber("Flags", flags)
+      of fakEmailEntirePDF:
+        let js = "this.mailDoc(false, \"$1\", \"$2\", \"$3\", \"$4\", \"$5\");" %
+          [x.to, x.cc, x.bcc, x.title, x.body]
+
+        if js.len > 80:
+          action.addElement("JS", self.state.newDictStream(js))
+        else:
+          action.addString("JS", js)
+      of fakRunJS:
+        if x.jsScript.len > 80:
+          action.addElement("JS", self.state.newDictStream(x.jsScript))
+        else:
+          action.addString("JS", x.jsScript)
+      of fakNamedAction:
+        const NamedActionStr: array[NamedAction, string] = [
+          "FirstPage", "NextPage", "PrevPage", "LastPage", "PrintDialog"]
+        action.addName("N", NamedActionStr[x.namedAction])
+      of fakGotoLocalPage:
+        var arr = toObject(x.localDest)
+        action.addElement("D", arr)
+      of fakGotoAnotherPDF:
+        var arr = newArrayObj()
+        arr.addNumber(x.remotePage)
+        arr.addName("Fit")
+        action.addString("F", x.path)
+        action.addElement("D", arr)
+      of fakLaunchApp:
+        var dict = newDictObj()
+        dict.addString("F", x.app)
+        dict.addString("P", x.params)
+        dict.addString("O", x.operation)
+        dict.addString("D", x.defaultDir)
+        action.addElement("Win", dict)
+
+  let ap = self.appearance
+  var apDict = ap.newDictStream()
+  apDict.addName("Type", "XObject")
+  apDict.addName("SubType", "Form")
+  apDict.addNumber("FormType", 1)
+  apDict.addElement("Resources", resourceDict)
+  var r = newArray(self.rect)
+  apDict.addElement("BBox", r)
+  var m = newArray(self.matrix.ax, self.matrix.ay, self.matrix.bx, self.matrix.by, self.matrix.tx, self.matrix.ty)
+  apDict.addElement("Matrix", m)
+  self.dictObj.addElement("AP", apDict)
+
+method needCalculateOrder*(self: Widget): bool =
+  result = self.calculateScript != nil
 
 proc init(self: Widget, doc: DocState, id: string) =
   self.state = doc                      #
@@ -416,12 +607,20 @@ proc init(self: Widget, doc: DocState, id: string) =
   self.fontColorRGB = initRGB(0, 0, 0)  # ok
   self.fillColorType = ColorRGB         # ok
   self.fillColorRGB = initRGB(0, 0, 0)  # ok
-  self.actions = nil                    #
-  self.validateScript = nil             #
-  self.calculateScript = nil            #
-  self.format = nil                     #
+  self.actions = nil                    # ok
+  self.validateScript = nil             # ok
+  self.calculateScript = nil            # ok
+  self.format = nil                     # ok
   self.highLightMode = hmNone           # ok
   self.fieldFlags = 0                   #
+  self.appearance = newAppearanceStream(doc)
+  self.matrix = IDMATRIX
+
+proc getApearanceStream*(self: Widget): AppearanceStream =
+  result = self.appearance
+
+proc setTransformation*(self: Widget, m: Matrix2d) =
+  self.matrix = m
 
 proc setToolTip*(self: Widget, toolTip: string) =
   self.toolTip = toolTip
@@ -517,12 +716,13 @@ proc setBorderDash*(self: Widget, dash: openArray[int]) =
   if self.border.isNil: self.border = newBorder()
   self.border.setDash(dash)
 
-proc addActionOpenWebLink*(self: Widget, trigger: FormActionTrigger, url: string) =
+proc addActionOpenWebLink*(self: Widget, trigger: FormActionTrigger, uri: string, isMap: bool) =
   if self.actions.isNil: self.actions = @[]
   var action = new(FormAction)
   action.trigger = trigger
   action.kind = fakOpenWebLink
-  action.url = url
+  action.uri = uri
+  action.isMap = isMap
   self.actions.add action
 
 proc addActionResetForm*(self: Widget, trigger: FormActionTrigger) =
@@ -530,14 +730,38 @@ proc addActionResetForm*(self: Widget, trigger: FormActionTrigger) =
   var action = new(FormAction)
   action.trigger = trigger
   action.kind = fakResetForm
+  action.rfFields = nil
+  action.rfExclude = false
   self.actions.add action
 
-proc addActionSubmitForm*(self: Widget, trigger: FormActionTrigger, format: FormSubmitFormat, uri: string) =
+proc addActionResetForm*(self: Widget, trigger: FormActionTrigger, fields: openArray[Widget], exclude: bool) =
+  if self.actions.isNil: self.actions = @[]
+  var action = new(FormAction)
+  action.trigger = trigger
+  action.kind = fakResetForm
+  action.rfFields = @fields
+  action.rfExclude = exclude
+  self.actions.add action
+
+proc addActionSubmitForm*(self: Widget, trigger: FormActionTrigger, format: FormSubmitFormat, url: string) =
   if self.actions.isNil: self.actions = @[]
   var action = new(FormAction)
   action.trigger = trigger
   action.kind = fakSubmitForm
-  action.uri = uri
+  action.format = format
+  action.sfFields = nil
+  action.url = url
+  self.actions.add action
+
+proc addActionSubmitForm*(self: Widget, trigger: FormActionTrigger, format: FormSubmitFormat, url: string, fields: openArray[Widget], exclude: bool) =
+  if self.actions.isNil: self.actions = @[]
+  var action = new(FormAction)
+  action.trigger = trigger
+  action.kind = fakSubmitForm
+  action.format = format
+  action.sfFields = @fields
+  action.sfExclude = exclude
+  action.url = url
   self.actions.add action
 
 proc addActionEmailEntirePDF*(self: Widget, trigger: FormActionTrigger; to, cc, bcc, title, body: string) =
@@ -557,7 +781,7 @@ proc addActionRunJS*(self: Widget, trigger: FormActionTrigger, script: string) =
   var action = new(FormAction)
   action.trigger = trigger
   action.kind = fakRunJS
-  action.script = script
+  action.jsScript = script
   self.actions.add action
 
 proc addActionNamed*(self: Widget, trigger: FormActionTrigger, name: NamedAction) =
@@ -576,12 +800,12 @@ proc addActionGotoLocalPage*(self: Widget, trigger: FormActionTrigger, dest: Des
   action.localDest = dest
   self.actions.add action
 
-proc addActionGotoAnotherPDF*(self: Widget, trigger: FormActionTrigger, path: string, dest: Destination) =
+proc addActionGotoAnotherPDF*(self: Widget, trigger: FormActionTrigger, path: string, pageNo: int) =
   if self.actions.isNil: self.actions = @[]
   var action = new(FormAction)
   action.trigger = trigger
   action.kind = fakGotoAnotherPDF
-  action.remoteDest = dest
+  action.remotePage = pageNo
   action.path = path
   self.actions.add action
 
@@ -596,17 +820,12 @@ proc addActionLaunchApp*(self: Widget, trigger: FormActionTrigger; app, params, 
   action.defaultDir = defaultDir
   self.actions.add action
 
-proc formatNumber*(self: Widget, decimalNumber: int, sepStyle: SepStyle, negStyle: NegStyle) =
+proc formatNumber*(self: Widget, decimalNumber: int, sepStyle: SepStyle, negStyle: NegStyle, strCurrency: string = "", currencyPrepend: bool = false) =
   var fmt = new(FormatObject)
   fmt.kind = FormatNumber
   fmt.decimalNumber = decimalNumber
   fmt.sepStyle = sepStyle
   fmt.negStyle = negStyle
-  self.format = fmt
-
-proc formatCurrency*(self: Widget, strCurrency: string, currencyPrepend: bool) =
-  var fmt = new(FormatObject)
-  fmt.kind = FormatCurrency
   fmt.strCurrency = strCurrency
   fmt.currencyPrepend = currencyPrepend
   self.format = fmt
@@ -618,57 +837,22 @@ proc formatPercent*(self: Widget, decimalNumber: int, sepStyle: SepStyle) =
   fmt.sepStyle = sepStyle
   self.format = fmt
 
-#[
-m/d
-m/d/yy
-m/d/yyyy
-mm/dd/yy
-mm/dd/yyyy
-mm/yy
-mm/yyyy
-d-mmm
-d-mmm-yy
-d-mmm-yyyy
-dd-mmm-yy
-dd-mmm-yyy
-yy-mm-dd
-yyyy-mm-dd
-mmm-yy
-mmm-yyyy
-mmmm-yy
-mmmm-yyyy
-mmm d, yyyy
-mmmm d, yyyy
-m/d/yy h:MM tt
-m/d/yyyy h:MM tt
-m/d/yy HH:MM
-m/d/yyyy HH MM
-]#
-
-proc formatDate*(self: Widget, strFmt: string) =
+proc formatDate*(self: Widget, formatType: FormatDateType) =
   var fmt = new(FormatObject)
   fmt.kind = FormatDate
-  fmt.strFmt = strFmt
+  fmt.formatDateType = formatType
   self.format = fmt
 
-#[
-HH:MM
-h:MM tt
-HH:MM:ss
-h:MM:ss tt
-]#
-
-proc formatTime*(self: Widget, strFmt: string) =
+proc formatTime*(self: Widget, formatType: FormatTimeType) =
   var fmt = new(FormatObject)
   fmt.kind = FormatTime
-  fmt.strFmt = strFmt
+  fmt.formatTimeType = formatType
   self.format = fmt
 
-proc formatSpecial*(self: Widget, style: SpecialFormat, mask: string = nil) =
+proc formatSpecial*(self: Widget, special: SpecialFormat) =
   var fmt = new(FormatObject)
   fmt.kind = FormatSpecial
-  fmt.style = style
-  fmt.mask = mask
+  fmt.special = special
   self.format = fmt
 
 proc formatCustom*(self: Widget, JSfmt, keyStroke: string) =

@@ -124,9 +124,8 @@ template fromUser*(doc: DocState, val: float64): float64 =
 template toUser*(doc: DocState, val:float64): float64 =
   doc.gState.docUnit.toUser(val)
 
-proc putDestination(doc: DocState, dict: DictObj, dest: Destination) =
+proc toObject*(dest: Destination): ArrayObj =
   var arr = newArrayObj()
-  dict.addElement("Dest", arr)
   arr.add(dest.page.page)
 
   case dest.style
@@ -155,6 +154,12 @@ proc putDestination(doc: DocState, dict: DictObj, dest: Destination) =
   of DS_FITBV:
     arr.addName("FitBV")
     arr.addPlain(f2sn(dest.a))
+
+  result = arr
+
+proc putDestination(doc: DocState, dict: DictObj, dest: Destination) =
+  var arr = toObject(dest)
+  dict.addElement("Dest", arr)
 
 proc putPages(doc: DocState, resource: DictObj, pages: seq[Page]): DictObj =
   let numpages = pages.len()
@@ -547,6 +552,9 @@ proc setEncryptionMode*(doc: DocState, mode: EncryptMode) =
   else: enc.keyLen = 32 # ENCRYPT_R5
   enc.mode = mode
 
+proc newDictStream*(doc: DocState, data: string): DictObj =
+  result = doc.xref.newDictStream(data)
+
 proc newAcroForm*(doc: DocState): AcroForm =
   if doc.acroForm != nil: return doc.acroForm
   new(result)
@@ -614,6 +622,9 @@ proc newAppearanceStream*(state: DocState): AppearanceStream =
   new(result)
   result.content = ""
   result.state = state
+
+proc newDictStream*(self: AppearanceStream): DictObj =
+  result = self.state.newDictStream(self.content)
 
 template fromUser(self: ContentRoot, val: float64): float64 =
   self.state.gState.docUnit.fromUser(val)

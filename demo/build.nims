@@ -24,9 +24,9 @@ let files = [
   "test",
   "text_annot"
   ]
-  
+
 for file in files:
   exec "nim c $1 $2" % [switches, file]
-  
+
 for file in files:
   exec file
