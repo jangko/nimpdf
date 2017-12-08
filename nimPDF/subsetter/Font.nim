@@ -56,7 +56,6 @@ type
 
   Font* = ref object of RootObj
     ID*: int
-    objID*: int
     subType*: FontType
     searchName*: string
 

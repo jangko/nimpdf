@@ -305,7 +305,6 @@ proc enc_win_map(val: int): int = WINMAP[val]
 proc clone(src: Base14): Base14 =
   new(result)
   result.ID = src.ID
-  result.objID = src.objID
   result.subType = src.subType
   result.searchName = src.searchName
   result.baseFont = src.baseFont

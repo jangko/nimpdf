@@ -279,11 +279,13 @@ type
   CheckBox* = ref object of Widget
     shape: string
     checkedByDefault: bool
+    caption: string
 
   RadioButton* = ref object of Widget
     shape: string
     checkedByDefault: bool
     allowUnchecked: bool
+    caption: string
 
   ComboBox* = ref object of Widget
     keyVal: Table[string, string]
@@ -384,10 +386,10 @@ proc newColorArray(colorType: ColorType, rgb: RGBColor, cmyk: CMYKColor): ArrayO
   else: result = newArray(cmyk)
 
 proc setBit[T: enum](x: var int, bit: T) =
-  x = x or (1 shr ord(bit))
+  x = x or (1 shl (ord(bit) - 1))
 
 proc removeBit[T: enum](x: var int, bit: T) =
-  x = x and (not (1 shr ord(bit)))
+  x = x and (not (1 shl (ord(bit) - 1)))
 
 proc getJSCode(fmt: FormatObject, fn: string): string =
   case fmt.kind
@@ -410,7 +412,7 @@ proc createPDFObject(self: Widget): DictObj =
   const
     hmSTR: array[HighLightMode, char] = ['N', 'I', 'O', 'P', 'T']
 
-  var dict = self.dictObj  
+  var dict = self.dictObj
   dict.addName("Type", "Annot")
   dict.addName("Subtype", "Widget")
   dict.addName("H", $hmSTR[self.highLightMode])
@@ -578,19 +580,21 @@ method finalizeObject(self: Widget; page, parent, resourceDict: DictObj) =
         action.addElement("Win", dict)
 
   let ap = self.appearance
-  var normalAP = ap.newDictStream()
-  normalAP.addName("Type", "XObject")
-  normalAP.addName("SubType", "Form")
-  normalAP.addNumber("FormType", 1)
-  normalAP.addElement("Resources", resourceDict)
-  var r = newArray(self.rect)
-  normalAP.addElement("BBox", r)
-  var m = newArray(self.matrix.ax, self.matrix.ay, self.matrix.bx, self.matrix.by, self.matrix.tx, self.matrix.ty)
-  normalAP.addElement("Matrix", m)
+  if ap != nil:
+    var normalAP = ap.newDictStream()
+    normalAP.addName("Type", "XObject")
+    normalAP.addName("Subtype", "Form")
+    normalAP.addNumber("FormType", 1)
+    normalAP.addElement("Resources", resourceDict)
+    var r = self.rect
+    var rc = newArray(r.x, r.y, r.x+r.w, r.y+r.h)
+    normalAP.addElement("BBox", rc)
+    var m = newArray(self.matrix.ax, self.matrix.ay, self.matrix.bx, self.matrix.by, self.matrix.tx, self.matrix.ty)
+    normalAP.addElement("Matrix", m)
 
-  var apDict = newDictObj()
-  apDict.addElement("N", normalAP) # or APsubdir
-  self.dictObj.addElement("AP", apDict)
+    var apDict = newDictObj()
+    apDict.addElement("N", normalAP) # or APsubdir
+    self.dictObj.addElement("AP", apDict)
 
   self.dictObj.addNumber("Ff", self.fieldFlags)
 
@@ -619,7 +623,7 @@ proc init(self: Widget, doc: DocState, id: string) =
   self.format = nil
   self.highLightMode = hmNone
   self.fieldFlags = 0
-  self.appearance = newAppearanceStream(doc)
+  self.appearance = nil # newAppearanceStream(doc)
   self.matrix = IDMATRIX
 
 proc getApearanceStream*(self: Widget): AppearanceStream =
@@ -965,6 +969,7 @@ proc newCheckBox*(doc: DocState, x,y,w,h: float64, id: string): CheckBox =
   result.kind = wkCheckBox
   result.shape = "\x35"
   result.checkedByDefault = false
+  result.caption = ""
   doc.addWidget(result)
 
 proc setShape*(self: CheckBox, val: string) =
@@ -972,6 +977,9 @@ proc setShape*(self: CheckBox, val: string) =
 
 proc setCheckedByDefault*(self: CheckBox, val: bool) =
   self.checkedByDefault = val
+
+proc setCaption*(self: CheckBox, val: string) =
+  self.caption = val
 
 method createObject(self: CheckBox): PdfObject =
   var dict = self.createPDFObject()
@@ -987,6 +995,7 @@ proc newRadioButton*(doc: DocState, x,y,w,h: float64, id: string): RadioButton =
   result.shape = "\6C"
   result.checkedByDefault = false
   result.allowUnchecked = false
+  result.caption = ""
   doc.addWidget(result)
 
 proc setShape*(self: RadioButton, val: string) =
@@ -997,6 +1006,9 @@ proc setCheckedByDefault*(self: RadioButton, val: bool) =
 
 proc setAllowUnchecked*(self: RadioButton, val: bool) =
   self.allowUnchecked = val
+
+proc setCaption*(self: RadioButton, val: string) =
+  self.caption = val
 
 method createObject(self: RadioButton): PdfObject =
   var dict = self.createPDFObject()
@@ -1139,7 +1151,7 @@ method createObject(self: PushButton): PdfObject =
   if self.alternateIcon != nil:
     mk.addElement("IX", self.alternateIcon.dictObj)
 
-  if self.icon != nil or self.rollOverIcon != nil or self. alternateIcon != nil:
+  if self.icon != nil or self.rollOverIcon != nil or self.alternateIcon != nil:
     const
       IconScaleModeStr: array[IconScaleMode, string] = ["A", "B", "S", "N"]
       IconScaleTypeStr: array[IconScalingType, string] = ["A", "P"]
@@ -1151,5 +1163,17 @@ method createObject(self: PushButton): PdfObject =
     var arr = newArray(self.iconLeftOver)
     dict.addElement("A", arr)
     mk.addElement("IF", dict)
+
+  self.appearance = newAppearanceStream(self.state)
+  var ap = self.appearance
+
+  ap.saveState()
+  self.state.setCoordinateMode(BOTTOM_UP)
+  ap.setFont("Times", {FS_ITALIC}, 10.0)
+  ap.drawText(10, 10, "Hello")
+  ap.setLineWidth(0.2)
+  ap.drawRect(10, 10, 50, 20)
+  ap.stroke()
+  ap.restoreState()
 
   result = dict

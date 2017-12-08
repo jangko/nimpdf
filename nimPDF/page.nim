@@ -20,7 +20,7 @@ type
     width*, height*: SizeUnit
 
   Rectangle* = object
-    x,y,w,h: float64
+    x*,y*,w*,h*: float64
 
   AnnotType = enum
     ANNOT_LINK, ANNOT_TEXT, ANNOT_WIDGET
@@ -354,6 +354,7 @@ proc putCatalog(doc: DocState, pages: seq[Page]) =
     for page in pages:
       for w in page.widgets:
         w.finalizeObject(page.page, acro, resource)
+        fields.add w.dictObj
         if w.needCalculateOrder():
           if co.isNil: co = newArrayObj()
           co.add w.dictObj
@@ -417,7 +418,7 @@ proc newDocState*(opts: PDFOptions): DocState =
   result.images = @[]
   result.gradients = @[]
   result.fontMan.init(opts.getFontsPath())
-  result.gState = newgState()
+  result.gState = newGState()
   result.pathStartX = 0
   result.pathStartY = 0
   result.pathEndX = 0

@@ -159,6 +159,7 @@ proc putFonts*(xref: Pdfxref, fonts: seq[Font]): DictObj =
   var seed = fromBase26("NIMPDF")
   if fonts.len > 0: result = newDictObj()
   var fn: DictObj
+
   for fon in fonts:
     if fon.subType == FT_BASE14: fn = xref.putBase14Fonts(fon)
     if fon.subType == FT_TRUETYPE: fn = xref.putTrueTypeFonts(fon, seed)
