@@ -482,7 +482,7 @@ proc vPoint*(doc: DocState, val: float64): float64 =
   else:
     result = doc.fromUser(val)
 
-proc vPointMirror(doc: DocState, val: float64): float64 =
+proc vPointMirror*(doc: DocState, val: float64): float64 =
   if doc.coordMode == TOP_DOWN:
     result = doc.fromUser(-val)
   else:

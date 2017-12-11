@@ -84,7 +84,7 @@ proc getVersion*(): string =
 
 proc getVersion*(doc: PDF): string =
   result = nimPDFVersion
-  
+
 proc getOptions*(doc: PDF): PDFOptions =
   result = doc.state.getOpt()
 
@@ -99,7 +99,7 @@ proc setLabel*(doc: PDF, style: LabelStyle) =
 
 proc setLabel*(doc: PDF, style: LabelStyle, prefix: string) =
   doc.state.setLabel(style, prefix, doc.pages.len)
-  
+
 proc addPage*(doc: PDF, size: PageSize, orient = PGO_PORTRAIT): Page {.discardable.} =
   var p = newPage(doc.state, size, orient)
   doc.pages.add(p)
@@ -418,8 +418,8 @@ proc newTextField*(doc: PDF, x,y,w,h: float64, id: string): TextField =
 
   let xx = doc.state.fromUser(x)
   let yy = doc.state.vPoint(y)
-  let ww = doc.state.fromUser(x + w)
-  let hh = doc.state.vPoint(y + h)
+  let ww = doc.state.fromUser(w)
+  let hh = doc.state.vPointMirror(h)
 
   result = newTextField(doc.state, xx, yy, ww, hh, id)
   doc.curPage.addWidget result
@@ -427,30 +427,60 @@ proc newTextField*(doc: PDF, x,y,w,h: float64, id: string): TextField =
 
 proc newCheckBox*(doc: PDF, x,y,w,h: float64, id: string): CheckBox =
   assert(doc.curPage != nil)
-  result = newCheckBox(doc.state, x, y, w, h, id)
+
+  let xx = doc.state.fromUser(x)
+  let yy = doc.state.vPoint(y)
+  let ww = doc.state.fromUser(w)
+  let hh = doc.state.vPointMirror(h)
+
+  result = newCheckBox(doc.state, xx, yy, ww, hh, id)
   doc.curPage.addWidget result
   discard doc.state.newAcroForm()
 
 proc newRadioButton*(doc: PDF, x,y,w,h: float64, id: string): RadioButton =
   assert(doc.curPage != nil)
-  result = newRadioButton(doc.state, x, y, w, h, id)
+
+  let xx = doc.state.fromUser(x)
+  let yy = doc.state.vPoint(y)
+  let ww = doc.state.fromUser(w)
+  let hh = doc.state.vPointMirror(h)
+
+  result = newRadioButton(doc.state, xx, yy, ww, hh, id)
   doc.curPage.addWidget result
   discard doc.state.newAcroForm()
 
 proc newComboBox*(doc: PDF, x,y,w,h: float64, id: string): ComboBox =
   assert(doc.curPage != nil)
-  result = newComboBox(doc.state, x, y, w, h, id)
+
+  let xx = doc.state.fromUser(x)
+  let yy = doc.state.vPoint(y)
+  let ww = doc.state.fromUser(w)
+  let hh = doc.state.vPointMirror(h)
+
+  result = newComboBox(doc.state, xx, yy, ww, hh, id)
   doc.curPage.addWidget result
   discard doc.state.newAcroForm()
 
 proc newListBox*(doc: PDF, x,y,w,h: float64, id: string): ListBox =
   assert(doc.curPage != nil)
-  result = newListBox(doc.state, x, y, w, h, id)
+
+  let xx = doc.state.fromUser(x)
+  let yy = doc.state.vPoint(y)
+  let ww = doc.state.fromUser(w)
+  let hh = doc.state.vPointMirror(h)
+
+  result = newListBox(doc.state, xx, yy, ww, hh, id)
   doc.curPage.addWidget result
   discard doc.state.newAcroForm()
 
 proc newPushButton*(doc: PDF, x,y,w,h: float64, id: string): PushButton =
   assert(doc.curPage != nil)
-  result = newPushButton(doc.state, x, y, w, h, id)
+
+  let xx = doc.state.fromUser(x)
+  let yy = doc.state.vPoint(y)
+  let ww = doc.state.fromUser(w)
+  let hh = doc.state.vPointMirror(h)
+
+  result = newPushButton(doc.state, xx, yy, ww, hh, id)
   doc.curPage.addWidget result
   discard doc.state.newAcroForm()

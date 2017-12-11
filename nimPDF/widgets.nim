@@ -251,7 +251,7 @@ type
     visibility: Visibility
     rotation: int
     fontFamily: string
-    fontStyle: FontStyles
+    fontStyles: FontStyles
     fontSize: float64
     fontEncoding: EncodingType
     fontColorRGB: RGBColor
@@ -266,7 +266,9 @@ type
     format: FormatObject
     highLightMode: HighLightMode
     fieldFlags: int
-    appearance: AppearanceStream
+    normalAP: AppearanceStream
+    rollOverAP: AppearanceStream
+    downAP: AppearanceStream
     matrix: Matrix2d
 
   TextField* = ref object of Widget
@@ -449,7 +451,7 @@ proc createPDFObject(self: Widget): DictObj =
   var rc = newArray(self.rect)
   dict.addElement("Rect", rc)
 
-  var font = self.state.makeFont(self.fontFamily, self.fontStyle, self.fontEncoding)
+  var font = self.state.makeFont(self.fontFamily, self.fontStyles, self.fontEncoding)
   let fontID = $font.ID
 
   if self.fontColorType == ColorRGB:
@@ -494,6 +496,22 @@ proc createPDFObject(self: Widget): DictObj =
 
   if aa != nil: dict.addElement("AA", aa)
   result = self.dictObj
+
+proc putAP(self: Widget, ap: AppearanceStream, code: string, resourceDict: DictObj) =
+  var currAP = ap.newDictStream()
+  currAP.addName("Type", "XObject")
+  currAP.addName("Subtype", "Form")
+  currAP.addNumber("FormType", 1)
+  currAP.addElement("Resources", resourceDict)
+  var r = self.rect
+  var rc = newArray(r.x, r.y, r.x+r.w, r.y+r.h)
+  currAP.addElement("BBox", rc)
+  var m = newArray(self.matrix.ax, self.matrix.ay, self.matrix.bx, self.matrix.by, self.matrix.tx, self.matrix.ty)
+  currAP.addElement("Matrix", m)
+
+  var apDict = newDictObj()
+  apDict.addElement(code, currAP) # or APsubdir
+  self.dictObj.addElement("AP", apDict)
 
 method finalizeObject(self: Widget; page, parent, resourceDict: DictObj) =
   self.dictObj.addElement("DR", resourceDict)
@@ -581,22 +599,15 @@ method finalizeObject(self: Widget; page, parent, resourceDict: DictObj) =
         dict.addString("D", x.defaultDir)
         action.addElement("Win", dict)
 
-  let ap = self.appearance
-  if ap != nil:
-    var normalAP = ap.newDictStream()
-    normalAP.addName("Type", "XObject")
-    normalAP.addName("Subtype", "Form")
-    normalAP.addNumber("FormType", 1)
-    normalAP.addElement("Resources", resourceDict)
-    var r = self.rect
-    var rc = newArray(r.x, r.y, r.x+r.w, r.y+r.h)
-    normalAP.addElement("BBox", rc)
-    var m = newArray(self.matrix.ax, self.matrix.ay, self.matrix.bx, self.matrix.by, self.matrix.tx, self.matrix.ty)
-    normalAP.addElement("Matrix", m)
+  if self.normalAP.isNil:
+    self.normalAP = self.createDefaultAP()
+  self.putAP(self.normalAP, "N", resourceDict)
 
-    var apDict = newDictObj()
-    apDict.addElement("N", normalAP) # or APsubdir
-    self.dictObj.addElement("AP", apDict)
+  if self.rollOverAP != nil:
+    self.putAP(self.rollOverAP, "R", resourceDict)
+
+  if self.downAP != nil:
+    self.putAP(self.downAP, "D", resourceDict)
 
   self.dictObj.addNumber("Ff", self.fieldFlags)
 
@@ -612,7 +623,7 @@ proc init(self: Widget, doc: DocState, id: string) =
   self.visibility = Visible
   self.rotation = 0
   self.fontFamily = "Helvetica"
-  self.fontStyle = {FS_REGULAR}
+  self.fontStyles = {FS_REGULAR}
   self.fontSize = 10.0
   self.fontEncoding = ENC_STANDARD
   self.fontColorType = ColorRGB
@@ -625,11 +636,22 @@ proc init(self: Widget, doc: DocState, id: string) =
   self.format = nil
   self.highLightMode = hmNone
   self.fieldFlags = 0
-  self.appearance = nil # newAppearanceStream(doc)
+  self.normalAP = nil
+  self.rollOverAP = nil
+  self.downAP = nil
   self.matrix = IDMATRIX
 
-proc getApearanceStream*(self: Widget): AppearanceStream =
-  result = self.appearance
+proc getNormalAP*(self: Widget): AppearanceStream =
+  result = self.normalAP
+
+proc setNormalAP*(self: Widget, ap: AppearanceStream) =
+  self.normalAP = ap
+
+proc setDownAP*(self: Widget, ap: AppearanceStream) =
+  self.downAP = ap
+
+proc setRollOverAP*(self: Widget, ap: AppearanceStream) =
+  self.rollOverAP = ap
 
 proc setTransformation*(self: Widget, m: Matrix2d) =
   self.matrix = m
@@ -659,8 +681,8 @@ proc setNoExport*(self: Widget, val: bool) =
 proc setFont*(self: Widget, family: string) =
   self.fontFamily = family
 
-proc setFontStyle*(self: Widget, style: FontStyles) =
-  self.fontStyle = style
+proc setFontStyles*(self: Widget, styles: FontStyles) =
+  self.fontStyles = styles
 
 proc setFontSize*(self: Widget, size: float64) =
   self.fontSize = self.state.fromUser(size)
@@ -1174,19 +1196,23 @@ method createObject(self: PushButton): PdfObject =
     dict.addElement("A", arr)
     mk.addElement("IF", dict)
 
-  self.appearance = newAppearanceStream(self.state)
-  var ap = self.appearance
-
-  ap.saveState()
-  ap.setCoordinateMode(BOTTOM_UP)
-  ap.setFont("Times", {FS_ITALIC}, 10.0)
-  ap.drawText(10, 50, "Hello")
-  ap.setLineWidth(0.2)
-  ap.drawRect(10, 50, 50, 20)
-  ap.stroke()
-  ap.restoreState()
-
   result = dict
 
 method createDefaultAP*(self: PushButton): AppearanceStream =
-  discard
+  var ap = newAppearanceStream(self.state)
+
+  ap.saveState()
+  ap.setCoordinateMode(BOTTOM_UP)
+  ap.setUnit(PGU_PT)
+  ap.setFont(self.fontFamily, self.fontStyles, self.fontSize)
+
+  var r = self.rect
+  let textWidth = ap.getTextWidth(self.caption)
+  ap.drawText(r.x + (r.w - textWidth) / 2, r.y + (r.h - self.fontSize) / 2, self.caption)
+
+  ap.setLineWidth(0.2)
+  ap.drawRect(r.x, r.y, r.w, r.h)
+  ap.stroke()
+  ap.restoreState()
+
+  result = ap

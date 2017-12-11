@@ -4,7 +4,7 @@ proc createPDF(doc: PDF, pageNo: int) =
   let size = getSizeFromName("A4")
   doc.addPage(size, PGO_PORTRAIT)
 
-  doc.setUnit(PGU_PT)
+  #doc.setUnit(PGU_PT)
   doc.setCoordinateMode(BOTTOM_UP)
   doc.setFont("Times", {FS_REGULAR}, 10.0)
   doc.drawText(10, 100, "Page: " & $pageNo)
