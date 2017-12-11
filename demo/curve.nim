@@ -17,7 +17,7 @@ type
     doc: PDF
 
 proc draw_title(doc: PDF, text:string) =
-  let size = doc.getSize()
+  let size = doc.getPageSize()
 
   doc.setFont("Helvetica", {FS_BOLD}, 5)
   let tw = doc.getTextWidth(text)
@@ -132,20 +132,20 @@ proc createPDF(doc: PDF) =
   var gd = newLinearGradient(initRGB("red"), initRGB("blue"), coord)
   doc.setGradientFill(gd)
   doc.drawCircle(50, 50, 30)
-  doc.roundRect(50, 50, 30, 30, 10)
+  doc.drawRoundRect(50, 50, 30, 30, 10)
   doc.fill()
 
   coord = initCoord(0,0,0,1)
   gd = newLinearGradient(initRGB("yellow"), initRGB("pink"), coord)
   doc.setGradientFill(gd)
-  doc.roundRect(150, 50, 30, 30, 10)
+  doc.drawRoundRect(150, 50, 30, 30, 10)
   doc.drawEllipse(100, 90, 30, 10)
   doc.fill()
 
   coord = initCoord(0,0,1,1)
   gd = newLinearGradient(initRGB("green"), initRGB("yellow"), coord)
   doc.setGradientFill(gd)
-  doc.roundRect(10, 70, 30, 30, 10)
+  doc.drawRoundRect(10, 70, 30, 30, 10)
   doc.drawEllipse(70, 100, 30, 10)
   doc.fillAndStroke()
 

@@ -894,7 +894,7 @@ proc draw_demo_9(doc: PDF) =
 
   doc.setRGBStroke(initRGB("red"))
   doc.setLineWidth(1.0)
-  doc.roundRect(20, spec.y0 + 20, 160.0, 30.0, 7.0)
+  doc.drawRoundRect(20, spec.y0 + 20, 160.0, 30.0, 7.0)
   doc.stroke()
 
 proc makeCanvas(doc: PDF): Canvas =
@@ -1006,20 +1006,20 @@ proc draw_demo_11(doc: PDF) =
   var gd = newLinearGradient(initRGB("red"), initRGB("blue"), coord)
   doc.setGradientFill(gd)
   doc.drawCircle(50, 50, 30)
-  doc.roundRect(50, 50, 30, 30, 10)
+  doc.drawRoundRect(50, 50, 30, 30, 10)
   doc.fill()
 
   coord = initCoord(0,0,0,1)
   gd = newLinearGradient(initRGB("yellow"), initRGB("pink"), coord)
   doc.setGradientFill(gd)
-  doc.roundRect(150, 50, 30, 30, 10)
+  doc.drawRoundRect(150, 50, 30, 30, 10)
   doc.drawEllipse(100, 90, 30, 10)
   doc.fill()
 
   var radCoord = initCoord(0.5,0.5,0,0.5,0.5,1)
   gd = newRadialGradient(initRGB("yellow"), initRGB("brown"), radCoord)
   doc.setGradientFill(gd)
-  doc.roundRect(10, 70, 30, 30, 10)
+  doc.drawRoundRect(10, 70, 30, 30, 10)
   doc.drawEllipse(70, 100, 30, 10)
   doc.fillAndStroke()
 

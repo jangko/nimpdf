@@ -23,7 +23,7 @@ type
     x*,y*,w*,h*: float64
 
   AnnotType = enum
-    ANNOT_LINK, ANNOT_TEXT, ANNOT_WIDGET
+    ANNOT_LINK, ANNOT_TEXT
 
   Annot* = ref object
     rect: Rectangle
@@ -32,8 +32,6 @@ type
       dest: Destination
     of ANNOT_TEXT:
       content: string
-    of ANNOT_WIDGET:
-      annot: DictObj
 
   PageLabel = object
     pageIndex: int
@@ -60,14 +58,10 @@ type
     fontFamily: string
     fontStyle: FontStyles
     encoding: EncodingType
-    fields: seq[Annot]
-
-  MapRoot* = ref object of RootObj
-    dictObj*: DictObj
 
   DocState* = ref object
     size: PageSize
-    extgStates: seq[ExtgState]
+    ExtGStates: seq[ExtGState]
     images: seq[Image]
     gradients: seq[Gradient]
     fontMan: FontManager
@@ -83,23 +77,28 @@ type
     xref: Pdfxref
     encrypt: EncryptDict
     acroForm: AcroForm
-    widgets: seq[MapRoot]
 
-  ContentRoot* = ref object of RootObj
+  DictBase = ref object of RootObj
+    dictObj*: DictObj
+
+  StateBase* = ref object of DictBase
+    state*: DocState
+
+  WidgetBase* = ref object of StateBase
+
+  ContentBase* = ref object of StateBase
     content: string
-    state: DocState
 
-  AppearanceStream* = ref object of ContentRoot
+  AppearanceStream* = ref object of ContentBase
 
-  Page* = ref object of ContentRoot
+  Page* = ref object of ContentBase
     size: PageSize
     annots: seq[Annot]
-    page: DictObj
-    widgets: seq[MapRoot]
+    widgets: seq[WidgetBase]
 
-method createObject*(self: MapRoot): PdfObject {.base.} = discard
-method finalizeObject*(self: MapRoot; page, parent, resourceDict: DictObj) {.base.} = discard
-method needCalculateOrder*(self: MapRoot): bool {.base.} = discard
+method createObject*(self: WidgetBase): PdfObject {.base.} = discard
+method finalizeObject*(self: WidgetBase; page, parent, resourceDict: DictObj) {.base.} = discard
+method needCalculateOrder*(self: WidgetBase): bool {.base.} = discard
 
 proc escapeString(text: string): string =
   result = ""
@@ -130,7 +129,7 @@ template toUser*(doc: DocState, val:float64): float64 =
 
 proc toObject*(dest: Destination): ArrayObj =
   var arr = newArrayObj()
-  arr.add(dest.page.page)
+  arr.add(dest.page.dictObj)
 
   case dest.style
   of DS_XYZ:
@@ -161,7 +160,7 @@ proc toObject*(dest: Destination): ArrayObj =
 
   result = arr
 
-proc putDestination(doc: DocState, dict: DictObj, dest: Destination) =
+proc putDestination(dict: DictObj, dest: Destination) =
   var arr = toObject(dest)
   dict.addElement("Dest", arr)
 
@@ -177,7 +176,7 @@ proc putPages(doc: DocState, resource: DictObj, pages: seq[Page]): DictObj =
 
   for p in pages:
     let content = doc.xref.newDictStream(p.content)
-    var page = p.page
+    var page = p.dictObj
     kids.add(page)
     page.addName("Type", "Page")
     page.addElement("Parent", root)
@@ -193,7 +192,7 @@ proc putPages(doc: DocState, resource: DictObj, pages: seq[Page]): DictObj =
   for p in pages:
     if p.annots.len == 0 and p.widgets.len == 0: continue
     var annots = newArrayObj()
-    p.page.addElement("Annots", annots)
+    p.dictObj.addElement("Annots", annots)
     for a in p.annots:
       var annot = newDictObj()
       doc.xref.add(annot)
@@ -201,12 +200,7 @@ proc putPages(doc: DocState, resource: DictObj, pages: seq[Page]): DictObj =
       annot.addName("Type", "Annot")
       if a.annotType == ANNOT_LINK:
         annot.addName("Subtype", "Link")
-        doc.putDestination(annot, a.dest)
-      elif a.annotType == ANNOT_WIDGET:
-        annot.addName("Subtype", "Widget")
-        annot.addName("FT", "Tx")
-        annot.addString("T", "Text" & $i) #unique label
-        a.annot = annot
+        putDestination(annot, a.dest)
       else:
         annot.addName("Subtype", "Text")
         annot.addString("Contents", a.content)
@@ -215,15 +209,13 @@ proc putPages(doc: DocState, resource: DictObj, pages: seq[Page]): DictObj =
       annot.addPlain("BS", "<</W 0>>")
       inc i
     for x in p.widgets:
-      var annot = x.createObject()
-      doc.xref.add(annot)
-      annots.add(annot)
+      annots.add(x.dictObj)
 
   result = root
 
 proc putResources(doc: DocState): DictObj =
   let grads = putGradients(doc.xref, doc.gradients)
-  let exts  = putExtgStates(doc.xref, doc.extgStates)
+  let exts  = putExtGStates(doc.xref, doc.ExtGStates)
   let imgs  = putImages(doc.xref, doc.images)
   let fonts = putFonts(doc.xref, doc.fontMan.fontList)
 
@@ -232,7 +224,7 @@ proc putResources(doc: DocState): DictObj =
 
   #doc.put("<</ProcSet [/PDF /Text /ImageB /ImageC /ImageI]")
   if fonts != nil: result.addElement("Font", fonts)
-  if exts != nil: result.addElement("ExtgState", exts)
+  if exts != nil: result.addElement("ExtGState", exts)
   if imgs != nil: result.addElement("XObject", imgs)
   if grads != nil: result.addElement("Shading", grads)
 
@@ -293,7 +285,7 @@ proc putOutlineItem(doc: DocState, outlines: seq[Outline], parent: DictObj, root
       root.addElement("Next", outlines[i+1])
       root.addElement("Prev", outlines[i-1])
 
-  doc.putDestination(root, root.dest)
+  putDestination(root, root.dest)
 
   if root.kids.len > 0:
     let firstKid = root.kids[0]
@@ -338,6 +330,11 @@ proc putCatalog(doc: DocState, pages: seq[Page]) =
     #set acroform default appearance
     font = doc.fontMan.makeFont(doc.acroForm.fontFamily, doc.acroForm.fontStyle, doc.acroForm.encoding)
 
+  for p in pages:
+    for x in p.widgets:
+      var annot = x.createObject()
+      doc.xref.add(annot)
+
   let resource = doc.putResources()
   let pageRoot = doc.putPages(resource, pages)
   #let firstPageID = pageRootID + 1
@@ -347,13 +344,11 @@ proc putCatalog(doc: DocState, pages: seq[Page]) =
     var acro = newDictObj()
     doc.xref.add(acro)
     var fields = newArrayObj()
-    for a in doc.acroForm.fields:
-      fields.add a.annot
 
     var co: ArrayObj
     for page in pages:
       for w in page.widgets:
-        w.finalizeObject(page.page, acro, resource)
+        w.finalizeObject(page.dictObj, acro, resource)
         fields.add w.dictObj
         if w.needCalculateOrder():
           if co.isNil: co = newArrayObj()
@@ -399,9 +394,6 @@ proc putCatalog(doc: DocState, pages: seq[Page]) =
 
     trailer.addElement("Encrypt", doc.encrypt)
 
-proc addWidget*(doc: DocState, w: MapRoot) =
-  doc.widgets.add w
-
 proc writePDF*(doc: DocState, s: Stream, pages: seq[Page]) =
   doc.putCatalog(pages)
   s.write("%PDF-1.7\x0A")
@@ -414,7 +406,7 @@ proc setInfo*(doc: DocState, field: DocInfo, info: string) =
 
 proc newDocState*(opts: PDFOptions): DocState =
   new(result)
-  result.extgStates = @[]
+  result.ExtGStates = @[]
   result.images = @[]
   result.gradients = @[]
   result.fontMan.init(opts.getFontsPath())
@@ -432,7 +424,6 @@ proc newDocState*(opts: PDFOptions): DocState =
   result.xref = newPdfxref()
   result.setInfo(DI_PRODUCER, "nimPDF")
   result.setFontCount = 0
-  result.widgets = @[]
 
 proc makeFont*(doc: DocState, family: string, style: FontStyles, enc: EncodingType = ENC_STANDARD): Font =
   result = doc.fontMan.makeFont(family, style, enc)
@@ -485,7 +476,7 @@ proc getCoordinateMode*(doc: DocState): CoordinateMode =
 template coordMode(doc: DocState): CoordinateMode =
   doc.gState.coordMode
 
-proc vPoint(doc: DocState, val: float64): float64 =
+proc vPoint*(doc: DocState, val: float64): float64 =
   if doc.coordMode == TOP_DOWN:
     result = doc.size.height.toPT - doc.fromUser(val)
   else:
@@ -583,7 +574,6 @@ proc newAcroForm*(doc: DocState): AcroForm =
   result.fontFamily = "Helvetica"
   result.fontStyle = {FS_REGULAR}
   result.encoding = ENC_STANDARD
-  result.fields = @[]
   doc.acroForm = result
 
 proc setFontColor*(a: AcroForm, r,g,b: float64) =
@@ -606,19 +596,7 @@ proc setFontStyle*(a: AcroForm, style: FontStyles) =
 proc setEncoding*(a: AcroForm, enc: EncodingType) =
   a.encoding = enc
 
-proc newTextField*(doc: DocState, rect: Rectangle, src: Page): Annot =
-  var acro = doc.newAcroForm()
-  new(result)
-  let xx = doc.fromUser(rect.x)
-  let yy = doc.vPoint(rect.y)
-  let ww = doc.fromUser(rect.x + rect.w)
-  let hh = doc.vPoint(rect.y + rect.h)
-  result.annotType = ANNOT_WIDGET
-  result.rect = initRect(xx,yy,ww,hh)
-  src.annots.add(result)
-  acro.fields.add(result)
-
-proc put(self: ContentRoot, text: varargs[string]) =
+proc put(self: ContentBase, text: varargs[string]) =
   for s in items(text): self.content.add(s)
   self.content.add('\x0A')
 
@@ -635,8 +613,33 @@ proc newPage*(state: DocState, size: PageSize, orient = PGO_PORTRAIT): Page =
     result.size.swap()
   result.state = state
   state.size = result.size
-  result.page = newDictObj()
-  state.xref.add(result.page)
+  result.dictObj = newDictObj()
+  state.xref.add(result.dictObj)
+
+
+proc loadImage*(self: StateBase, fileName: string): Image =
+  result = self.state.loadImage(fileName)
+
+proc setUnit*(self: StateBase, unit: PageUnitType) =
+  self.state.setUnit(unit)
+
+proc getUnit*(self: StateBase): PageUnitType =
+  result = self.state.getUnit()
+
+proc setCoordinateMode*(self: StateBase, mode: CoordinateMode) =
+  self.state.setCoordinateMode(mode)
+
+proc getCoordinateMode*(self: StateBase): CoordinateMode =
+  result = self.state.getCoordinateMode()
+
+proc getPageSize*(self: StateBase): PageSize =
+  result = self.state.getPageSize()
+
+proc toUser*(self: StateBase, val: float64): float64 =
+  self.state.toUser(val)
+
+proc fromUser*(self: StateBase, val: float64): float64 =
+  self.state.fromUser(val)
 
 proc newAppearanceStream*(state: DocState): AppearanceStream =
   new(result)
@@ -646,13 +649,13 @@ proc newAppearanceStream*(state: DocState): AppearanceStream =
 proc newDictStream*(self: AppearanceStream): DictObj =
   result = self.state.newDictStream(self.content)
 
-template fromUser(self: ContentRoot, val: float64): float64 =
+template fromUser(self: ContentBase, val: float64): float64 =
   self.state.gState.docUnit.fromUser(val)
 
-template toUser(self: ContentRoot, val: float64): float64 =
+template toUser(self: ContentBase, val: float64): float64 =
   self.state.gState.docUnit.toUser(val)
 
-proc setFont*(self: ContentRoot, family:string, style: FontStyles, size: float64, enc: EncodingType = ENC_STANDARD) =
+proc setFont*(self: ContentBase, family:string, style: FontStyles, size: float64, enc: EncodingType = ENC_STANDARD) =
   var font = self.state.fontMan.makeFont(family, style, enc)
   let fontNumber = font.ID
   let fontSize = self.fromUser(size)
@@ -661,7 +664,7 @@ proc setFont*(self: ContentRoot, family:string, style: FontStyles, size: float64
   self.state.gState.fontSize = fontSize
   inc(self.state.setFontCount)
 
-proc drawText*(self: ContentRoot; x,y: float64; text: string) =
+proc drawText*(self: ContentBase; x,y: float64; text: string) =
   let xx = self.fromUser(x)
   let yy = self.state.vPoint(y)
 
@@ -676,7 +679,7 @@ proc drawText*(self: ContentRoot; x,y: float64; text: string) =
   else:
     self.put("BT ",f2s(xx)," ",f2s(yy)," Td (",escapeString(text),") Tj ET")
 
-proc drawVText*(self: ContentRoot; x,y: float64; text: string) =
+proc drawVText*(self: ContentBase; x,y: float64; text: string) =
   if self.state.gState.font == nil or self.state.setFontCount == 0:
     self.setFont(defaultFont, {FS_REGULAR}, 5)
 
@@ -700,13 +703,13 @@ proc drawVText*(self: ContentRoot; x,y: float64; text: string) =
     inc(i, 4)
   self.put("ET")
 
-proc beginText*(self: ContentRoot) =
+proc beginText*(self: ContentBase) =
   if self.state.gState.font == nil or self.state.setFontCount == 0:
     self.setFont(defaultFont, {FS_REGULAR}, 5)
 
   self.put("BT")
 
-proc beginText*(self: ContentRoot; x,y: float64) =
+proc beginText*(self: ContentBase; x,y: float64) =
   if self.state.gState.font == nil:
     self.setFont(defaultFont, {FS_REGULAR}, 5)
 
@@ -714,20 +717,20 @@ proc beginText*(self: ContentRoot; x,y: float64) =
   let yy = self.state.vPoint(y)
   self.put("BT ", f2s(xx)," ",f2s(yy)," Td")
 
-proc moveTextPos*(self: ContentRoot; x,y: float64) =
+proc moveTextPos*(self: ContentBase; x,y: float64) =
   let xx = self.fromUser(x)
   let yy = self.state.vPointMirror(y)
   self.put(f2s(xx)," ",f2s(yy)," Td")
 
-proc setTextRenderingMode*(self: ContentRoot, rm: TextRenderingMode) =
+proc setTextRenderingMode*(self: ContentBase, rm: TextRenderingMode) =
   let trm = cast[int](rm)
   if self.state.gState.renderingMode != rm: self.put($trm, " Tr")
   self.state.gState.renderingMode = rm
 
-proc setTextMatrix*(self: ContentRoot, m: Matrix2d) =
+proc setTextMatrix*(self: ContentBase, m: Matrix2d) =
   self.put(f2s(m.ax)," ", f2s(m.ay), " ", f2s(m.bx), " ", f2s(m.by), " ", f2s(m.tx)," ",f2s(m.ty)," Tm")
 
-proc showText*(self: ContentRoot, text:string) =
+proc showText*(self: ContentBase, text:string) =
   var font = self.state.gState.font
 
   if font.subType == FT_TRUETYPE:
@@ -736,60 +739,60 @@ proc showText*(self: ContentRoot, text:string) =
   else:
     self.put("(",escapeString(text),") Tj")
 
-proc setTextLeading*(self: ContentRoot, val: float64) =
+proc setTextLeading*(self: ContentBase, val: float64) =
   let tl = self.fromUser(val)
   self.put(f2s(tl)," TL")
 
-proc moveToNextLine*(self: ContentRoot) =
+proc moveToNextLine*(self: ContentBase) =
   self.put("T*")
 
-proc endText*(self: ContentRoot) =
+proc endText*(self: ContentBase) =
   self.put("ET")
 
 proc degree_to_radian*(x: float): float =
   result = (x * math.PI) / 180.0
 
-proc setCharSpace*(self: ContentRoot; val: float64) =
+proc setCharSpace*(self: ContentBase; val: float64) =
   self.put(f2s(val)," Tc")
   self.state.gState.charSpace = val
 
-proc setTextHScale*(self: ContentRoot; val: float64) =
+proc setTextHScale*(self: ContentBase; val: float64) =
   self.put(f2s(val)," Th")
   self.state.gState.hScaling = val
 
-proc setWordSpace*(self: ContentRoot; val: float64) =
+proc setWordSpace*(self: ContentBase; val: float64) =
   self.put(f2s(val)," Tw")
   self.state.gState.wordSpace = val
 
-proc setTransform*(self: ContentRoot, m: Matrix2d) =
+proc setTransform*(self: ContentBase, m: Matrix2d) =
   self.put(f2s(m.ax)," ", f2s(m.ay), " ", f2s(m.bx), " ", f2s(m.by), " ", f2s(m.tx)," ",f2s(m.ty)," cm")
   self.state.gState.transMatrix = self.state.gState.transMatrix & m
 
-proc rotate*(self: ContentRoot, angle:float64) =
+proc rotate*(self: ContentBase, angle:float64) =
   self.setTransform(rotate(degree_to_radian(angle)))
 
-proc rotate*(self: ContentRoot, angle, x,y:float64) =
+proc rotate*(self: ContentBase, angle, x,y:float64) =
   let xx = self.fromUser(x)
   let yy = self.state.vPoint(y)
   self.setTransform(rotate(degree_to_radian(angle), point2d(xx, yy)))
 
-proc move*(self: ContentRoot, x,y:float64) =
+proc move*(self: ContentBase, x,y:float64) =
   let xx = self.fromUser(x)
   let yy = self.state.vPointMirror(y)
   self.setTransform(move(xx,yy))
 
-proc scale*(self: ContentRoot, s:float64) =
+proc scale*(self: ContentBase, s:float64) =
   self.setTransform(scale(s))
 
-proc scale*(self: ContentRoot, s, x,y:float64) =
+proc scale*(self: ContentBase, s, x,y:float64) =
   let xx = self.fromUser(x)
   let yy = self.state.vPoint(y)
   self.setTransform(scale(s, point2d(xx, yy)))
 
-proc stretch*(self: ContentRoot, sx,sy:float64) =
+proc stretch*(self: ContentBase, sx,sy:float64) =
   self.setTransform(stretch(sx,sy))
 
-proc stretch*(self: ContentRoot, sx,sy,x,y:float64) =
+proc stretch*(self: ContentBase, sx,sy,x,y:float64) =
   let xx = self.fromUser(x)
   let yy = self.state.vPoint(y)
   self.setTransform(stretch(sx, sy, point2d(xx, yy)))
@@ -800,19 +803,19 @@ proc shear(sx,sy,x,y:float64): Matrix2d =
     s = matrix2d(1.0,sx,sy,1.0,0.0,0.0)
   result = m & s & move(x,y)
 
-proc skew*(self: ContentRoot, sx,sy:float64) =
+proc skew*(self: ContentBase, sx,sy:float64) =
   let tsx = math.tan(degree_to_radian(sx))
   let tsy = math.tan(degree_to_radian(sy))
   self.setTransform(matrix2d(1,tsx,tsy,1,0,0))
 
-proc skew*(self: ContentRoot, sx,sy,x,y:float64) =
+proc skew*(self: ContentBase, sx,sy,x,y:float64) =
   let xx = self.fromUser(x)
   let yy = self.state.vPoint(y)
   let tsx = math.tan(degree_to_radian(sx))
   let tsy = math.tan(degree_to_radian(sy))
   self.setTransform(shear(tsx, tsy, xx, yy))
 
-proc drawImage*(self: ContentRoot, x:float64, y:float64, source: Image) =
+proc drawImage*(self: ContentBase, x:float64, y:float64, source: Image) =
   let size = self.state.images.len()
   var found = false
   var img = source
@@ -856,7 +859,7 @@ proc drawImage*(self: ContentRoot, x:float64, y:float64, source: Image) =
   self.put("/I",$img.ID," Do")
   self.put("Q")
 
-proc drawRect*(self: ContentRoot, x: float64, y: float64, w: float64, h: float64) =
+proc drawRect*(self: ContentBase, x: float64, y: float64, w: float64, h: float64) =
   if self.state.recordShape:
     self.state.shapes[self.state.shapes.len - 1].addRect(x, y, w, h)
     self.state.shapes.add(makePath())
@@ -867,7 +870,7 @@ proc drawRect*(self: ContentRoot, x: float64, y: float64, w: float64, h: float64
     let hh = self.state.vPointMirror(h)
     self.put(f2s(xx)," ",f2s(yy)," ",f2s(ww)," ",f2s(hh)," re")
 
-proc moveTo*(self: ContentRoot, x: float64, y: float64) =
+proc moveTo*(self: ContentBase, x: float64, y: float64) =
   let xx = self.fromUser(x)
   let yy = self.state.vPoint(y)
   self.put(f2s(xx)," ",f2s(yy)," m")
@@ -876,9 +879,9 @@ proc moveTo*(self: ContentRoot, x: float64, y: float64) =
   self.state.pathEndX = x
   self.state.pathEndY = y
 
-proc moveTo*(self: ContentRoot, p: Point2d) {.inline.} = self.moveTo(p.x, p.y)
+proc moveTo*(self: ContentBase, p: Point2d) {.inline.} = self.moveTo(p.x, p.y)
 
-proc lineTo*(self: ContentRoot, x: float64, y: float64) =
+proc lineTo*(self: ContentBase, x: float64, y: float64) =
   if self.state.recordShape:
     self.state.shapes[self.state.shapes.len - 1].addLine(self.state.pathStartX, self.state.pathStartY, x, y)
     if x == self.state.pathStartX and y == self.state.pathStartY:
@@ -890,9 +893,9 @@ proc lineTo*(self: ContentRoot, x: float64, y: float64) =
   self.state.pathEndX = x
   self.state.pathEndY = y
 
-proc lineTo*(self: ContentRoot, p: Point2d) {.inline.} = self.lineTo(p.x, p.y)
+proc lineTo*(self: ContentBase, p: Point2d) {.inline.} = self.lineTo(p.x, p.y)
 
-proc bezierCurveTo*(self: ContentRoot; cp1x, cp1y, cp2x, cp2y, x, y: float64) =
+proc bezierCurveTo*(self: ContentBase; cp1x, cp1y, cp2x, cp2y, x, y: float64) =
   if self.state.recordShape:
     self.state.shapes[self.state.shapes.len - 1].addCubicCurve(self.state.pathEndX, self.state.pathEndY, cp1x,cp1y, cp2x,cp2y, x, y)
     if x == self.state.pathStartX and y == self.state.pathStartY:
@@ -909,9 +912,9 @@ proc bezierCurveTo*(self: ContentRoot; cp1x, cp1y, cp2x, cp2y, x, y: float64) =
   self.state.pathEndX = x
   self.state.pathEndY = y
 
-proc bezierCurveTo*(self: ContentRoot; cp1, cp2, p: Point2d) {.inline.} = self.bezierCurveTo(cp1.x,cp1.y,cp2.x,cp2.y,p.x,p.y)
+proc bezierCurveTo*(self: ContentBase; cp1, cp2, p: Point2d) {.inline.} = self.bezierCurveTo(cp1.x,cp1.y,cp2.x,cp2.y,p.x,p.y)
 
-proc curveTo1*(self: ContentRoot; cpx, cpy, x, y: float64) =
+proc curveTo1*(self: ContentBase; cpx, cpy, x, y: float64) =
   if self.state.recordShape:
     self.state.shapes[self.state.shapes.len - 1].addQuadraticCurve(self.state.pathEndX, self.state.pathEndY, cpx,cpy, x, y)
     if x == self.state.pathStartX and y == self.state.pathStartY:
@@ -925,9 +928,9 @@ proc curveTo1*(self: ContentRoot; cpx, cpy, x, y: float64) =
   self.state.pathEndX = x
   self.state.pathEndY = y
 
-proc curveTo1*(self: ContentRoot; cp, p: Point2d) {.inline.} = self.curveTo1(cp.x,cp.y,p.x,p.y)
+proc curveTo1*(self: ContentBase; cp, p: Point2d) {.inline.} = self.curveTo1(cp.x,cp.y,p.x,p.y)
 
-proc curveTo2*(self: ContentRoot; cpx, cpy, x, y: float64) =
+proc curveTo2*(self: ContentBase; cpx, cpy, x, y: float64) =
   if self.state.recordShape:
     self.state.shapes[self.state.shapes.len - 1].addQuadraticCurve(self.state.pathEndX, self.state.pathEndY, cpx,cpy, x, y)
     if x == self.state.pathStartX and y == self.state.pathStartY:
@@ -941,9 +944,9 @@ proc curveTo2*(self: ContentRoot; cpx, cpy, x, y: float64) =
   self.state.pathEndX = x
   self.state.pathEndY = y
 
-proc curveTo2*(self: ContentRoot; cp, p: Point2d) {.inline.} = self.curveTo2(cp.x,cp.y,p.x,p.y)
+proc curveTo2*(self: ContentBase; cp, p: Point2d) {.inline.} = self.curveTo2(cp.x,cp.y,p.x,p.y)
 
-proc closePath*(self: ContentRoot) =
+proc closePath*(self: ContentBase) =
   if self.state.recordShape:
     self.state.shapes[self.state.shapes.len - 1].addLine(self.state.pathEndX, self.state.pathEndY, self.state.pathStartX, self.state.pathStartY)
     self.state.shapes.add(makePath())
@@ -953,7 +956,7 @@ proc closePath*(self: ContentRoot) =
   self.state.pathEndX = self.state.pathStartX
   self.state.pathEndY = self.state.pathStartY
 
-proc roundRect*(self: ContentRoot; x, y, w, h: float64; r: float64 = 0.0) =
+proc roundRect*(self: ContentBase; x, y, w, h: float64; r: float64 = 0.0) =
   self.moveTo(x + r, y)
   self.lineTo(x + w - r, y)
   self.curveTo1(x + w, y, x + w, y + r)
@@ -964,7 +967,7 @@ proc roundRect*(self: ContentRoot; x, y, w, h: float64; r: float64 = 0.0) =
   self.lineTo(x, y + r)
   self.curveTo1(x, y, x + r, y)
 
-proc drawEllipse*(self: ContentRoot; x, y, r1, r2 : float64) =
+proc drawEllipse*(self: ContentBase; x, y, r1, r2 : float64) =
   # based on http://stackoverflow.com/questions/2172798/how-to-draw-an-oval-in-html5-canvas/2173084#2173084
   let KAPPA = 4.0 * ((math.sqrt(2.0) - 1.0) / 3.0)
   let xx = x - r1
@@ -982,110 +985,110 @@ proc drawEllipse*(self: ContentRoot; x, y, r1, r2 : float64) =
   self.bezierCurveTo(xe, ym + oy, xm + ox, ye, xm, ye)
   self.bezierCurveTo(xm - ox, ye, xx, ym + oy, xx, ym)
 
-proc drawCircle*(self: ContentRoot; x, y, radius : float64) =
+proc drawCircle*(self: ContentBase; x, y, radius : float64) =
   self.drawEllipse(x,y,radius,radius)
 
-proc setLineWidth*(self: ContentRoot, lineWidth: float64) =
+proc setLineWidth*(self: ContentBase, lineWidth: float64) =
   let lw = self.fromUser(lineWidth)
   if lineWidth != self.state.gState.lineWidth: self.put(f2s(lw), " w")
   self.state.gState.lineWidth = lineWidth
 
-proc setLineCap*(self: ContentRoot, lineCap: LineCap) =
+proc setLineCap*(self: ContentBase, lineCap: LineCap) =
   let lc = cast[int](lineCap)
   if lineCap != self.state.gState.lineCap: self.put($lc, " J")
   self.state.gState.lineCap = lineCap
 
-proc setLineJoin*(self: ContentRoot, lineJoin: LineJoin) =
+proc setLineJoin*(self: ContentBase, lineJoin: LineJoin) =
   let lj = cast[int](lineJoin)
   if self.state.gState.lineJoin != lineJoin: self.put($lj, " j")
   self.state.gState.lineJoin = lineJoin
 
-proc setMiterLimit*(self: ContentRoot, miterLimit: float64) =
+proc setMiterLimit*(self: ContentBase, miterLimit: float64) =
   let ml = self.fromUser(miterLimit)
   if self.state.gState.miterLimit != miterLimit: self.put(f2s(ml), " M")
   self.state.gState.miterLimit = miterLimit
 
-proc setGrayFill*(self: ContentRoot; g: float64) =
+proc setGrayFill*(self: ContentBase; g: float64) =
   self.put(f2s(g), " g")
   self.state.gState.grayFill = g
   self.state.gState.csFill = CS_DEVICE_GRAY
   self.state.shapes = nil
   self.state.recordShape = false
 
-proc setGrayStroke*(self: ContentRoot; g: float64) =
+proc setGrayStroke*(self: ContentBase; g: float64) =
   self.put(f2s(g), " G")
   self.state.gState.grayStroke = g
   self.state.gState.csStroke = CS_DEVICE_GRAY
 
-proc setRGBFill*(self: ContentRoot; r,g,b: float64) =
+proc setRGBFill*(self: ContentBase; r,g,b: float64) =
   self.put(f2s(r), " ",f2s(g), " ",f2s(b), " rg")
   self.state.gState.rgbFill = initRGB(r,g,b)
   self.state.gState.csFill = CS_DEVICE_RGB
   self.state.shapes = nil
   self.state.recordShape = false
 
-proc setRGBStroke*(self: ContentRoot; r,g,b: float64) =
+proc setRGBStroke*(self: ContentBase; r,g,b: float64) =
   self.put(f2s(r), " ",f2s(g), " ",f2s(b), " RG")
   self.state.gState.rgbStroke = initRGB(r,g,b)
   self.state.gState.csStroke = CS_DEVICE_RGB
 
-proc setRGBFill*(self: ContentRoot; col: RGBColor) =
+proc setRGBFill*(self: ContentBase; col: RGBColor) =
   self.setRGBFill(col.r,col.g,col.b)
 
-proc setRGBStroke*(self: ContentRoot; col: RGBColor) =
+proc setRGBStroke*(self: ContentBase; col: RGBColor) =
   self.setRGBStroke(col.r,col.g,col.b)
 
-proc setCMYKFill*(self: ContentRoot; c,m,y,k: float64) =
+proc setCMYKFill*(self: ContentBase; c,m,y,k: float64) =
   self.put(f2s(c), " ",f2s(m), " ",f2s(y), " ",f2s(k), " k")
   self.state.gState.cmykFill = initCMYK(c,m,y,k)
   self.state.gState.csFill = CS_DEVICE_CMYK
   self.state.shapes = nil
   self.state.recordShape = false
 
-proc setCMYKStroke*(self: ContentRoot; c,m,y,k: float64) =
+proc setCMYKStroke*(self: ContentBase; c,m,y,k: float64) =
   self.put(f2s(c), " ",f2s(m), " ",f2s(y), " ",f2s(k), " K")
   self.state.gState.cmykFill = initCMYK(c,m,y,k)
   self.state.gState.csFill = CS_DEVICE_CMYK
 
-proc setCMYKFill*(self: ContentRoot; col: CMYKColor) =
+proc setCMYKFill*(self: ContentBase; col: CMYKColor) =
   self.setCMYKFill(col.c,col.m,col.y,col.k)
 
-proc setCMYKStroke*(self: ContentRoot; col: CMYKColor) =
+proc setCMYKStroke*(self: ContentBase; col: CMYKColor) =
   self.setCMYKStroke(col.c,col.m,col.y,col.k)
 
-proc init(gs: var ExtgState; id: int; sA, nsA: float64, bm: string = "Normal") =
+proc init(gs: var ExtGState; id: int; sA, nsA: float64, bm: string = "Normal") =
   gs.ID = id
   gs.strokingAlpha = sA
   gs.nonstrokingAlpha = nsA
   gs.blendMode = bm
 
-proc setAlpha*(self: ContentRoot, a: float64) =
-  let id = self.state.extgStates.len() + 1
-  var gs : ExtgState
+proc setAlpha*(self: ContentBase, a: float64) =
+  let id = self.state.ExtGStates.len() + 1
+  var gs : ExtGState
   gs.init(id, a, a)
-  self.state.extgStates.add(gs)
+  self.state.ExtGStates.add(gs)
   self.put("/GS",$id," gs")
   self.state.gState.alphaFill = a
   self.state.gState.alphaStroke = a
 
-proc setBlendMode*(self: ContentRoot, bm: BlendMode) =
-  let id = self.state.extgStates.len() + 1
-  var gs : ExtgState
+proc setBlendMode*(self: ContentBase, bm: BlendMode) =
+  let id = self.state.ExtGStates.len() + 1
+  var gs : ExtGState
   var bmid = cast[int](bm)
   gs.init(id, -1.0, -1.0, BM_NAMES[bmid])
-  self.state.extgStates.add(gs)
+  self.state.ExtGStates.add(gs)
   self.put("/GS",$id," gs")
   self.state.gState.blendMode = bm
 
-proc saveState*(self: ContentRoot) =
-  self.state.gState = newgState(self.state.gState)
+proc saveState*(self: ContentBase) =
+  self.state.gState = newGState(self.state.gState)
   self.put("q")
 
-proc restoreState*(self: ContentRoot) =
-  self.state.gState = freegState(self.state.gState)
+proc restoreState*(self: ContentBase) =
+  self.state.gState = freeGState(self.state.gState)
   self.put("Q")
 
-proc getTextWidth*(self: ContentRoot, text:string): float64 =
+proc getTextWidth*(self: ContentBase, text:string): float64 =
   var res = 0.0
   let tw = self.state.gState.font.GetTextWidth(text)
 
@@ -1095,7 +1098,7 @@ proc getTextWidth*(self: ContentRoot, text:string): float64 =
 
   result = self.toUser(res)
 
-proc getTextHeight*(self: ContentRoot, text:string): float64 =
+proc getTextHeight*(self: ContentBase, text:string): float64 =
   var res = 0.0
   let tw = self.state.gState.font.GetTextHeight(text)
 
@@ -1105,7 +1108,7 @@ proc getTextHeight*(self: ContentRoot, text:string): float64 =
 
   result = self.toUser(res)
 
-proc setDash*(self: ContentRoot, dash:openArray[int], phase:int) =
+proc setDash*(self: ContentBase, dash:openArray[int], phase:int) =
   var ptn = "["
   var num_ptn = 0
 
@@ -1124,10 +1127,10 @@ proc setDash*(self: ContentRoot, dash:openArray[int], phase:int) =
   for i in 0..num_ptn-1:
     self.state.gState.dash.ptn[i] = dash[i]
 
-proc clip*(self: ContentRoot) =
+proc clip*(self: ContentBase) =
   self.put("W")
 
-proc executePath*(self: ContentRoot, p: Path) =
+proc executePath*(self: ContentBase, p: Path) =
   let len = p.len()
   var i = 0
   self.moveTo(p[i+1], p[i+2])
@@ -1146,7 +1149,7 @@ proc executePath*(self: ContentRoot, p: Path) =
       self.bezierCurveTo(p[i+3],p[i+4],p[i+5],p[i+6],p[i+7],p[i+8])
       inc(i, 9)
 
-proc drawBounds*(self: ContentRoot, p: Path) =
+proc drawBounds*(self: ContentBase, p: Path) =
   let len = p.len
   var i = 0
   while i < len:
@@ -1165,14 +1168,14 @@ proc drawBounds*(self: ContentRoot, p: Path) =
       self.put("S")
       inc(i, 9)
 
-proc drawBounds*(self: ContentRoot) =
+proc drawBounds*(self: ContentBase) =
   if self.state.recordShape:
     self.state.recordShape = false
     for p in self.state.shapes:
       if p.len > 0: self.drawBounds(p)
     self.state.recordShape = true
 
-proc applyGradient(self: ContentRoot) =
+proc applyGradient(self: ContentBase) =
   for p in self.state.shapes:
     if p.len > 0 and p.isClosed():
       self.put("q")
@@ -1188,7 +1191,7 @@ proc applyGradient(self: ContentRoot) =
       self.put("/Sh",$self.state.gState.gradientFill.ID," sh") #paint the gradient
       self.put("Q")
 
-proc fill*(self: ContentRoot) =
+proc fill*(self: ContentBase) =
   if self.state.recordShape:
     self.state.recordShape = false
     if self.state.gState.csFill == CS_GRADIENT: self.applyGradient()
@@ -1198,7 +1201,7 @@ proc fill*(self: ContentRoot) =
   else:
     self.put("f")
 
-proc stroke*(self: ContentRoot) =
+proc stroke*(self: ContentBase) =
   if self.state.recordShape:
     self.state.recordShape = false
     for p in self.state.shapes:
@@ -1209,7 +1212,7 @@ proc stroke*(self: ContentRoot) =
   else:
     self.put("S")
 
-proc fillAndStroke*(self: ContentRoot) =
+proc fillAndStroke*(self: ContentBase) =
   if self.state.recordShape:
     self.state.recordShape = false
     if self.state.gState.csFill == CS_GRADIENT: self.applyGradient()
@@ -1218,7 +1221,7 @@ proc fillAndStroke*(self: ContentRoot) =
   else:
     self.put("B")
 
-proc setGradientFill*(self: ContentRoot, grad: Gradient) =
+proc setGradientFill*(self: ContentBase, grad: Gradient) =
   let size = self.state.gradients.len()
   var found = false
   if grad == nil: return
@@ -1237,7 +1240,7 @@ proc setGradientFill*(self: ContentRoot, grad: Gradient) =
   self.state.gState.csFill = CS_GRADIENT
   self.state.gState.gradientFill = grad
 
-proc addWidget*(page: Page, w: MapRoot) =
+proc addWidget*(page: Page, w: WidgetBase) =
   page.widgets.add w
 
 proc newXYZDest*(page: Page, x,y,z: float64): Destination =

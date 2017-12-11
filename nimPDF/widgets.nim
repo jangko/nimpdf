@@ -242,9 +242,8 @@ type
     ffRequired = 2
     ffNoExport = 3
 
-  Widget = ref object of MapRoot
+  Widget = ref object of WidgetBase
     kind: WidgetKind
-    state: DocState
     id: string
     border: Border
     rect: Rectangle
@@ -407,6 +406,9 @@ proc getJSCode(fmt: FormatObject, fn: string): string =
   of FormatCustom:
     if fn == "Keystroke": result = fmt.keyStroke
     else: result = fmt.JSfmt
+
+method createDefaultAP*(self: Widget): AppearanceStream {.base.} =
+  discard
 
 proc createPDFObject(self: Widget): DictObj =
   const
@@ -932,7 +934,6 @@ proc newTextField*(doc: DocState, x,y,w,h: float64, id: string): TextField =
   result.maxChars = 0
   result.defaultValue = ""
   result.flags = {}
-  doc.addWidget(result)
 
 proc setAlignment*(self: TextField, align: TextFieldAlignment) =
   self.align = align
@@ -961,6 +962,9 @@ method createObject(self: TextField): PdfObject =
   self.fieldFlags = self.fieldFlags or ord(self.flags)
   result = dict
 
+method createDefaultAP*(self: TextField): AppearanceStream =
+  discard
+
 #----------------------CHECK BOX
 proc newCheckBox*(doc: DocState, x,y,w,h: float64, id: string): CheckBox =
   new(result)
@@ -970,7 +974,6 @@ proc newCheckBox*(doc: DocState, x,y,w,h: float64, id: string): CheckBox =
   result.shape = "\x35"
   result.checkedByDefault = false
   result.caption = ""
-  doc.addWidget(result)
 
 proc setShape*(self: CheckBox, val: string) =
   self.shape = val
@@ -986,6 +989,9 @@ method createObject(self: CheckBox): PdfObject =
   dict.addName("FT", FIELD_TYPE_BUTTON)
   result = dict
 
+method createDefaultAP*(self: CheckBox): AppearanceStream =
+  discard
+
 #----------------------RADIO BUTTON
 proc newRadioButton*(doc: DocState, x,y,w,h: float64, id: string): RadioButton =
   new(result)
@@ -996,7 +1002,6 @@ proc newRadioButton*(doc: DocState, x,y,w,h: float64, id: string): RadioButton =
   result.checkedByDefault = false
   result.allowUnchecked = false
   result.caption = ""
-  doc.addWidget(result)
 
 proc setShape*(self: RadioButton, val: string) =
   self.shape = val
@@ -1017,6 +1022,9 @@ method createObject(self: RadioButton): PdfObject =
   self.fieldFlags.setBit(bfNoToggleToOff)
   result = dict
 
+method createDefaultAP*(self: RadioButton): AppearanceStream =
+  discard
+
 #---------------------COMBO BOX
 proc newComboBox*(doc: DocState, x,y,w,h: float64, id: string): ComboBox =
   new(result)
@@ -1028,7 +1036,6 @@ proc newComboBox*(doc: DocState, x,y,w,h: float64, id: string): ComboBox =
   result.spellCheck = false
   result.commitOnSelChange = false
   result.keyVal = initTable[string, string]()
-  doc.addWidget(result)
 
 proc addKeyVal*(self: ComboBox, key, val: string) =
   self.keyVal[key] = val
@@ -1046,6 +1053,9 @@ method createObject(self: ComboBox): PdfObject =
   if self.commitOnSelChange: self.fieldFlags.setBit(cfCommitOnSelChange)
   result = dict
 
+method createDefaultAP*(self: ComboBox): AppearanceStream =
+  discard
+
 #---------------------LIST BOX
 proc newListBox*(doc: DocState, x,y,w,h: float64, id: string): ListBox =
   new(result)
@@ -1057,7 +1067,6 @@ proc newListBox*(doc: DocState, x,y,w,h: float64, id: string): ListBox =
   result.spellCheck = false
   result.commitOnSelChange = false
   result.keyVal = initTable[string, string]()
-  doc.addWidget(result)
 
 proc addKeyVal*(self: ListBox, key, val: string) =
   self.keyVal[key] = val
@@ -1073,6 +1082,9 @@ method createObject(self: ListBox): PdfObject =
   if not self.spellCheck: self.fieldFlags.setBit(cfDoNotSpellCheck)
   if self.commitOnSelChange: self.fieldFlags.setBit(cfCommitOnSelChange)
   result = dict
+
+method createDefaultAP*(self: ListBox): AppearanceStream =
+  discard
 
 #---------------------PUSH BUTTON
 proc newPushButton*(doc: DocState, x,y,w,h: float64, id: string): PushButton =
@@ -1091,8 +1103,6 @@ proc newPushButton*(doc: DocState, x,y,w,h: float64, id: string): PushButton =
   result.iconScalingType = istProportional
   result.iconFitToBorder = false
   result.iconLeftOver = [0.5, 0.5]
-
-  doc.addWidget(result)
 
 proc setCaption*(self: PushButton, val: string) =
   self.caption = val
@@ -1168,12 +1178,15 @@ method createObject(self: PushButton): PdfObject =
   var ap = self.appearance
 
   ap.saveState()
-  self.state.setCoordinateMode(BOTTOM_UP)
+  ap.setCoordinateMode(BOTTOM_UP)
   ap.setFont("Times", {FS_ITALIC}, 10.0)
-  ap.drawText(10, 10, "Hello")
+  ap.drawText(10, 50, "Hello")
   ap.setLineWidth(0.2)
-  ap.drawRect(10, 10, 50, 20)
+  ap.drawRect(10, 50, 50, 20)
   ap.stroke()
   ap.restoreState()
 
   result = dict
+
+method createDefaultAP*(self: PushButton): AppearanceStream =
+  discard

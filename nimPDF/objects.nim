@@ -12,45 +12,44 @@ const
   IN_USE_ENTRY = 'n'
   MAX_GENERATION_NUM = 65535
 
-  byteOffset_LEN = 10
-  GEN_NO_LEN = 5
+  BYTE_OFFSET_LEN = 10
+  GEN_NUMBER_LEN = 5
 
 type
   ObjectClass* = enum
-    CLASS_UNKNOWN,
-    CLASS_NULL,
-    CLASS_PLAIN,
-    CLASS_BOOLEAN,
-    CLASS_NUMBER,
-    CLASS_REAL,
-    CLASS_NAME,
-    CLASS_STRING,
-    CLASS_BINARY,
-    CLASS_ARRAY,
-    CLASS_DICT,
+    CLASS_NULL
+    CLASS_PLAIN
+    CLASS_BOOLEAN
+    CLASS_NUMBER
+    CLASS_REAL
+    CLASS_NAME
+    CLASS_STRING
+    CLASS_BINARY
+    CLASS_ARRAY
+    CLASS_DICT
     CLASS_PROXY
 
   ObjectSubclass* = enum
-    SUBCLASS_FONT,
-    SUBCLASS_CATALOG,
-    SUBCLASS_PAGES,
-    SUBCLASS_PAGE,
-    SUBCLASS_XOBJECT,
-    SUBCLASS_OUTLINE,
-    SUBCLASS_DESTINATION,
-    SUBCLASS_ANNOTATION,
-    SUBCLASS_ENCRYPT,
-    SUBCLASS_EXT_GSTATE,
-    SUBCLASS_CRYPT_FILTERS,
-    SUBCLASS_CRYPT_FILTER,
-    SUBCLASS_NAMEDICT,
+    SUBCLASS_FONT
+    SUBCLASS_CATALOG
+    SUBCLASS_PAGES
+    SUBCLASS_PAGE
+    SUBCLASS_XOBJECT
+    SUBCLASS_OUTLINE
+    SUBCLASS_DESTINATION
+    SUBCLASS_ANNOTATION
+    SUBCLASS_ENCRYPT
+    SUBCLASS_EXT_GSTATE
+    SUBCLASS_CRYPT_FILTERS
+    SUBCLASS_CRYPT_FILTER
+    SUBCLASS_NAMEDICT
     SUBCLASS_NAMETREE
 
   FilterMode = enum
-    FILTER_ASCIIHEX,
-    FILTER_ASCII85,
-    FILTER_FLATE_DECODE,
-    FILTER_DCT_DECODE,
+    FILTER_ASCIIHEX
+    FILTER_ASCII85
+    FILTER_FLATE_DECODE
+    FILTER_DCT_DECODE
     FILTER_CCITT_DECODE
 
   PdfObject* = ref object of RootObj
@@ -640,9 +639,9 @@ proc writeToStream*(x: PdfXref, s: Stream, enc: PdfEncrypt) =
     s.write "\x0A"
 
     for en in tmp.entries:
-      s.write i2string(en.byteOffset, byteOffset_LEN)
+      s.write i2string(en.byteOffset, BYTE_OFFSET_LEN)
       s.write " "
-      s.write i2string(en.gen, GEN_NO_LEN)
+      s.write i2string(en.gen, GEN_NUMBER_LEN)
       s.write " "
       s.write en.entryType
       s.write "\x0D\x0A" # Acrobat 8.15 requires both \r and \n here

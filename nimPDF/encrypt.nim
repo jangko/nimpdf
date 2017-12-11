@@ -1,12 +1,12 @@
 import md5, strutils, nimSHA2, nimAES, math, random
 
 const
-  PDF_ID_LEN            =  16
-  PDF_PASSWD_LEN        =  32
-  PDF_ENCRYPT_KEY_MAX   =  16
-  PDF_MD5_keyLen       =  16
-  PDF_PERMISSION_PAD    =  0xFFFFFFC0'u32
-  PDF_ARC4_BUF_SIZE      =  256
+  PDF_ID_LEN           =  16
+  PDF_PASSWD_LEN       =  32
+  PDF_ENCRYPT_KEY_MAX  =  16
+  PDF_MD5_KEYLEN       =  16
+  PDF_PERMISSION_PAD   =  0xFFFFFFC0'u32
+  PDF_ARC4_BUF_SIZE    =  256
 
   PADDING_STRING = "\x28\xBF\x4E\x5E\x4E\x75\x8A\x41\x64\x00\x4E\x56\xFF\xFA\x01\x08" &
     "\x2E\x2E\x00\xB6\xD0\x68\x3E\x80\x2F\x0C\xA9\xFE\x64\x53\x69\x7A"
@@ -186,7 +186,7 @@ proc createOwnerKey*(enc: PdfEncrypt) =
   # Algorithm 3.3 step 7
   if enc.mode in {ENCRYPT_R3, ENCRYPT_R4_ARC4, ENCRYPT_R4_AES}:
     for i in 1..19:
-      var new_key: array[0..PDF_MD5_keyLen-1, uint8]
+      var new_key: array[0..PDF_MD5_KEYLEN-1, uint8]
       for j in 0..enc.keyLen-1: new_key[j] = uint8(int(digest[j]) xor i)
       ARC4Ctx.ARC4Init(new_key, enc.keyLen)
       tmppwd = ARC4Ctx.ARC4CryptBuf(tmppwd)
@@ -261,14 +261,14 @@ proc createUserKey*(enc: PdfEncrypt) =
 
     # Algorithm 3.5 step5
     for i in 1..19:
-      var new_key: array[0..PDF_MD5_keyLen-1, uint8]
+      var new_key: array[0..PDF_MD5_KEYLEN-1, uint8]
       for j in 0..enc.keyLen-1: new_key[j] = uint8(int(enc.encryptionKey[j]) xor i)
       ARC4Ctx.ARC4Init(new_key, enc.keyLen)
       digest2 = ARC4Ctx.ARC4CryptBuf(digest2)
 
     # use the result of Algorithm 3.4 as 'arbitrary padding' */
     enc.userKey = repeat('\x00', PDF_PASSWD_LEN)
-    for i in 0..PDF_MD5_keyLen-1:
+    for i in 0..PDF_MD5_KEYLEN-1:
       enc.userKey[i] = digest2[i]
 
 proc computeEncryptionKeyR5*(enc: PdfEncrypt) =

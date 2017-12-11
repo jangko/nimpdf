@@ -43,9 +43,8 @@ const
     ("Broadsheet",457.0,610.0),("Royal",508.0,635.0),("Elephant",584.0,711.0),("REAL Demy",572.0,889.0),("Quad Demy",889.0,1143.0)]
 
 type
-  PDF* = ref object of RootObj
+  PDF* = ref object of StateBase
     pages: seq[Page]
-    state: DocState
     curPage: Page
 
   NamedPageSize = tuple[name: string, width: float64, height: float64]
@@ -80,7 +79,13 @@ proc newPDF*(): PDF =
   opts.addResourcesPath("resources")
   result = newPDF(opts)
 
-proc getOpt*(doc: PDF): PDFOptions =
+proc getVersion*(): string =
+  result = nimPDFVersion
+
+proc getVersion*(doc: PDF): string =
+  result = nimPDFVersion
+  
+proc getOptions*(doc: PDF): PDFOptions =
   result = doc.state.getOpt()
 
 proc setInfo*(doc: PDF, field: DocInfo, info: string) =
@@ -94,36 +99,7 @@ proc setLabel*(doc: PDF, style: LabelStyle) =
 
 proc setLabel*(doc: PDF, style: LabelStyle, prefix: string) =
   doc.state.setLabel(style, prefix, doc.pages.len)
-
-proc loadImage*(doc: PDF, fileName: string): Image =
-  result = doc.state.loadImage(fileName)
-
-proc getVersion*(): string =
-  result = nimPDFVersion
-
-proc getVersion*(doc: PDF): string =
-  result = nimPDFVersion
-
-proc setUnit*(doc: PDF, unit: PageUnitType) =
-  doc.state.setUnit(unit)
-
-proc getUnit*(doc: PDF): PageUnitType =
-  result = doc.state.getUnit()
-
-proc setCoordinateMode*(doc: PDF, mode: CoordinateMode) =
-  doc.state.setCoordinateMode(mode)
-
-proc getCoordinateMode*(doc: PDF): CoordinateMode =
-  result = doc.state.getCoordinateMode()
-
-proc getPageSize*(doc: PDF): PageSize = doc.state.getPageSize()
-
-proc toUser*(doc: PDF, val: float64): float64 =
-  doc.state.toUser(val)
-
-proc fromUser*(doc: PDF, val: float64): float64 =
-  doc.state.fromUser(val)
-
+  
 proc addPage*(doc: PDF, size: PageSize, orient = PGO_PORTRAIT): Page {.discardable.} =
   var p = newPage(doc.state, size, orient)
   doc.pages.add(p)
@@ -241,18 +217,6 @@ proc skew*(doc: PDF, sx, sy, x, y: float64) =
   assert(doc.curPage != nil)
   doc.curPage.skew(sx, sy, x, y)
 
-proc drawImage*(doc: PDF, x, y: float64, source: Image) =
-  assert(doc.curPage != nil)
-  doc.curPage.drawImage(x, y, source)
-
-proc drawRect*(doc: PDF, x, y, w, h: float64) =
-  assert(doc.curPage != nil)
-  doc.curPage.drawREct(x, y, w, h)
-
-proc drawArc*(doc: PDF; cx, cy, rx, ry, startAngle, sweepAngle: float64) =
-  assert(doc.curPage != nil)
-  doc.curPage.drawArc(cx, cy, rx, ry, startAngle, sweepAngle)
-
 proc arcTo*(doc: PDF; x, y, rx, ry, angle: float64; largeArcFlag, sweepFlag: bool) =
   assert(doc.curPage != nil)
   doc.curPage.arcTo(x, y, rx, ry, angle, largeArcFlag, sweepFlag)
@@ -273,35 +237,50 @@ proc bezierCurveTo*(doc: PDF; cp1x, cp1y, cp2x, cp2y, x, y: float64) =
   assert(doc.curPage != nil)
   doc.curPage.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x, y)
 
-proc bezierCurveTo*(doc: PDF; cp1, cp2, p: Point2d) {.inline.}= doc.bezierCurveTo(cp1.x,cp1.y,cp2.x,cp2.y,p.x,p.y)
+proc bezierCurveTo*(doc: PDF; cp1, cp2, p: Point2d) {.inline.} =
+  doc.bezierCurveTo(cp1.x,cp1.y,cp2.x,cp2.y,p.x,p.y)
 
 proc curveTo1*(doc: PDF; cpx, cpy, x, y: float64) =
   assert(doc.curPage != nil)
   doc.curPage.curveTo1(cpx, cpy, x, y)
 
-proc curveTo1*(doc: PDF; cp, p: Point2d) {.inline.}= doc.curveTo1(cp.x,cp.y,p.x,p.y)
+proc curveTo1*(doc: PDF; cp, p: Point2d) {.inline.} =
+  doc.curveTo1(cp.x,cp.y,p.x,p.y)
 
 proc curveTo2*(doc: PDF; cpx, cpy, x, y: float64) =
   assert(doc.curPage != nil)
   doc.curPage.curveTo2(cpx, cpy, x, y)
 
-proc curveTo2*(doc: PDF; cp, p: Point2d) {.inline.}= doc.curveTo2(cp.x,cp.y,p.x,p.y)
+proc curveTo2*(doc: PDF; cp, p: Point2d) {.inline.} =
+  doc.curveTo2(cp.x,cp.y,p.x,p.y)
 
 proc closePath*(doc: PDF) =
   assert(doc.curPage != nil)
   doc.curPage.closePath()
 
-proc roundRect*(doc: PDF; x, y, w, h: float64; r: float64 = 0.0) =
+proc drawRoundRect*(doc: PDF; x, y, w, h: float64; r: float64 = 0.0) =
   assert(doc.curPage != nil)
   doc.curPage.roundRect(x, y, w, h, r)
 
-proc drawEllipse*(doc: PDF; x, y, r1, r2 : float64) =
+proc drawEllipse*(doc: PDF; x, y, r1, r2: float64) =
   assert(doc.curPage != nil)
   doc.curPage.drawEllipse(x, y, r1, r2)
 
-proc drawCircle*(doc: PDF; x, y, radius : float64) =
+proc drawCircle*(doc: PDF; x, y, radius: float64) =
   assert(doc.curPage != nil)
   doc.curPage.drawCircle(x, y, radius)
+
+proc drawImage*(doc: PDF, x, y: float64, source: Image) =
+  assert(doc.curPage != nil)
+  doc.curPage.drawImage(x, y, source)
+
+proc drawRect*(doc: PDF, x, y, w, h: float64) =
+  assert(doc.curPage != nil)
+  doc.curPage.drawREct(x, y, w, h)
+
+proc drawArc*(doc: PDF; cx, cy, rx, ry, startAngle, sweepAngle: float64) =
+  assert(doc.curPage != nil)
+  doc.curPage.drawArc(cx, cy, rx, ry, startAngle, sweepAngle)
 
 proc setLineWidth*(doc: PDF, lineWidth: float64) =
   assert(doc.curPage != nil)
@@ -318,6 +297,10 @@ proc setLineJoin*(doc: PDF, lineJoin: LineJoin) =
 proc setMiterLimit*(doc: PDF, miterLimit: float64) =
   assert(doc.curPage != nil)
   doc.curPage.setMiterLimit(miterLimit)
+
+proc setDash*(doc: PDF, dash: openArray[int], phase: int) =
+  assert(doc.curPage != nil)
+  doc.curPage.setDash(dash, phase)
 
 proc setGrayFill*(doc: PDF; g: float64) =
   assert(doc.curPage != nil)
@@ -359,6 +342,10 @@ proc setCMYKStroke*(doc: PDF; col: CMYKColor) =
   assert(doc.curPage != nil)
   doc.curPage.setCMYKStroke(col)
 
+proc setGradientFill*(doc: PDF, grad: Gradient) =
+  assert(doc.curPage != nil)
+  doc.curPage.setGradientFill(grad)
+
 proc setAlpha*(doc: PDF, a: float64) =
   assert(doc.curPage != nil)
   doc.curPage.setAlpha(a)
@@ -382,10 +369,6 @@ proc getTextWidth*(doc: PDF, text: string): float64 =
 proc getTextHeight*(doc: PDF, text: string): float64 =
   assert(doc.curPage != nil)
   doc.curPage.getTextHeight(text)
-
-proc setDash*(doc: PDF, dash: openArray[int], phase: int) =
-  assert(doc.curPage != nil)
-  doc.curPage.setDash(dash, phase)
 
 proc clip*(doc: PDF) =
   assert(doc.curPage != nil)
@@ -415,10 +398,6 @@ proc fillAndStroke*(doc: PDF) =
   assert(doc.curPage != nil)
   doc.curPage.fillAndStroke()
 
-proc setGradientFill*(doc: PDF, grad: Gradient) =
-  assert(doc.curPage != nil)
-  doc.curPage.setGradientFill(grad)
-
 proc outline*(doc: PDF, title: string, dest: Destination): Outline =
   result = doc.state.newOutline(title, dest)
 
@@ -434,15 +413,15 @@ proc setPassword*(doc: PDF, ownerPass, userPass: string): bool =
 proc setEncryptionMode*(doc: PDF, mode: EncryptMode) =
   doc.state.setEncryptionMode(mode)
 
-proc newAcroForm*(doc: PDF): AcroForm =
-  result = doc.state.newAcroForm()
-
-proc textField*(doc: PDF, rect: Rectangle, src: Page): Annot =
-  result = doc.state.newTextField(rect, src)
-
 proc newTextField*(doc: PDF, x,y,w,h: float64, id: string): TextField =
   assert(doc.curPage != nil)
-  result = newTextField(doc.state, x, y, w, h, id)
+
+  let xx = doc.state.fromUser(x)
+  let yy = doc.state.vPoint(y)
+  let ww = doc.state.fromUser(x + w)
+  let hh = doc.state.vPoint(y + h)
+
+  result = newTextField(doc.state, xx, yy, ww, hh, id)
   doc.curPage.addWidget result
   discard doc.state.newAcroForm()
 
