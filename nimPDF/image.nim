@@ -11,6 +11,11 @@
 # eg: .png, .jpg, .jpeg, .bmp
 
 import nimBMP, os, strutils, nimPNG, private.nimz
+#import os, strutils, private.nimz
+
+# William Whitacre - 2018/01/19 - Fallback
+import stb_image/read as stbi
+import stb_image/write as stbiw
 
 #{.deadCodeElim: on.}
 #{.passC: "-D LODEPNG_NO_COMPILE_CPP".}
@@ -75,14 +80,82 @@ proc loadImageBMP(fileName:string): Image =
   else:
     result = nil
 
+# William Whitacre - 2018/01/19
+template initImageData(dat, siz: untyped): untyped =
+  if dat.isNil: dat = newString(siz) else: dat.setLen(siz)
+
+# William Whitacre - 2018/01/19
+template setChannels(odat, i, r, g, b: untyped): untyped =
+  odat[i * 3] = cast[char](r)
+  odat[i * 3 + 1] = cast[char](g)
+  odat[i * 3 + 2] = cast[char](b)
+
+# William Whitacre - 2018/01/19
+proc mapImageData(indata: seq[byte]; siz, ch: int; outdata, outmask: var string, nomask: bool): void =
+  initImageData(outdata, siz * 3)
+  if nomask: outmask = ""
+  case ch:
+    of 1:
+      outmask = ""
+      for i in 0..siz-1:
+        setChannels(outdata, i, indata[i], indata[i], indata[i])
+    of 2:
+      initImageData(outmask, siz)
+      for i in 0..siz-1:
+        setChannels(outdata, i, indata[i*2], indata[i*2], indata[i*2])
+        if not nomask: outmask[i] = indata[i * 2 + 1].char
+    of 3:
+      outmask = ""
+      for i in 0..siz-1:
+        setChannels(outdata, i, indata[i*3], indata[i*3+1], indata[i*3+2])
+    of 4:
+      initImageData(outmask, siz)
+      for i in 0..siz-1:
+        setChannels(outdata, i, indata[i*4], indata[i*4+1], indata[i*4+2])
+        if not nomask: outmask[i] = indata[i * 4 + 3].char
+    else:
+      raise newException(Exception, "Bad image channel count " & $ch)
+
+# William Whitacre - 2018/01/19
+proc loadImageFallbackSTBI(filename: string, nomask: bool): Image =
+  var
+    img: Image
+    numChannels: int
+
+  new(img)
+
+  result = nil
+  try:
+    let
+      bytes = stbi.load(fileName, img.width, img.height, numChannels, if nomask: 3 else: 4)
+
+    if not (bytes.isNil or bytes.len == 0):
+      bytes.mapImageData(img.width * img.height, numChannels, img.data, img.mask, nomask)
+      result = img
+  except:
+    echo(getCurrentExceptionMsg() & " " & filename)
+    result = nil
+
 proc loadImage*(fileName:string): Image =
+  echo "before it's ", fileName
   let path = splitFile(fileName)
+  var nomask = false
   if path.ext.len() > 0:
     let ext = toLowerAscii(path.ext)
-    if ext == ".png": return loadImagePNG(fileName)
-    if ext == ".bmp": return loadImageBMP(fileName)
-    if ext == ".jpg" or ext == ".jpeg": return loadImageJPG(fileName)
-  result = nil
+    if ext == ".png":
+      result = loadImagePNG(fileName)
+    elif ext == ".bmp":
+      nomask = true
+      result = loadImageBMP(fileName)
+    elif ext == ".jpg" or ext == ".jpeg":
+      nomask = true
+      result = loadImageJPG(fileName)
+
+    if result.isNil: # try fallback
+      echo "falling back!"
+      result = loadImageFallbackSTBI(fileName, nomask)
+  else:
+    result = nil
 
 proc haveMask*(img: Image): bool =
   result = img.mask.len() > 0
