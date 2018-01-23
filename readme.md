@@ -8,6 +8,8 @@ after lodePNG substituted with PNG decoder written in nim, nimPDF become one ste
 
 nimPDF implements the following features(see [demo.pdf](https://github.com/jangko/nimpdf/blob/master/demo/demo.pdf)):
 
+nimPDF version 0.4.0 introduces many breaking changes, see [migration guide](migration.md) to help you change your code.
+
 * **images**
   - PNG -- ~~use [LodePNG](lodev.org/lodepng), still in C~~ now written in nim
   - JPEG -- use [uJPEG (MicroJPEG) -- KeyJ's Small Baseline JPEG Decoder](http://keyj.emphy.de/nanojpeg), still in C
