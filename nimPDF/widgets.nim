@@ -421,7 +421,8 @@ proc createPDFObject(self: Widget): DictObj =
   dict.addName("Subtype", "Widget")
   dict.addName("H", $hmSTR[self.highLightMode])
   dict.addString("T", self.id)
-  dict.addString("TU", self.toolTip)
+  if self.toolTip.len > 0:
+    dict.addString("TU", self.toolTip)
 
   var annotFlags = 0
 
