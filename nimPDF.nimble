@@ -11,3 +11,5 @@ Requires: "nimBMP >= 0.1.0"
 Requires: "nimPNG >= 0.1.0"
 Requires: "nimSHA2 >= 0.1.0"
 Requires: "nimAES >= 0.1.0"
+requires: "stb_image >= 2.1"
+
