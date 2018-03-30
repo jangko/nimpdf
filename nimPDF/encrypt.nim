@@ -103,7 +103,7 @@ proc createRandom16(input: string): string =
   let digest = ctx.final()
   random.randomize()
   result = newString(16)
-  let r = random.random(255)
+  let r = random.rand(255)
   for i in 0..15:
     result[i] = chr(ord(digest[i]) xor ord(digest[i+15]))
     result[i] = chr(r xor ord(result[i]))

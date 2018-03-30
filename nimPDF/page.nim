@@ -237,7 +237,7 @@ proc putInfo(doc: DocState): DictObj =
   var dict = newDictObj()
   doc.xref.add(dict)
 
-  var lt = getLocalTime(getTime())
+  var lt = times.local(getTime())
   doc.writeInfo(dict, DI_CREATOR)
   doc.writeInfo(dict, DI_PRODUCER)
   doc.writeInfo(dict, DI_TITLE)
@@ -610,7 +610,7 @@ proc newPage*(state: DocState, size: PageSize, orient = PGO_PORTRAIT): Page =
   result.annots = @[]
   result.widgets = @[]
   if orient == PGO_LANDSCAPE:
-    result.size.swap()
+    result.size.swap()  
   result.state = state
   state.size = result.size
   result.dictObj = newDictObj()
@@ -655,7 +655,7 @@ template fromUser(self: ContentBase, val: float64): float64 =
 template toUser(self: ContentBase, val: float64): float64 =
   self.state.gState.docUnit.toUser(val)
 
-proc setFont*(self: ContentBase, family:string, style: FontStyles, size: float64, enc: EncodingType = ENC_STANDARD) =
+proc setFont*(self: ContentBase, family: string, style: FontStyles, size: float64, enc: EncodingType = ENC_STANDARD) =
   var font = self.state.fontMan.makeFont(family, style, enc)
   let fontNumber = font.ID
   let fontSize = self.fromUser(size)
@@ -663,6 +663,9 @@ proc setFont*(self: ContentBase, family:string, style: FontStyles, size: float64
   self.state.gState.font = font
   self.state.gState.fontSize = fontSize
   inc(self.state.setFontCount)
+
+proc setFont*(self: ContentBase, family: string, size: float64 = 5.0) =
+  self.setFont(family, {FS_REGULAR}, size)
 
 proc drawText*(self: ContentBase; x,y: float64; text: string) =
   let xx = self.fromUser(x)
@@ -1038,6 +1041,12 @@ proc setRGBFill*(self: ContentBase; col: RGBColor) =
 proc setRGBStroke*(self: ContentBase; col: RGBColor) =
   self.setRGBStroke(col.r,col.g,col.b)
 
+proc setFillColor*(self: ContentBase; col: string) =
+  self.setRGBFill(initRGB(col))
+
+proc setStrokeColor*(self: ContentBase; col: string) =
+  self.setRGBStroke(initRGB(col))
+
 proc setCMYKFill*(self: ContentBase; c,m,y,k: float64) =
   self.put(f2s(c), " ",f2s(m), " ",f2s(y), " ",f2s(k), " k")
   self.state.gState.cmykFill = initCMYK(c,m,y,k)
@@ -1243,7 +1252,7 @@ proc setGradientFill*(self: ContentBase, grad: Gradient) =
 proc addWidget*(page: Page, w: WidgetBase) =
   page.widgets.add w
 
-proc newXYZDest*(page: Page, x,y,z: float64): Destination =
+proc newXYZDest*(page: Page, x, y, z: float64): Destination =
   new(result)
   result.style = DS_XYZ
   result.page  = page
@@ -1268,7 +1277,7 @@ proc newFitVDest*(page: Page, left: float64): Destination =
   result.page  = page
   result.a = page.fromUSer(left)
 
-proc newFitRDest*(page: Page, left,bottom,right,top: float64): Destination =
+proc newFitRDest*(page: Page, left, bottom, right, top: float64): Destination =
   new(result)
   result.style = DS_FITR
   result.page  = page

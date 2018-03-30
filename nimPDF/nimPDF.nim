@@ -106,6 +106,9 @@ proc addPage*(doc: PDF, size: PageSize, orient = PGO_PORTRAIT): Page {.discardab
   doc.curPage = p
   result = p
 
+proc addPage*(doc: PDF, size: string, orient = PGO_PORTRAIT): Page {.discardable.} =
+  result = doc.addPage(getSizeFromName(size), orient)
+
 proc writePDF*(doc: PDF, s: Stream) =
   doc.state.writePDF(s, doc.pages)
 
@@ -120,6 +123,10 @@ proc writePDF*(doc: PDF, fileName: string): bool =
 proc setFont*(doc: PDF, family: string, style: FontStyles, size: float64, enc: EncodingType = ENC_STANDARD) =
   assert(doc.curPage != nil)
   doc.curPage.setFont(family, style, size, enc)
+
+proc setFont*(doc: PDF, family: string, size: float64 = 5.0) =
+  assert(doc.curPage != nil)
+  doc.curPage.setFont(family, size)
 
 proc drawText*(doc: PDF; x,y: float64; text: string) =
   assert(doc.curPage != nil)
@@ -276,7 +283,7 @@ proc drawImage*(doc: PDF, x, y: float64, source: Image) =
 
 proc drawRect*(doc: PDF, x, y, w, h: float64) =
   assert(doc.curPage != nil)
-  doc.curPage.drawREct(x, y, w, h)
+  doc.curPage.drawRect(x, y, w, h)
 
 proc drawArc*(doc: PDF; cx, cy, rx, ry, startAngle, sweepAngle: float64) =
   assert(doc.curPage != nil)
@@ -325,6 +332,14 @@ proc setRGBFill*(doc: PDF; col: RGBColor) =
 proc setRGBStroke*(doc: PDF; col: RGBColor) =
   assert(doc.curPage != nil)
   doc.curPage.setRGBStroke(col)
+
+proc setFillColor*(doc: PDF, col: string) =
+  assert(doc.curPage != nil)
+  doc.curPage.setFillColor(col)
+
+proc setStrokeColor*(doc: PDF, col: string) =
+  assert(doc.curPage != nil)
+  doc.curPage.setStrokeColor(col)
 
 proc setCMYKFill*(doc: PDF; c,m,y,k: float64) =
   assert(doc.curPage != nil)
