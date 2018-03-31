@@ -16,5 +16,6 @@ but also the old code not conforms with Nim coding style.
 * roundRect() become drawRoundRect(), longer but consistent with the rest of the API
 * makeDoctOpt() become newPDFOptions()
 * makePageSize() become initPageSize()
-
+* setRGBFill() become setFillColor()
+* setRGBStroke become setStrokeColor()
 
