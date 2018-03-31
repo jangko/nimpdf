@@ -2,17 +2,17 @@ import streams, nimPDF
 
 proc createPDF(doc: PDF) =
   let size = getSizeFromName("A4")
-  let pg1 = doc.addPage(size, PGO_PORTRAIT)
-  doc.drawText(15, 30, "Page 1")
+  var pg1 = doc.addPage(size, PGO_PORTRAIT)
+  pg1.drawText(15, 30, "Page 1")
 
-  let pg2 = doc.addPage(size, PGO_PORTRAIT)
-  doc.drawText(15, 30, "Page 2")
+  var pg2 = doc.addPage(size, PGO_PORTRAIT)
+  pg2.drawText(15, 30, "Page 2")
 
-  let pg3 = doc.addPage(size, PGO_PORTRAIT)
-  doc.drawText(15, 30, "Page 3")
+  var pg3 = doc.addPage(size, PGO_PORTRAIT)
+  pg3.drawText(15, 30, "Page 3")
 
-  let pg4 = doc.addPage(size, PGO_PORTRAIT)
-  doc.drawText(15, 30, "Page 4")
+  var pg4 = doc.addPage(size, PGO_PORTRAIT)
+  pg4.drawText(15, 30, "Page 4")
 
   let dest1 = pg1.newXYZDest( 0, 0, 0)
   let dest2 = pg2.newXYZDest( 0, 0, 0)

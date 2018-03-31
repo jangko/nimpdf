@@ -65,7 +65,6 @@ type
     images: seq[Image]
     gradients: seq[Gradient]
     fontMan: FontManager
-    gState: GState
     pathStartX, pathStartY, pathEndX, pathEndY: float64
     recordShape: bool
     shapes: seq[Path]
@@ -77,12 +76,15 @@ type
     xref: Pdfxref
     encrypt: EncryptDict
     acroForm: AcroForm
+    docUnit: PageUnit
+    coordMode*: CoordinateMode
 
   DictBase = ref object of RootObj
     dictObj*: DictObj
 
   StateBase* = ref object of DictBase
     state*: DocState
+    gState*: GState
 
   WidgetBase* = ref object of StateBase
 
@@ -121,11 +123,11 @@ template f2s*(a: typed): untyped =
 proc f2sn(a: float64): string =
   if a == 0: "null" else: f2s(a)
 
-template fromUser*(doc: DocState, val: float64): float64 =
-  doc.gState.docUnit.fromUser(val)
+template fromUser*(self: DocState, val: float64): float64 =
+  self.docUnit.fromUser(val)
 
-template toUser*(doc: DocState, val:float64): float64 =
-  doc.gState.docUnit.toUser(val)
+template toUser*(self: DocState, val:float64): float64 =
+  self.docUnit.toUser(val)
 
 proc toObject*(dest: Destination): ArrayObj =
   var arr = newArrayObj()
@@ -410,7 +412,6 @@ proc newDocState*(opts: PDFOptions): DocState =
   result.images = @[]
   result.gradients = @[]
   result.fontMan.init(opts.getFontsPath())
-  result.gState = newGState()
   result.pathStartX = 0
   result.pathStartY = 0
   result.pathEndX = 0
@@ -424,6 +425,8 @@ proc newDocState*(opts: PDFOptions): DocState =
   result.xref = newPdfxref()
   result.setInfo(DI_PRODUCER, "nimPDF")
   result.setFontCount = 0
+  result.docUnit.setUnit(PGU_MM)
+  result.coordMode   = TOP_DOWN
 
 proc makeFont*(doc: DocState, family: string, style: FontStyles, enc: EncodingType = ENC_STANDARD): Font =
   result = doc.fontMan.makeFont(family, style, enc)
@@ -465,19 +468,16 @@ proc loadImage*(doc: DocState, fileName: string): Image =
   result = nil
 
 proc setUnit*(doc: DocState, unit: PageUnitType) =
-  doc.gState.docUnit.setUnit(unit)
+  doc.docUnit.setUnit(unit)
 
 proc getUnit*(doc: DocState): PageUnitType =
-  result = doc.gState.docUnit.unitType
+  result = doc.docUnit.unitType
 
 proc setCoordinateMode*(doc: DocState, mode: CoordinateMode) =
-  doc.gState.coordMode = mode
+  doc.coordMode = mode
 
 proc getCoordinateMode*(doc: DocState): CoordinateMode =
-  result = doc.gState.coordMode
-
-template coordMode(doc: DocState): CoordinateMode =
-  doc.gState.coordMode
+  result = doc.coordMode
 
 proc vPoint*(doc: DocState, val: float64): float64 =
   if doc.coordMode == TOP_DOWN:
@@ -614,11 +614,11 @@ proc newPage*(state: DocState, size: PageSize, orient = PGO_PORTRAIT): Page =
   result.widgets = @[]
   if orient == PGO_LANDSCAPE:
     result.size.swap()
+  result.gState = newGState()
   result.state = state
   state.size = result.size
   result.dictObj = newDictObj()
   state.xref.add(result.dictObj)
-
 
 proc loadImage*(self: StateBase, fileName: string): Image =
   result = self.state.loadImage(fileName)
@@ -653,18 +653,18 @@ proc newDictStream*(self: AppearanceStream): DictObj =
   result = self.state.newDictStream(self.content)
 
 template fromUser(self: ContentBase, val: float64): float64 =
-  self.state.gState.docUnit.fromUser(val)
+  self.state.docUnit.fromUser(val)
 
 template toUser(self: ContentBase, val: float64): float64 =
-  self.state.gState.docUnit.toUser(val)
+  self.state.docUnit.toUser(val)
 
 proc setFont*(self: ContentBase, family: string, style: FontStyles, size: float64, enc: EncodingType = ENC_STANDARD) =
   var font = self.state.fontMan.makeFont(family, style, enc)
   let fontNumber = font.ID
   let fontSize = self.fromUser(size)
   self.put("BT /F",$fontNumber," ",$fontSize," Tf ET")
-  self.state.gState.font = font
-  self.state.gState.fontSize = fontSize
+  self.gState.font = font
+  self.gState.fontSize = fontSize
   inc(self.state.setFontCount)
 
 proc setFont*(self: ContentBase, family: string, size: float64 = 5.0) =
@@ -674,10 +674,10 @@ proc drawText*(self: ContentBase; x,y: float64; text: string) =
   let xx = self.fromUser(x)
   let yy = self.state.vPoint(y)
 
-  if self.state.gState.font == nil or self.state.setFontCount == 0:
+  if self.gState.font == nil or self.state.setFontCount == 0:
     self.setFont(defaultFont, {FS_REGULAR}, 5)
 
-  var font = self.state.gState.font
+  var font = self.gState.font
 
   if font.subType == FT_TRUETYPE:
     var utf8 = replace_invalid(text)
@@ -686,10 +686,10 @@ proc drawText*(self: ContentBase; x,y: float64; text: string) =
     self.put("BT ",f2s(xx)," ",f2s(yy)," Td (",escapeString(text),") Tj ET")
 
 proc drawVText*(self: ContentBase; x,y: float64; text: string) =
-  if self.state.gState.font == nil or self.state.setFontCount == 0:
+  if self.gState.font == nil or self.state.setFontCount == 0:
     self.setFont(defaultFont, {FS_REGULAR}, 5)
 
-  var font = self.state.gState.font
+  var font = self.gState.font
 
   if not font.CanWriteVertical():
     self.drawText(x, y, text)
@@ -704,19 +704,19 @@ proc drawVText*(self: ContentBase; x,y: float64; text: string) =
   var i = 0
   for b in runes(utf8):
     self.put(f2s(xx)," ",f2s(yy)," Td <", substr(cid, i, i + 3),"> Tj")
-    yy = -float(TTFont(font).GetCharHeight(int(b))) * self.state.gState.fontSize / 1000
+    yy = -float(TTFont(font).GetCharHeight(int(b))) * self.gState.fontSize / 1000
     xx = 0
     inc(i, 4)
   self.put("ET")
 
 proc beginText*(self: ContentBase) =
-  if self.state.gState.font == nil or self.state.setFontCount == 0:
+  if self.gState.font == nil or self.state.setFontCount == 0:
     self.setFont(defaultFont, {FS_REGULAR}, 5)
 
   self.put("BT")
 
 proc beginText*(self: ContentBase; x,y: float64) =
-  if self.state.gState.font == nil:
+  if self.gState.font == nil:
     self.setFont(defaultFont, {FS_REGULAR}, 5)
 
   let xx = self.fromUser(x)
@@ -730,14 +730,14 @@ proc moveTextPos*(self: ContentBase; x,y: float64) =
 
 proc setTextRenderingMode*(self: ContentBase, rm: TextRenderingMode) =
   let trm = cast[int](rm)
-  if self.state.gState.renderingMode != rm: self.put($trm, " Tr")
-  self.state.gState.renderingMode = rm
+  if self.gState.renderingMode != rm: self.put($trm, " Tr")
+  self.gState.renderingMode = rm
 
 proc setTextMatrix*(self: ContentBase, m: Matrix2d) =
   self.put(f2s(m.ax)," ", f2s(m.ay), " ", f2s(m.bx), " ", f2s(m.by), " ", f2s(m.tx)," ",f2s(m.ty)," Tm")
 
 proc showText*(self: ContentBase, text:string) =
-  var font = self.state.gState.font
+  var font = self.gState.font
 
   if font.subType == FT_TRUETYPE:
     var utf8 = replace_invalid(text)
@@ -760,19 +760,19 @@ proc degree_to_radian*(x: float): float =
 
 proc setCharSpace*(self: ContentBase; val: float64) =
   self.put(f2s(val)," Tc")
-  self.state.gState.charSpace = val
+  self.gState.charSpace = val
 
 proc setTextHScale*(self: ContentBase; val: float64) =
   self.put(f2s(val)," Th")
-  self.state.gState.hScaling = val
+  self.gState.hScaling = val
 
 proc setWordSpace*(self: ContentBase; val: float64) =
   self.put(f2s(val)," Tw")
-  self.state.gState.wordSpace = val
+  self.gState.wordSpace = val
 
 proc setTransform*(self: ContentBase, m: Matrix2d) =
   self.put(f2s(m.ax)," ", f2s(m.ay), " ", f2s(m.bx), " ", f2s(m.by), " ", f2s(m.tx)," ",f2s(m.ty)," cm")
-  self.state.gState.transMatrix = self.state.gState.transMatrix & m
+  self.gState.transMatrix = self.gState.transMatrix & m
 
 proc rotate*(self: ContentBase, angle:float64) =
   self.setTransform(rotate(degree_to_radian(angle)))
@@ -833,9 +833,9 @@ proc drawImage*(self: ContentBase, x, y:float64, source: Image) =
       found = true
       break
 
-  if self.state.gState.alphaFill > 0.0 and self.state.gState.alphaFill < 1.0:
+  if self.gState.alphaFill > 0.0 and self.gState.alphaFill < 1.0:
     img = img.clone()
-    img.adjustTransparency(self.state.gState.alphaFill)
+    img.adjustTransparency(self.gState.alphaFill)
     found = false
 
   if not found:
@@ -1000,47 +1000,47 @@ proc drawCircle*(self: ContentBase; x, y, radius : float64) =
 
 proc setLineWidth*(self: ContentBase, lineWidth: float64) =
   let lw = self.fromUser(lineWidth)
-  if lineWidth != self.state.gState.lineWidth: self.put(f2s(lw), " w")
-  self.state.gState.lineWidth = lineWidth
+  if lineWidth != self.gState.lineWidth: self.put(f2s(lw), " w")
+  self.gState.lineWidth = lineWidth
 
 proc setLineCap*(self: ContentBase, lineCap: LineCap) =
   let lc = cast[int](lineCap)
-  if lineCap != self.state.gState.lineCap: self.put($lc, " J")
-  self.state.gState.lineCap = lineCap
+  if lineCap != self.gState.lineCap: self.put($lc, " J")
+  self.gState.lineCap = lineCap
 
 proc setLineJoin*(self: ContentBase, lineJoin: LineJoin) =
   let lj = cast[int](lineJoin)
-  if self.state.gState.lineJoin != lineJoin: self.put($lj, " j")
-  self.state.gState.lineJoin = lineJoin
+  if self.gState.lineJoin != lineJoin: self.put($lj, " j")
+  self.gState.lineJoin = lineJoin
 
 proc setMiterLimit*(self: ContentBase, miterLimit: float64) =
   let ml = self.fromUser(miterLimit)
-  if self.state.gState.miterLimit != miterLimit: self.put(f2s(ml), " M")
-  self.state.gState.miterLimit = miterLimit
+  if self.gState.miterLimit != miterLimit: self.put(f2s(ml), " M")
+  self.gState.miterLimit = miterLimit
 
 proc setGrayFill*(self: ContentBase; g: float64) =
   self.put(f2s(g), " g")
-  self.state.gState.grayFill = g
-  self.state.gState.csFill = CS_DEVICE_GRAY
+  self.gState.grayFill = g
+  self.gState.csFill = CS_DEVICE_GRAY
   self.state.shapes = nil
   self.state.recordShape = false
 
 proc setGrayStroke*(self: ContentBase; g: float64) =
   self.put(f2s(g), " G")
-  self.state.gState.grayStroke = g
-  self.state.gState.csStroke = CS_DEVICE_GRAY
+  self.gState.grayStroke = g
+  self.gState.csStroke = CS_DEVICE_GRAY
 
 proc setFillColor*(self: ContentBase; r,g,b: float64) =
   self.put(f2s(r), " ",f2s(g), " ",f2s(b), " rg")
-  self.state.gState.rgbFill = initRGB(r,g,b)
-  self.state.gState.csFill = CS_DEVICE_RGB
+  self.gState.rgbFill = initRGB(r,g,b)
+  self.gState.csFill = CS_DEVICE_RGB
   self.state.shapes = nil
   self.state.recordShape = false
 
 proc setStrokeColor*(self: ContentBase; r,g,b: float64) =
   self.put(f2s(r), " ",f2s(g), " ",f2s(b), " RG")
-  self.state.gState.rgbStroke = initRGB(r,g,b)
-  self.state.gState.csStroke = CS_DEVICE_RGB
+  self.gState.rgbStroke = initRGB(r,g,b)
+  self.gState.csStroke = CS_DEVICE_RGB
 
 proc setFillColor*(self: ContentBase; col: RGBColor) =
   self.setFillColor(col.r,col.g,col.b)
@@ -1056,15 +1056,15 @@ proc setStrokeColor*(self: ContentBase; col: string) =
 
 proc setCMYKFill*(self: ContentBase; c,m,y,k: float64) =
   self.put(f2s(c), " ",f2s(m), " ",f2s(y), " ",f2s(k), " k")
-  self.state.gState.cmykFill = initCMYK(c,m,y,k)
-  self.state.gState.csFill = CS_DEVICE_CMYK
+  self.gState.cmykFill = initCMYK(c,m,y,k)
+  self.gState.csFill = CS_DEVICE_CMYK
   self.state.shapes = nil
   self.state.recordShape = false
 
 proc setCMYKStroke*(self: ContentBase; c,m,y,k: float64) =
   self.put(f2s(c), " ",f2s(m), " ",f2s(y), " ",f2s(k), " K")
-  self.state.gState.cmykFill = initCMYK(c,m,y,k)
-  self.state.gState.csFill = CS_DEVICE_CMYK
+  self.gState.cmykFill = initCMYK(c,m,y,k)
+  self.gState.csFill = CS_DEVICE_CMYK
 
 proc setCMYKFill*(self: ContentBase; col: CMYKColor) =
   self.setCMYKFill(col.c,col.m,col.y,col.k)
@@ -1084,8 +1084,8 @@ proc setAlpha*(self: ContentBase, a: float64) =
   gs.init(id, a, a)
   self.state.ExtGStates.add(gs)
   self.put("/GS",$id," gs")
-  self.state.gState.alphaFill = a
-  self.state.gState.alphaStroke = a
+  self.gState.alphaFill = a
+  self.gState.alphaStroke = a
 
 proc setBlendMode*(self: ContentBase, bm: BlendMode) =
   let id = self.state.ExtGStates.len() + 1
@@ -1094,33 +1094,33 @@ proc setBlendMode*(self: ContentBase, bm: BlendMode) =
   gs.init(id, -1.0, -1.0, BM_NAMES[bmid])
   self.state.ExtGStates.add(gs)
   self.put("/GS",$id," gs")
-  self.state.gState.blendMode = bm
+  self.gState.blendMode = bm
 
 proc saveState*(self: ContentBase) =
-  self.state.gState = newGState(self.state.gState)
+  self.gState = newGState(self.gState)
   self.put("q")
 
 proc restoreState*(self: ContentBase) =
-  self.state.gState = freeGState(self.state.gState)
+  self.gState = freeGState(self.gState)
   self.put("Q")
 
 proc getTextWidth*(self: ContentBase, text:string): float64 =
   var res = 0.0
-  let tw = self.state.gState.font.GetTextWidth(text)
+  let tw = self.gState.font.GetTextWidth(text)
 
-  res += self.state.gState.wordSpace * float64(tw.numspace)
-  res += float64(tw.width) * self.state.gState.fontSize / 1000
-  res += self.state.gState.charSpace * float64(tw.numchars)
+  res += self.gState.wordSpace * float64(tw.numspace)
+  res += float64(tw.width) * self.gState.fontSize / 1000
+  res += self.gState.charSpace * float64(tw.numchars)
 
   result = self.toUser(res)
 
 proc getTextHeight*(self: ContentBase, text:string): float64 =
   var res = 0.0
-  let tw = self.state.gState.font.GetTextHeight(text)
+  let tw = self.gState.font.GetTextHeight(text)
 
-  res += self.state.gState.wordSpace * float64(tw.numspace)
-  res += float64(tw.width) * self.state.gState.fontSize / 1000
-  res += self.state.gState.charSpace * float64(tw.numchars)
+  res += self.gState.wordSpace * float64(tw.numspace)
+  res += float64(tw.width) * self.gState.fontSize / 1000
+  res += self.gState.charSpace * float64(tw.numchars)
 
   result = self.toUser(res)
 
@@ -1137,11 +1137,11 @@ proc setDash*(self: ContentBase, dash:openArray[int], phase:int) =
   ptn.add("] " & $phase & " d")
   self.put(ptn)
 
-  self.state.gState.dash.num_ptn = num_ptn
-  self.state.gState.dash.phase = phase
+  self.gState.dash.num_ptn = num_ptn
+  self.gState.dash.phase = phase
 
   for i in 0..num_ptn-1:
-    self.state.gState.dash.ptn[i] = dash[i]
+    self.gState.dash.ptn[i] = dash[i]
 
 proc clip*(self: ContentBase) =
   self.put("W")
@@ -1204,13 +1204,13 @@ proc applyGradient(self: ContentBase) =
       let hh = self.fromUser(bb.ymax - bb.ymin)
       #set up transformation matrix for gradient
       self.put(f2s(ww)," 0 0 ", f2s(hh), " ", f2s(xx), " ", f2s(yy), " cm")
-      self.put("/Sh",$self.state.gState.gradientFill.ID," sh") #paint the gradient
+      self.put("/Sh",$self.gState.gradientFill.ID," sh") #paint the gradient
       self.put("Q")
 
 proc fill*(self: ContentBase) =
   if self.state.recordShape:
     self.state.recordShape = false
-    if self.state.gState.csFill == CS_GRADIENT: self.applyGradient()
+    if self.gState.csFill == CS_GRADIENT: self.applyGradient()
     self.state.shapes = @[]
     self.state.shapes.add(makePath())
     self.state.recordShape = true
@@ -1231,7 +1231,7 @@ proc stroke*(self: ContentBase) =
 proc fillAndStroke*(self: ContentBase) =
   if self.state.recordShape:
     self.state.recordShape = false
-    if self.state.gState.csFill == CS_GRADIENT: self.applyGradient()
+    if self.gState.csFill == CS_GRADIENT: self.applyGradient()
     self.state.recordShape = true
     self.stroke()
   else:
@@ -1253,8 +1253,8 @@ proc setGradientFill*(self: ContentBase, grad: Gradient) =
   self.state.shapes = @[]
   self.state.shapes.add(makePath())
   self.state.recordShape = true
-  self.state.gState.csFill = CS_GRADIENT
-  self.state.gState.gradientFill = grad
+  self.gState.csFill = CS_GRADIENT
+  self.gState.gradientFill = grad
 
 proc addWidget*(page: Page, w: WidgetBase) =
   page.widgets.add w
