@@ -457,8 +457,11 @@ proc setLabel*(doc: DocState, style: LabelStyle, prefix: string, pageIndex: int)
 proc loadImage*(doc: DocState, fileName: string): Image =
   var imagePath = doc.opts.getImagesPath()
   for p in imagePath:
-    let image = loadImage(p & DirSep & fileName)
-    if image != nil: return image
+    let fileName = p & DirSep & fileName
+    if fileExists(fileName):
+      let image = loadImage(fileName)
+      if image != nil: return image
+      break
   result = nil
 
 proc setUnit*(doc: DocState, unit: PageUnitType) =
@@ -610,7 +613,7 @@ proc newPage*(state: DocState, size: PageSize, orient = PGO_PORTRAIT): Page =
   result.annots = @[]
   result.widgets = @[]
   if orient == PGO_LANDSCAPE:
-    result.size.swap()  
+    result.size.swap()
   result.state = state
   state.size = result.size
   result.dictObj = newDictObj()
@@ -818,7 +821,7 @@ proc skew*(self: ContentBase, sx,sy,x,y:float64) =
   let tsy = math.tan(degree_to_radian(sy))
   self.setTransform(shear(tsx, tsy, xx, yy))
 
-proc drawImage*(self: ContentBase, x:float64, y:float64, source: Image) =
+proc drawImage*(self: ContentBase, x, y:float64, source: Image) =
   let size = self.state.images.len()
   var found = false
   var img = source
@@ -862,7 +865,7 @@ proc drawImage*(self: ContentBase, x:float64, y:float64, source: Image) =
   self.put("/I",$img.ID," Do")
   self.put("Q")
 
-proc drawRect*(self: ContentBase, x: float64, y: float64, w: float64, h: float64) =
+proc drawRect*(self: ContentBase, x, y, w, h: float64) =
   if self.state.recordShape:
     self.state.shapes[self.state.shapes.len - 1].addRect(x, y, w, h)
     self.state.shapes.add(makePath())
@@ -873,7 +876,7 @@ proc drawRect*(self: ContentBase, x: float64, y: float64, w: float64, h: float64
     let hh = self.state.vPointMirror(h)
     self.put(f2s(xx)," ",f2s(yy)," ",f2s(ww)," ",f2s(hh)," re")
 
-proc moveTo*(self: ContentBase, x: float64, y: float64) =
+proc moveTo*(self: ContentBase, x, y: float64) =
   let xx = self.fromUser(x)
   let yy = self.state.vPoint(y)
   self.put(f2s(xx)," ",f2s(yy)," m")
@@ -884,7 +887,7 @@ proc moveTo*(self: ContentBase, x: float64, y: float64) =
 
 proc moveTo*(self: ContentBase, p: Point2d) {.inline.} = self.moveTo(p.x, p.y)
 
-proc lineTo*(self: ContentBase, x: float64, y: float64) =
+proc lineTo*(self: ContentBase, x, y: float64) =
   if self.state.recordShape:
     self.state.shapes[self.state.shapes.len - 1].addLine(self.state.pathStartX, self.state.pathStartY, x, y)
     if x == self.state.pathStartX and y == self.state.pathStartY:
@@ -897,6 +900,10 @@ proc lineTo*(self: ContentBase, x: float64, y: float64) =
   self.state.pathEndY = y
 
 proc lineTo*(self: ContentBase, p: Point2d) {.inline.} = self.lineTo(p.x, p.y)
+
+proc drawLine*(self: ContentBase, x1, y1, x2, y2: float64) =
+  self.moveTo(x1, y1)
+  self.lineTo(x2, y2)
 
 proc bezierCurveTo*(self: ContentBase; cp1x, cp1y, cp2x, cp2y, x, y: float64) =
   if self.state.recordShape:
@@ -959,7 +966,7 @@ proc closePath*(self: ContentBase) =
   self.state.pathEndX = self.state.pathStartX
   self.state.pathEndY = self.state.pathStartY
 
-proc roundRect*(self: ContentBase; x, y, w, h: float64; r: float64 = 0.0) =
+proc drawRoundRect*(self: ContentBase; x, y, w, h: float64; r: float64 = 0.0) =
   self.moveTo(x + r, y)
   self.lineTo(x + w - r, y)
   self.curveTo1(x + w, y, x + w, y + r)
@@ -1023,29 +1030,29 @@ proc setGrayStroke*(self: ContentBase; g: float64) =
   self.state.gState.grayStroke = g
   self.state.gState.csStroke = CS_DEVICE_GRAY
 
-proc setRGBFill*(self: ContentBase; r,g,b: float64) =
+proc setFillColor*(self: ContentBase; r,g,b: float64) =
   self.put(f2s(r), " ",f2s(g), " ",f2s(b), " rg")
   self.state.gState.rgbFill = initRGB(r,g,b)
   self.state.gState.csFill = CS_DEVICE_RGB
   self.state.shapes = nil
   self.state.recordShape = false
 
-proc setRGBStroke*(self: ContentBase; r,g,b: float64) =
+proc setStrokeColor*(self: ContentBase; r,g,b: float64) =
   self.put(f2s(r), " ",f2s(g), " ",f2s(b), " RG")
   self.state.gState.rgbStroke = initRGB(r,g,b)
   self.state.gState.csStroke = CS_DEVICE_RGB
 
-proc setRGBFill*(self: ContentBase; col: RGBColor) =
-  self.setRGBFill(col.r,col.g,col.b)
+proc setFillColor*(self: ContentBase; col: RGBColor) =
+  self.setFillColor(col.r,col.g,col.b)
 
-proc setRGBStroke*(self: ContentBase; col: RGBColor) =
-  self.setRGBStroke(col.r,col.g,col.b)
+proc setStrokeColor*(self: ContentBase; col: RGBColor) =
+  self.setStrokeColor(col.r,col.g,col.b)
 
 proc setFillColor*(self: ContentBase; col: string) =
-  self.setRGBFill(initRGB(col))
+  self.setFillColor(initRGB(col))
 
 proc setStrokeColor*(self: ContentBase; col: string) =
-  self.setRGBStroke(initRGB(col))
+  self.setStrokeColor(initRGB(col))
 
 proc setCMYKFill*(self: ContentBase; c,m,y,k: float64) =
   self.put(f2s(c), " ",f2s(m), " ",f2s(y), " ",f2s(k), " k")

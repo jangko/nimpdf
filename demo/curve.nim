@@ -23,9 +23,9 @@ proc draw_title(doc: PDF, text:string) =
   let tw = doc.getTextWidth(text)
   let x = size.width.toMM/2 - tw/2
 
-  doc.setRGBFill(0,0,0)
+  doc.setFillColor(0,0,0)
   doc.drawText(x, 10.0, text)
-  doc.setRGBStroke(0,0,0)
+  doc.setStrokeColor(0,0,0)
   doc.drawRect(10,15,size.width.toMM - 20, size.height.toMM-25)
   doc.stroke()
 
@@ -57,7 +57,7 @@ proc Transform(cnv: Canvas, p: Point2d): Point2d =
 proc drawBBox(doc: PDF, p: Path) =
   let bounds = p.calculateBounds()
   doc.setDash([3], 1)
-  doc.setRGBStroke(initRGB("skyblue"))
+  doc.setStrokeColor(initRGB("skyblue"))
   doc.drawRect(bounds.xmin, bounds.ymin, bounds.xmax - bounds.xmin, bounds.ymax - bounds.ymin)
   doc.stroke()
   doc.setDash([], 0)
@@ -86,14 +86,14 @@ proc addFunction(cnv: Canvas, f: TFunction, fstart, fend: float64, segments: int
 proc drawCurve(cnv:Canvas, c: CyclicCurve, x, y: float64) =
   cnv.doc.saveState()
   cnv.doc.move(x,y)
-  cnv.doc.setRGBStroke(initRGB("pink"))
+  cnv.doc.setStrokeColor(initRGB("pink"))
   cnv.addCyclicCurve(c, 60)
   cnv.doc.restoreState()
 
 proc drawFunction(cnv:Canvas, c: TFunction, x, y: float64) =
   cnv.doc.saveState()
   cnv.doc.move(x,y)
-  cnv.doc.setRGBStroke(initRGB("pink"))
+  cnv.doc.setStrokeColor(initRGB("pink"))
   cnv.addFunction(c, 0, degree_to_radian(360), 50)
   cnv.doc.restoreState()
 

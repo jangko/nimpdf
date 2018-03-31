@@ -20,18 +20,18 @@ proc draw_circles(doc: PDF, desc: string, x, y: float64) =
   let radius = 10.0
   let r2 = radius / 2
   doc.setLineWidth(0.5)
-  doc.setRGBStroke(0.0, 0.0, 0.0)
-  doc.setRGBFill(1.0, 0.0, 0.0)
+  doc.setStrokeColor(0.0, 0.0, 0.0)
+  doc.setFillColor(1.0, 0.0, 0.0)
   doc.drawCircle(x + radius, y + radius, radius)
   doc.fillAndStroke()
-  doc.setRGBFill(0.0, 1.0, 0.0)
+  doc.setFillColor(0.0, 1.0, 0.0)
   doc.drawCircle(x + radius + radius + r2, y + radius, radius)
   doc.fillAndStroke()
-  doc.setRGBFill(0.0, 0.0, 1.0)
+  doc.setFillColor(0.0, 0.0, 1.0)
   doc.drawCircle(x + radius + (radius + r2)/2, y + radius + radius, radius)
   doc.fillAndStroke()
 
-  doc.setRGBFill(0.0, 0.0, 0.0)
+  doc.setFillColor(0.0, 0.0, 0.0)
   doc.drawText(x + 0.0, y + radius * 4, desc)
 
 proc draw_title(doc: PDF, text:string) =
@@ -41,9 +41,9 @@ proc draw_title(doc: PDF, text:string) =
   let tw = doc.getTextWidth(text)
   let x = size.width.toMM/2 - tw/2
 
-  doc.setRGBFill(0,0,0)
+  doc.setFillColor(0,0,0)
   doc.drawText(x, 10.0, text)
-  doc.setRGBStroke(0,0,0)
+  doc.setStrokeColor(0,0,0)
   doc.drawRect(10,15,size.width.toMM - 20, size.height.toMM-25)
   doc.stroke()
 
@@ -132,35 +132,35 @@ proc draw_demo_2(doc: PDF) =
   let cx = 100.0
   let cy = 100.0
 
-  doc.setRGBFill(1.0,0.0,0.0)
+  doc.setFillColor(1.0,0.0,0.0)
   doc.drawArc(cx, cy, radius, radius, 0, 90)
   doc.lineTo(cx, cy)
   doc.closePath()
   doc.fill()
 
-  doc.setRGBFill(0.0,1.0,0.0)
+  doc.setFillColor(0.0,1.0,0.0)
   doc.drawArc(cx, cy, radius, radius, 90, 70)
   doc.lineTo(cx, cy)
   doc.closePath()
   doc.fill()
 
-  doc.setRGBFill(0.0,0.0,1.0)
+  doc.setFillColor(0.0,0.0,1.0)
   doc.drawArc(cx, cy, radius, radius, 160, 80)
   doc.lineTo(cx, cy)
   doc.closePath()
   doc.fill()
 
-  doc.setRGBFill(1.0,1.0,0.0)
+  doc.setFillColor(1.0,1.0,0.0)
   doc.drawArc(cx, cy, radius, radius, 240, 120)
   doc.lineTo(cx, cy)
   doc.closePath()
   doc.fill()
 
-  doc.setRGBFill(1.0,1.0,1.0)
+  doc.setFillColor(1.0,1.0,1.0)
   doc.drawCircle(cx,cy,radius * 0.5)
   doc.fill()
 
-  doc.setRGBStroke(initRGB("indigo"))
+  doc.setStrokeColor(initRGB("indigo"))
   doc.drawEllipse(100, 250, 60, 20)
   doc.drawEllipse(100, 230, 20, 40)
   doc.stroke()
@@ -212,8 +212,8 @@ proc draw_demo_4(doc: PDF) =
   let gray_thin = initRGB(0.5,0.5,0.5)
   let gray_bold = initRGB(0.8,0.8,0.8)
 
-  doc.setRGBFill(gray_thin)
-  doc.setRGBStroke(gray_bold)
+  doc.setFillColor(gray_thin)
+  doc.setStrokeColor(gray_bold)
 
   let width = size.width.toMM
   let height = size.height.toMM
@@ -231,13 +231,13 @@ proc draw_demo_4(doc: PDF) =
     doc.stroke()
 
     if (fmod(y, 10.0) == 0) and (y > 0):
-      doc.setRGBStroke(gray_thin)
+      doc.setStrokeColor(gray_thin)
 
       doc.moveTo(0, y)
       doc.lineTo(5, y)
       doc.stroke()
 
-      doc.setRGBStroke(gray_bold)
+      doc.setStrokeColor(gray_bold)
 
     y += 5.0
 
@@ -254,7 +254,7 @@ proc draw_demo_4(doc: PDF) =
     doc.stroke()
 
     if (fmod(x,50.0) == 0) and (x > 0):
-      doc.setRGBStroke(gray_thin)
+      doc.setStrokeColor(gray_thin)
 
       doc.moveTo(x, 0)
       doc.lineTo(x, 5)
@@ -264,7 +264,7 @@ proc draw_demo_4(doc: PDF) =
       doc.lineTo(x, height)
       doc.stroke()
 
-      doc.setRGBStroke(gray_bold)
+      doc.setStrokeColor(gray_bold)
     x += 5.0
 
   # Draw horizontal text
@@ -291,7 +291,7 @@ proc show_desc(doc: PDF; x,y: float; text:string) =
   doc.stroke()
 
   doc.setFont("Times", {FS_REGULAR}, 4)
-  doc.setRGBFill(0, 0, 0)
+  doc.setFillColor(0, 0, 0)
 
   var buf = "(x=" & $x & ",y=" & $y & ")"
 
@@ -342,7 +342,7 @@ proc draw_demo_5(doc: PDF) =
 
   var toucan = doc.loadImage("toucan.png")
   x += 60.0
-  doc.setRGBStroke(initRGB("red"))
+  doc.setStrokeColor(initRGB("red"))
   doc.drawCircle(x,y,20.0)
   doc.stroke()
   doc.saveState()
@@ -465,7 +465,7 @@ proc draw_demo_6(doc: PDF) =
   doc.setDash([], 0)
 
   doc.setLineWidth(10)
-  doc.setRGBStroke(initRGB("green"))
+  doc.setStrokeColor(initRGB("green"))
 
   #Line Cap Style
   doc.setLineCap(BUTT_END)
@@ -480,7 +480,7 @@ proc draw_demo_6(doc: PDF) =
 
   #Line Join Style
   doc.setLineWidth(10)
-  doc.setRGBStroke(initRGB("blue"))
+  doc.setStrokeColor(initRGB("blue"))
 
   drawJoin(doc, 30, 180, "MITER JOIN", MITER_JOIN)
   drawJoin(doc, 30, 210, "ROUND JOIN", ROUND_JOIN)
@@ -488,8 +488,8 @@ proc draw_demo_6(doc: PDF) =
 
   # Draw Rectangle
   doc.setLineWidth(0.5)
-  doc.setRGBStroke(0,0,0)
-  doc.setRGBFill(initRGB("maroon"))
+  doc.setStrokeColor(0,0,0)
+  doc.setFillColor(initRGB("maroon"))
 
   draw_rect(doc, 100, 20, "Stroke");
   doc.stroke()
@@ -595,7 +595,7 @@ proc draw_stripe_pattern(doc: PDF; x,y:float64) =
   var iy = 0.0
 
   while iy < 10:
-    doc.setRGBStroke(0.0, 0.0, 0.5)
+    doc.setStrokeColor(0.0, 0.0, 0.5)
     doc.setLineWidth(0.1)
     doc.moveTo(x, y - iy)
     doc.lineTo(x + 200, y - iy)
@@ -613,7 +613,7 @@ proc draw_demo_7(doc: PDF) =
 
   var size = 3.0
   var y = 20.0
-  doc.setRGBFill(0,0,0)
+  doc.setFillColor(0,0,0)
   while size < 13:
     doc.setFont("Helvetica", {FS_REGULAR}, size)
     doc.drawText(20, y, samp_text)
@@ -633,7 +633,7 @@ proc draw_demo_7(doc: PDF) =
     let r = i / len
     let g = 1 - (i / len)
     buf[0] = samp_text[i]
-    doc.setRGBFill(r,g,0)
+    doc.setFillColor(r,g,0)
     doc.showText(buf)
 
   doc.moveTextPos(0, 9.0)
@@ -642,7 +642,7 @@ proc draw_demo_7(doc: PDF) =
     let r = i / len
     let b = 1 - (i / len)
     buf[0] = samp_text[i]
-    doc.setRGBFill(r,0,b)
+    doc.setFillColor(r,0,b)
     doc.showText(buf)
 
   doc.moveTextPos(0, 9.0)
@@ -651,21 +651,21 @@ proc draw_demo_7(doc: PDF) =
     let b = i / len
     let g = 1 - (i / len)
     buf[0] = samp_text[i]
-    doc.setRGBFill(0,g,b)
+    doc.setFillColor(0,g,b)
     doc.showText(buf)
 
   doc.endText()
 
   y += 35.0
   doc.setFont("Helvetica", {FS_REGULAR}, 3.0)
-  doc.setRGBFill(initRGB("black"))
+  doc.setFillColor(initRGB("black"))
   doc.drawText(20, y, "Text Rendering Mode:")
 
   #Font rendering mode
   doc.setFont("Helvetica", {FS_REGULAR}, 9.0)
-  doc.setRGBFill(0.5,0.5,0.0)
+  doc.setFillColor(0.5,0.5,0.0)
   doc.setLineWidth(0.4)
-  doc.setRGBStroke(1,0,0)
+  doc.setStrokeColor(1,0,0)
 
   #PDF_FILL
   y += 10.0
@@ -707,7 +707,7 @@ proc draw_demo_7(doc: PDF) =
   doc.restoreState()
 
   doc.setFont("Helvetica", {FS_REGULAR}, 9.0)
-  doc.setRGBFill(initRGB("red"))
+  doc.setFillColor(initRGB("red"))
   let samp_text2 = "ABC123xyz"
   let oldy = y
   doc.setTextRenderingMode(TR_FILL)
@@ -735,7 +735,7 @@ proc draw_demo_7(doc: PDF) =
   doc.restoreState()
 
   doc.setFont("Times", {FS_REGULAR}, 3.0)
-  doc.setRGBFill(initRGB("black"))
+  doc.setFillColor(initRGB("black"))
   y = oldy + 35
   doc.drawText(20, y, "Rotating Text")
   doc.drawText(100, y, "Skewing Text")
@@ -748,14 +748,14 @@ proc draw_demo_8(doc: PDF) =
   draw_title(doc, "TEXT DEMO 2")
 
   doc.setFont("Helvetica", {FS_REGULAR}, 3.0)
-  doc.setRGBFill(initRGB("black"))
+  doc.setFillColor(initRGB("black"))
   doc.drawText(20, 20, "char-spacing 0")
   doc.drawText(20, 40, "char-spacing 1.5")
   doc.drawText(20, 60, "char-spacing 1.5, word-spacing 2.5")
 
   let samp_text = "The quick brown fox jumps over the lazy dog."
   doc.setFont("Times", {FS_REGULAR}, 7.0)
-  doc.setRGBFill(initRGB("seagreen"))
+  doc.setFillColor(initRGB("seagreen"))
   doc.saveState()
   doc.setCharSpace(0)
   doc.drawText(20, 30, samp_text)
@@ -769,8 +769,8 @@ proc draw_demo_8(doc: PDF) =
   let size = getSizeFromName("A4")
   let height = size.height.toPT
 
-  doc.setRGBStroke(initRGB("fuchsia"))
-  doc.setRGBFill(initRGB("orange"))
+  doc.setStrokeColor(initRGB("fuchsia"))
+  doc.setFillColor(initRGB("orange"))
   doc.setLineWidth(0.3)
   let cx = 110.0
   let cy = 170.0
@@ -815,18 +815,18 @@ type
 
 proc rgb1(doc: PDF, rng, x, y: int) =
   let r = float(rng)
-  doc.setRGBFill(float(x)/r, float(y)/r, 0.0)
-  doc.setRGBStroke(float(x)/r, float(y)/r, 0.0)
+  doc.setFillColor(float(x)/r, float(y)/r, 0.0)
+  doc.setStrokeColor(float(x)/r, float(y)/r, 0.0)
 
 proc rgb2(doc: PDF, rng, x, y: int) =
   let r = float(rng)
-  doc.setRGBFill(float(x)/r, 0.0, float(y)/r)
-  doc.setRGBStroke(float(x)/r, 0.0, float(y)/r)
+  doc.setFillColor(float(x)/r, 0.0, float(y)/r)
+  doc.setStrokeColor(float(x)/r, 0.0, float(y)/r)
 
 proc rgb3(doc: PDF, rng, x, y: int) =
   let r = float(rng)
-  doc.setRGBFill(0.0,float(x)/r, float(y)/r)
-  doc.setRGBStroke(0.0,float(x)/r, float(y)/r)
+  doc.setFillColor(0.0,float(x)/r, float(y)/r)
+  doc.setStrokeColor(0.0,float(x)/r, float(y)/r)
 
 proc cmyk1(doc: PDF, rng, x, y: int) =
   let r = float(rng)
@@ -874,7 +874,7 @@ proc draw_demo_9(doc: PDF) =
 
   spec.x0 = 15.0
   spec.y0 += float(spec.num_y) * spec.h + float(spec.num_y * spec.step_y) + 10.0
-  doc.setRGBFill(0,0,0)
+  doc.setFillColor(0,0,0)
   doc.drawText(15, spec.y0 - 5, "RGB color space")
 
   draw_rect_grid(doc, spec, cmyk1)
@@ -884,15 +884,15 @@ proc draw_demo_9(doc: PDF) =
   draw_rect_grid(doc, spec, cmyk3)
 
   spec.y0 += float(spec.num_y) * spec.h + float(spec.num_y * spec.step_y) + 10.0
-  doc.setRGBFill(0,0,0)
+  doc.setFillColor(0,0,0)
   doc.drawText(15, spec.y0 - 5, "CMYK color space")
 
   spec =(x0:15.0, y0:spec.y0, w:6.0, h:6.0, num_x:24, num_y:1, step_x:1, step_y:1)
   draw_rect_grid(doc, spec, gray1)
-  doc.setRGBFill(0,0,0)
+  doc.setFillColor(0,0,0)
   doc.drawText(15, spec.y0 + 10, "Gray color space")
 
-  doc.setRGBStroke(initRGB("red"))
+  doc.setStrokeColor(initRGB("red"))
   doc.setLineWidth(1.0)
   doc.drawRoundRect(20, spec.y0 + 20, 160.0, 30.0, 7.0)
   doc.stroke()
@@ -925,7 +925,7 @@ proc makeCanvas(doc: PDF): Canvas =
 proc drawBBox(doc: PDF, p: Path): bound =
   let bounds = p.calculateBounds()
   doc.setDash([3], 1)
-  doc.setRGBStroke(initRGB("skyblue"))
+  doc.setStrokeColor(initRGB("skyblue"))
   doc.drawRect(bounds.xmin, bounds.ymin, bounds.xmax - bounds.xmin, bounds.ymax - bounds.ymin)
   doc.stroke()
   doc.setDash([], 0)
@@ -955,7 +955,7 @@ proc addFunction(cnv: Canvas, f: TFunction, fstart, fend: float64, segments: int
 proc drawCurve(cnv:Canvas, c: CyclicCurve, x, y: float64, text:string) =
   cnv.doc.saveState()
   cnv.doc.move(x,y)
-  cnv.doc.setRGBStroke(initRGB("pink"))
+  cnv.doc.setStrokeColor(initRGB("pink"))
   let bb = cnv.addCyclicCurve(c, 60)
   cnv.doc.drawText(bb.xmin, bb.ymax + 5, text)
   cnv.doc.restoreState()
@@ -963,7 +963,7 @@ proc drawCurve(cnv:Canvas, c: CyclicCurve, x, y: float64, text:string) =
 proc drawFunction(cnv:Canvas, c: TFunction, x, y: float64, text:string) =
   cnv.doc.saveState()
   cnv.doc.move(x,y)
-  cnv.doc.setRGBStroke(initRGB("pink"))
+  cnv.doc.setStrokeColor(initRGB("pink"))
   let bb = cnv.addFunction(c, 0, degree_to_radian(360), 50)
   cnv.doc.drawText(bb.xmin, bb.ymax + 5, text)
   cnv.doc.restoreState()
@@ -1023,7 +1023,7 @@ proc draw_demo_11(doc: PDF) =
   doc.drawEllipse(70, 100, 30, 10)
   doc.fillAndStroke()
 
-  doc.setRGBFill(0,0,0)
+  doc.setFillColor(0,0,0)
   doc.drawText(15, 130, "How gradient works in PDF?")
   doc.drawText(15, 137, "1. Calculate the bounding box")
   doc.drawText(115, 137, "3. Paint gradient inside bbox")
@@ -1031,12 +1031,12 @@ proc draw_demo_11(doc: PDF) =
   doc.drawText(15, 197, "2. Set clipping area")
   doc.drawText(115, 197, "4. Voila")
 
-  doc.setRGBStroke(initRGB("black"))
+  doc.setStrokeColor(initRGB("black"))
   doc.drawCircle(15+25, 140+25, 25)
   doc.stroke()
 
   doc.setDash([3], 1)
-  doc.setRGBStroke(initRGB("skyblue"))
+  doc.setStrokeColor(initRGB("skyblue"))
   doc.drawRect(15, 140, 50, 50)
   doc.drawRect(15, 200, 50, 50)
   doc.drawRect(115, 140, 50, 50)

@@ -9,18 +9,18 @@ proc drawTitle(doc: PDF, text:string) =
   let tw = doc.getTextWidth(text)
   let x = size.width.toMM/2 - tw/2
 
-  doc.setRGBFill(0,0,0)
+  doc.setFillColor(0,0,0)
   doc.drawText(x, 10.0, text)
-  doc.setRGBStroke(0,0,0)
+  doc.setStrokeColor(0,0,0)
   doc.drawRect(10,15,size.width.toMM - 20, size.height.toMM-25)
   doc.stroke()
 
 proc rndlen(len: int): string =
   result = ""
-  for i in 1..len: result.add($random(10))
+  for i in 1..len: result.add($rand(10))
 
 proc random(a, b: int): int =
-  result = random(b-a) + a
+  result = rand(b-a) + a
 
 proc i2a(val: int): string =
   if val < 10: result = "0" & $val
@@ -42,7 +42,7 @@ proc createPDF(doc: PDF) =
   doc.setFont("Helvetica", {FS_BOLD}, 40)
 
   doc.saveState()
-  doc.setRGBFill(initRGB("lightgray"))
+  doc.setFillColor(initRGB("lightgray"))
   var y = size.height.toMM / 2.0
   doc.rotate(45, size.width.toMM/2.0, y)
   doc.drawText((size.width.toMM-doc.getTextWidth(text))/2.0 + 10, y, text)

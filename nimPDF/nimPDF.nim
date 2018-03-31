@@ -267,7 +267,7 @@ proc closePath*(doc: PDF) =
 
 proc drawRoundRect*(doc: PDF; x, y, w, h: float64; r: float64 = 0.0) =
   assert(doc.curPage != nil)
-  doc.curPage.roundRect(x, y, w, h, r)
+  doc.curPage.drawRoundRect(x, y, w, h, r)
 
 proc drawEllipse*(doc: PDF; x, y, r1, r2: float64) =
   assert(doc.curPage != nil)
@@ -284,6 +284,10 @@ proc drawImage*(doc: PDF, x, y: float64, source: Image) =
 proc drawRect*(doc: PDF, x, y, w, h: float64) =
   assert(doc.curPage != nil)
   doc.curPage.drawRect(x, y, w, h)
+
+proc drawLine*(doc: PDF, x1, y1, x2, y2: float64) =
+  assert(doc.curPage != nil)
+  doc.curPage.drawLine(x1, y1, x2, y2)
 
 proc drawArc*(doc: PDF; cx, cy, rx, ry, startAngle, sweepAngle: float64) =
   assert(doc.curPage != nil)
@@ -317,21 +321,21 @@ proc setGrayStroke*(doc: PDF; g: float64) =
   assert(doc.curPage != nil)
   doc.curPage.setGrayStroke(g)
 
-proc setRGBFill*(doc: PDF; r,g,b: float64) =
+proc setFillColor*(doc: PDF; r,g,b: float64) =
   assert(doc.curPage != nil)
-  doc.curPage.setRGBFill(r,g,b)
+  doc.curPage.setFillColor(r,g,b)
 
-proc setRGBStroke*(doc: PDF; r,g,b: float64) =
+proc setStrokeColor*(doc: PDF; r,g,b: float64) =
   assert(doc.curPage != nil)
-  doc.curPage.setRGBStroke(r,g,b)
+  doc.curPage.setStrokeColor(r,g,b)
 
-proc setRGBFill*(doc: PDF; col: RGBColor) =
+proc setFillColor*(doc: PDF; col: RGBColor) =
   assert(doc.curPage != nil)
-  doc.curPage.setRGBFill(col)
+  doc.curPage.setFillColor(col)
 
-proc setRGBStroke*(doc: PDF; col: RGBColor) =
+proc setStrokeColor*(doc: PDF; col: RGBColor) =
   assert(doc.curPage != nil)
-  doc.curPage.setRGBStroke(col)
+  doc.curPage.setStrokeColor(col)
 
 proc setFillColor*(doc: PDF, col: string) =
   assert(doc.curPage != nil)
