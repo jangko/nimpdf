@@ -137,7 +137,7 @@ proc loadImageFallbackSTBI(filename: string, nomask: bool): Image =
     result = nil
 
 proc loadImage*(fileName:string): Image =
-  #echo "before it's ", fileName
+  echo "before it's ", fileName
   let path = splitFile(fileName)
   var nomask = false
   if path.ext.len() > 0:
@@ -154,7 +154,6 @@ proc loadImage*(fileName:string): Image =
     if result.isNil: # try fallback
       echo "falling back!"
       result = loadImageFallbackSTBI(fileName, nomask)
-
   else:
     result = nil
 

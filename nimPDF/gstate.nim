@@ -142,6 +142,8 @@ type
     font*: Font
     fontSize*: float64
     writingMode*: WritingMode
+    docUnit*: PageUnit
+    coordMode*: CoordinateMode
     prev: GState
 
 proc init*(c: var RGBColor; r,g,b: float64) =
@@ -263,6 +265,8 @@ proc newGState*(): GState =
   result.font        = nil
   result.fontSize    = fromMM(10).toPT
   result.writingMode = WMODE_HORIZONTAL
+  result.coordMode   = TOP_DOWN
+  result.docUnit.setUnit(PGU_MM)
 
   result.prev        = nil
 
@@ -301,6 +305,8 @@ proc newGState*(gs: GState): GState =
   result.font        = gs.font
   result.fontSize    = gs.fontSize
   result.writingMode = gs.writingMode
+  result.coordMode   = gs.coordMode
+  result.docUnit     = gs.docUnit
   result.prev        = gs
 
 proc freeGState*(gs: GState): GState =

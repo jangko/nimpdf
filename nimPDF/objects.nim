@@ -4,9 +4,9 @@ const
   NeedEscape = {'\x00'..'\x20', '\\', '%', '#',
     '/', '(', ')', '<', '>', '[', ']', '{', '}', '\x7E'..'\xFF' }
 
-  OTYPE_DIRECT*   = 0x80000000.int
-  OTYPE_INDIRECT* = 0x40000000.int
-  OTYPE_HIDDEN    = 0x10000000.int
+  OTYPE_DIRECT    = 0x80000000'i32
+  OTYPE_INDIRECT  = 0x40000000'i32
+  OTYPE_HIDDEN    = 0x10000000'i32
 
   FREE_ENTRY   = 'f'
   IN_USE_ENTRY = 'n'
@@ -311,7 +311,7 @@ proc add*(obj: ArrayObj, val: PdfObject) =
     proxy.objID = proxy.objID or OTYPE_DIRECT
     obj.value.add proxy
   else:
-    val.objID = val.objID or OTYPE_DIRECT
+    obj.objID = obj.objID or OTYPE_DIRECT
     obj.value.add val
 
 proc addNumber*(obj: ArrayObj, val: int) =
