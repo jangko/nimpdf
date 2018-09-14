@@ -1,6 +1,6 @@
 # Copyright(c) 2016 Andri Lim
 #
-# Distributed under the MIT license 
+# Distributed under the MIT license
 # (See accompanying file LICENSE.txt)
 #
 # Nim version of wtf8 originally written by Bjoern Hoehrmann
@@ -84,7 +84,7 @@ iterator wtf8_decode*(str: string): int =
     inc i
     if res == UTF8_ACCEPT: yield codepoint
     elif res == UTF8_REJECT: yield codepoint
-    
+
 proc wtf8_encode*(codepoint: int, str: var cstring): cstring =
   if codepoint <= 0x7f:
     str[0] = codepoint.chr
@@ -98,7 +98,7 @@ proc wtf8_encode*(codepoint: int, str: var cstring): cstring =
     str[1] = chr(0x80 + ((codepoint shr 6) and 63))
     str[2] = chr(0x80 + (codepoint and 63))
     result = str[3].addr
-  elif codepoint <= 0x1ffff:
+  elif codepoint <= 0x1fffff:
     str[0] = chr(0xf0 + (codepoint shr 18))
     str[1] = chr(0x80 + ((codepoint shr 12) and 0x3f))
     str[2] = chr(0x80 + ((codepoint shr 6) and 0x3f))
@@ -115,12 +115,12 @@ proc wtf8_encode*(codepoint: int, str: var string) =
     str.add chr(0xe0 + (codepoint shr 12))
     str.add chr(0x80 + ((codepoint shr 6) and 63))
     str.add chr(0x80 + (codepoint and 63))
-  elif codepoint <= 0x1ffff:
+  elif codepoint <= 0x1fffff:
     str.add chr(0xf0 + (codepoint shr 18))
     str.add chr(0x80 + ((codepoint shr 12) and 0x3f))
     str.add chr(0x80 + ((codepoint shr 6) and 0x3f))
     str.add chr(0x80 + (codepoint and 0x3f))
-    
+
 proc wtf8_strlen*(str: string): int =
   var count = 0
   var state = 0
@@ -138,17 +138,17 @@ proc wtf8_is_continuation_byte*(byte: char): bool =
 proc wtf8_is_initial_byte*(byte: char): bool =
   result = (byte.ord and 0x80) == 0 or (byte.ord and 0xc0) == 0xc0
 
-const 
+const
   LEAD_SURROGATE_MIN  = 0x0000d800
   LEAD_SURROGATE_MAX  = 0x0000dbff
   TRAIL_SURROGATE_MIN = 0x0000dc00
   #TRAIL_SURROGATE_MAX = 0x0000dfff
   LEAD_OFFSET         = LEAD_SURROGATE_MIN - 0x00000040
   SURROGATE_OFFSET    = 0x00010000 - (LEAD_SURROGATE_MIN shl 10) - TRAIL_SURROGATE_MIN
-  
-proc utf8to16*(str: string): seq[uint16] = 
+
+proc utf8to16*(str: string): seq[uint16] =
   result = @[]
-  
+
   for codepoint in wtf8_decode(str):
     if codepoint > 0xffff:
       #make a surrogate pair
@@ -157,13 +157,13 @@ proc utf8to16*(str: string): seq[uint16] =
       result.add(uint16((cp and 0x3ff) + TRAIL_SURROGATE_MIN))
     else:
       result.add(uint16(codepoint))
- 
+
 proc is_lead_surrogate(cp: int): bool {.inline.} = cp >= LEAD_SURROGATE_MIN and cp <= LEAD_SURROGATE_MAX
- 
-proc utf16to8*(se: openArray[uint16]): string = 
+
+proc utf16to8*(se: openArray[uint16]): string =
   result = ""
   var it = 0
-  while it < se.len: 
+  while it < se.len:
     var cp = se[it].int
     inc it
     #Take care of surrogate pairs first
@@ -171,15 +171,15 @@ proc utf16to8*(se: openArray[uint16]): string =
       let trail_surrogate = se[it].int
       inc it
       cp = (cp shl 10) + trail_surrogate + SURROGATE_OFFSET
-    
+
     wtf8_encode(cp, result)
 
-proc utf8to32*(str: string): seq[uint32] = 
+proc utf8to32*(str: string): seq[uint32] =
   result = @[]
   for codepoint in wtf8_decode(str):
     result.add(uint32(codepoint))
-  
-proc utf32to8*(se: openArray[uint32]): string = 
+
+proc utf32to8*(se: openArray[uint32]): string =
   result = ""
   for cp in se:
     wtf8_encode(cp.int, result)
@@ -188,7 +188,7 @@ proc replace_invalid*(src: string): string =
   result = ""
   for codepoint in wtf8_decode(src):
     wtf8_encode(codepoint, result)
-    
+
 when isMainModule:
   proc single_octet() =
     let str1 = "\x01"
@@ -349,7 +349,7 @@ when isMainModule:
     var codepoint = 0
     var res = wtf8_decode(str1, 2, codepoint)
     doAssert(codepoint == 0xfffd)
-    
+
     codepoint = 0
     discard wtf8_decode(str2, 3, codepoint)
     doAssert(codepoint == 0xfffd)
@@ -365,7 +365,7 @@ when isMainModule:
     codepoint = 0
     discard wtf8_decode(str5, 6, codepoint)
     doAssert(codepoint == 0xfffd)
-    
+
 
   proc should_not_allow_surrogate() =
     var str1 = newString(3)
