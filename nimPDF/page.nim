@@ -260,7 +260,7 @@ proc putLabels(doc: DocState): DictObj =
     nums.addNumber(label.pageIndex)
     nums.add(dict)
     dict.addName("S", LABEL_STYLE_CH[int(label.style)])
-    if label.prefix != nil:
+    if label.prefix.len != 0:
       if label.prefix.len > 0: dict.addString("P", label.prefix)
     if label.start > 0: dict.addNumber("St", label.start)
 
@@ -416,7 +416,7 @@ proc newDocState*(opts: PDFOptions): DocState =
   result.pathEndX = 0
   result.pathEndY = 0
   result.recordShape = false
-  result.shapes = nil
+  result.shapes = @[]
   result.info = initTable[int, string]()
   result.opts = opts
   result.labels = @[]
@@ -457,8 +457,10 @@ proc setLabel*(doc: DocState, style: LabelStyle, prefix: string, pageIndex: int)
 proc loadImage*(doc: DocState, fileName: string): Image =
   var imagePath = doc.opts.getImagesPath()
   for p in imagePath:
-    let image = loadImage(p & DirSep & fileName)
-    if image != nil: return image
+    let fName = p & DirSep & fileName
+    if existsFile(fName):
+      let image = loadImage(fName)
+      if image != nil: return image
   result = nil
 
 proc setUnit*(doc: DocState, unit: PageUnitType) =
@@ -1019,7 +1021,7 @@ proc setGrayFill*(self: ContentBase; g: float64) =
   self.put(f2s(g), " g")
   self.state.gState.grayFill = g
   self.state.gState.csFill = CS_DEVICE_GRAY
-  self.state.shapes = nil
+  self.state.shapes = @[]
   self.state.recordShape = false
 
 proc setGrayStroke*(self: ContentBase; g: float64) =
@@ -1031,7 +1033,7 @@ proc setFillColor*(self: ContentBase; r,g,b: float64) =
   self.put(f2s(r), " ",f2s(g), " ",f2s(b), " rg")
   self.state.gState.rgbFill = initRGB(r,g,b)
   self.state.gState.csFill = CS_DEVICE_RGB
-  self.state.shapes = nil
+  self.state.shapes = @[]
   self.state.recordShape = false
 
 proc setStrokeColor*(self: ContentBase; r,g,b: float64) =
@@ -1055,7 +1057,7 @@ proc setCMYKFill*(self: ContentBase; c,m,y,k: float64) =
   self.put(f2s(c), " ",f2s(m), " ",f2s(y), " ",f2s(k), " k")
   self.state.gState.cmykFill = initCMYK(c,m,y,k)
   self.state.gState.csFill = CS_DEVICE_CMYK
-  self.state.shapes = nil
+  self.state.shapes = @[]
   self.state.recordShape = false
 
 proc setCMYKStroke*(self: ContentBase; c,m,y,k: float64) =

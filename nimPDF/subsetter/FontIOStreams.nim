@@ -94,7 +94,7 @@ method read*(s: FileInputStream, b: var ByteVector, offset, length: int): int =
 
   let readCount = min(s.len - s.pos, length)
 
-  if b == nil: b = newString(offset + readCount)
+  if b.len == 0: b = newString(offset + readCount)
 
   if b.len < (offset + readCount):
     let grow = (offset + readCount) - b.len

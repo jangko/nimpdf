@@ -1,4 +1,4 @@
-import encrypt, tables, streams, strutils, private.nimz
+import encrypt, tables, streams, strutils, private/nimz
 
 const
   NeedEscape = {'\x00'..'\x20', '\\', '%', '#',
@@ -417,7 +417,7 @@ proc getKeyByObj*(d: DictObj, obj: PdfObject): string =
       if ProxyObj(v).value == obj: return k
     else:
       if v == obj: return k
-  return nil
+  result = ""
 
 proc removeElement*(d: DictObj, key: string): bool =
   if d.value.hasKey(key):
@@ -497,7 +497,7 @@ method write(dict: DictObj, s: Stream, encryptor: PdfEncrypt) =
   var enc = encryptor
   if (dict.class == CLASS_DICT) and (dict.subclass == SUBCLASS_ENCRYPT): enc = PdfEncrypt(nil)
 
-  if dict.stream != nil:
+  if dict.stream.len != 0:
     # set filter element
     if dict.filter == {}:
       discard dict.removeElement("Filter")
@@ -524,7 +524,7 @@ method write(dict: DictObj, s: Stream, encryptor: PdfEncrypt) =
   dict.onWrite(s)
   s.write ">>"
 
-  if dict.stream != nil:
+  if dict.stream.len > 0:
     # get "length" element
     let length = NumberObj(dict.getItem("Length", CLASS_NUMBER))
     # "length" element must be indirect-object

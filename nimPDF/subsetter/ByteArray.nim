@@ -79,7 +79,7 @@ method copyTo*(ba: ByteArray, dstOffset: int, target: ByteArray, srcOffset, len:
     bytesRead = ba.get(index + srcOffset, b, 0, bufferLength)
     if bytesRead <= 0: break
     discard target.put(index + dstOffset, b, 0, bytesRead)
-    index  += bytesRead
+    index += bytesRead
     length -= bytesRead
     bufferLength = min(b.len, length)
 
@@ -120,7 +120,7 @@ method copyFrom*(ba: ByteArray, inp: InputStream, len: int) {.base.} =
     if bytesRead <= 0: break
     if ba.put(index, b, 0, bytesRead) != bytesRead:
       raise newEIO("Error writing bytes.")
-    index  += bytesRead
+    index += bytesRead
     length -= bytesRead
     bufferLength = min(b.len, length)
 

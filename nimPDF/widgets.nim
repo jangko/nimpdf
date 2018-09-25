@@ -338,7 +338,7 @@ proc newBorder(): Border =
   new(result)
   result.style = bsSolid
   result.width = 1
-  result.dashPattern = nil
+  result.dashPattern = @[]
   result.colorRGB = initRGB(0,0,0)
   result.colorType = ColorRGB
 
@@ -475,7 +475,7 @@ proc createPDFObject(self: Widget): DictObj =
     aa.addElement("K", k)
     aa.addElement("F", f)
 
-  if self.validateScript != nil:
+  if self.validateScript.len > 0:
     if aa.isNil: aa = newDictObj()
     var v = newDictObj()
     v.addName("S", "JavaScript")
@@ -485,7 +485,7 @@ proc createPDFObject(self: Widget): DictObj =
       v.addString("JS", self.validateScript)
     aa.addElement("V", v)
 
-  if self.calculateScript != nil:
+  if self.calculateScript.len > 0:
     if aa.isNil: aa = newDictObj()
     var c = newDictObj()
     c.addName("S", "JavaScript")
@@ -527,7 +527,7 @@ method finalizeObject(self: Widget; page, parent, resourceDict: DictObj) =
   const FormActionKindStr: array[FormActionKind, string] =
     ["URI", "ResetForm", "SubmitForm", "JavaScript", "JavaScript", "Named", "GoTo", "GoToR", "Launch"]
 
-  if self.actions != nil:
+  if self.actions.len > 0:
     aa = DictObj(self.dictObj.getItem("AA", CLASS_DICT))
     if aa.isNil:
       aa = newDictObj()
@@ -543,7 +543,7 @@ method finalizeObject(self: Widget; page, parent, resourceDict: DictObj) =
         action.addString("URI", x.uri)
         action.addBoolean("IsMap", x.isMap)
       of fakResetForm:
-        if x.rfFields != nil:
+        if x.rfFields.len > 0:
           action.addNumber("Flags", int(x.rfExclude))
           var arr = newArrayObj()
           for c in x.rfFields:
@@ -552,7 +552,7 @@ method finalizeObject(self: Widget; page, parent, resourceDict: DictObj) =
       of fakSubmitForm:
         action.addString("F", x.url)
         var flags: int = 0
-        if x.sfFields != nil:
+        if x.sfFields.len > 0:
           if x.sfExclude: flags = flags and (1 shr 1)
           var arr = newArrayObj()
           for c in x.sfFields:
@@ -613,7 +613,7 @@ method finalizeObject(self: Widget; page, parent, resourceDict: DictObj) =
   self.dictObj.addNumber("Ff", self.fieldFlags)
 
 method needCalculateOrder*(self: Widget): bool =
-  result = self.calculateScript != nil
+  result = self.calculateScript.len > 0
 
 proc init(self: Widget, doc: DocState, id: string) =
   self.state = doc
@@ -631,9 +631,9 @@ proc init(self: Widget, doc: DocState, id: string) =
   self.fontColorRGB = initRGB(0, 0, 0)
   self.fillColorType = ColorRGB
   self.fillColorRGB = initRGB(0, 0, 0)
-  self.actions = nil
-  self.validateScript = nil
-  self.calculateScript = nil
+  self.actions = @[]
+  self.validateScript = ""
+  self.calculateScript = ""
   self.format = nil
   self.highLightMode = hmNone
   self.fieldFlags = 0
@@ -752,7 +752,6 @@ proc setBorderDash*(self: Widget, dash: openArray[int]) =
   self.border.setDash(dash)
 
 proc addActionOpenWebLink*(self: Widget, trigger: FormActionTrigger, uri: string, isMap: bool) =
-  if self.actions.isNil: self.actions = @[]
   var action = new(FormAction)
   action.trigger = trigger
   action.kind = fakOpenWebLink
@@ -761,16 +760,14 @@ proc addActionOpenWebLink*(self: Widget, trigger: FormActionTrigger, uri: string
   self.actions.add action
 
 proc addActionResetForm*(self: Widget, trigger: FormActionTrigger) =
-  if self.actions.isNil: self.actions = @[]
   var action = new(FormAction)
   action.trigger = trigger
   action.kind = fakResetForm
-  action.rfFields = nil
+  action.rfFields = @[]
   action.rfExclude = false
   self.actions.add action
 
 proc addActionResetForm*(self: Widget, trigger: FormActionTrigger, fields: openArray[Widget], exclude: bool) =
-  if self.actions.isNil: self.actions = @[]
   var action = new(FormAction)
   action.trigger = trigger
   action.kind = fakResetForm
@@ -779,17 +776,15 @@ proc addActionResetForm*(self: Widget, trigger: FormActionTrigger, fields: openA
   self.actions.add action
 
 proc addActionSubmitForm*(self: Widget, trigger: FormActionTrigger, format: FormSubmitFormat, url: string) =
-  if self.actions.isNil: self.actions = @[]
   var action = new(FormAction)
   action.trigger = trigger
   action.kind = fakSubmitForm
   action.format = format
-  action.sfFields = nil
+  action.sfFields = @[]
   action.url = url
   self.actions.add action
 
 proc addActionSubmitForm*(self: Widget, trigger: FormActionTrigger, format: FormSubmitFormat, url: string, fields: openArray[Widget], exclude: bool) =
-  if self.actions.isNil: self.actions = @[]
   var action = new(FormAction)
   action.trigger = trigger
   action.kind = fakSubmitForm
@@ -800,7 +795,6 @@ proc addActionSubmitForm*(self: Widget, trigger: FormActionTrigger, format: Form
   self.actions.add action
 
 proc addActionEmailEntirePDF*(self: Widget, trigger: FormActionTrigger; to, cc, bcc, title, body: string) =
-  if self.actions.isNil: self.actions = @[]
   var action = new(FormAction)
   action.trigger = trigger
   action.kind = fakEmailEntirePDF
@@ -812,7 +806,6 @@ proc addActionEmailEntirePDF*(self: Widget, trigger: FormActionTrigger; to, cc, 
   self.actions.add action
 
 proc addActionRunJS*(self: Widget, trigger: FormActionTrigger, script: string) =
-  if self.actions.isNil: self.actions = @[]
   var action = new(FormAction)
   action.trigger = trigger
   action.kind = fakRunJS
@@ -820,7 +813,6 @@ proc addActionRunJS*(self: Widget, trigger: FormActionTrigger, script: string) =
   self.actions.add action
 
 proc addActionNamed*(self: Widget, trigger: FormActionTrigger, name: NamedAction) =
-  if self.actions.isNil: self.actions = @[]
   var action = new(FormAction)
   action.trigger = trigger
   action.kind = fakNamedAction
@@ -828,7 +820,6 @@ proc addActionNamed*(self: Widget, trigger: FormActionTrigger, name: NamedAction
   self.actions.add action
 
 proc addActionGotoLocalPage*(self: Widget, trigger: FormActionTrigger, dest: Destination) =
-  if self.actions.isNil: self.actions = @[]
   var action = new(FormAction)
   action.trigger = trigger
   action.kind = fakGotoLocalPage
@@ -836,7 +827,6 @@ proc addActionGotoLocalPage*(self: Widget, trigger: FormActionTrigger, dest: Des
   self.actions.add action
 
 proc addActionGotoAnotherPDF*(self: Widget, trigger: FormActionTrigger, path: string, pageNo: int) =
-  if self.actions.isNil: self.actions = @[]
   var action = new(FormAction)
   action.trigger = trigger
   action.kind = fakGotoAnotherPDF
@@ -845,7 +835,6 @@ proc addActionGotoAnotherPDF*(self: Widget, trigger: FormActionTrigger, path: st
   self.actions.add action
 
 proc addActionLaunchApp*(self: Widget, trigger: FormActionTrigger; app, params, operation, defaultDir: string) =
-  if self.actions.isNil: self.actions = @[]
   var action = new(FormAction)
   action.trigger = trigger
   action.kind = fakLaunchApp
@@ -982,7 +971,11 @@ proc removeFlags*(self: TextField, flags: set[TextFieldFlags]) =
 method createObject(self: TextField): PdfObject =
   var dict = self.createPDFObject()
   dict.addName("FT", FIELD_TYPE_TEXT)
-  self.fieldFlags = self.fieldFlags or ord(self.flags)
+  for c in low(TextFieldFlags)..high(TextFieldFlags):
+    if c in self.flags:
+      self.fieldFlags.setBit(c)
+    else:
+      self.fieldFlags.removeBit(c)
   result = dict
 
 method createDefaultAP*(self: TextField): AppearanceStream =
@@ -1116,8 +1109,8 @@ proc newPushButton*(doc: DocState, x,y,w,h: float64, id: string): PushButton =
   result.rect = initRect(x,y,w,h)
   result.kind = wkPushButton
   result.caption = ""
-  result.rollOverCaption = nil
-  result.alternateCaption = nil
+  result.rollOverCaption = ""
+  result.alternateCaption = ""
   result.look = pblCaptionOnly
   result.icon = nil
   result.rollOverIcon = nil
@@ -1168,9 +1161,9 @@ method createObject(self: PushButton): PdfObject =
   var mk = DictObj(self.dictObj.getItem("MK", CLASS_DICT))
 
   mk.addString("CA", self.caption)
-  if self.rollOverCaption != nil:
+  if self.rollOverCaption.len > 0:
     mk.addString("RC", self.rollOverCaption)
-  if self.alternateCaption != nil:
+  if self.alternateCaption.len > 0:
     mk.addString("AC", self.alternateCaption)
 
   mk.addNumber("TP", ord(self.look))

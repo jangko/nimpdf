@@ -1,6 +1,6 @@
 # Copyright (c) 2015 Andri Lim
 #
-# Distributed under the MIT license 
+# Distributed under the MIT license
 # (See accompanying file LICENSE.txt)
 #
 #-----------------------------------------
@@ -58,23 +58,23 @@ proc Points*(f: TFunction, fstart, fend: float64, segments: int): TPoints =
 proc Compose(f,g:TFunction): TFunction =
   #Composition f(g(x)) #Chain Rule  f'(g(x))*g'(x)
   result = makeFunction(
-    proc (x:float64): float64 = f.Val(g.Val(x)), 
+    proc (x:float64): float64 = f.Val(g.Val(x)),
     proc (x:float64): float64 = f.DVal(g.Val(x)) * g.DVal(x) )
-  
+
 proc Sum(f,g:TFunction): TFunction =
   result = makeFunction(
-    proc (x:float64): float64 = f.Val(x) + g.Val(x), 
+    proc (x:float64): float64 = f.Val(x) + g.Val(x),
     proc (x:float64): float64 = f.DVal(x) + g.DVal(x) )
 
-proc Difference(f,g:TFunction): TFunction = 
+proc Difference(f,g:TFunction): TFunction =
   result = makeFunction(
-    proc (x:float64): float64 = f.Val(x) - g.Val(x), 
+    proc (x:float64): float64 = f.Val(x) - g.Val(x),
     proc (x:float64): float64 = f.DVal(x) - g.DVal(x) )
 
 proc Product(f,g:TFunction): TFunction =
   #Chain Rule f'(x)g(x) + f(x)g'(x)
   result = makeFunction(
-    proc (x:float64): float64 = f.Val(x) * g.Val(x), 
+    proc (x:float64): float64 = f.Val(x) * g.Val(x),
     proc (x:float64): float64 = f.DVal(x) * g.Val(x) + g.DVal(x) * f.Val(x) )
 
 proc Quotient(f,g:TFunction): TFunction =
@@ -89,22 +89,22 @@ proc `-`*(f,g:TFunction): TFunction = Difference(f,g)
 proc `*`*(f,g:TFunction): TFunction = Product(f,g)
 proc `/`*(f,g:TFunction): TFunction = Quotient(f,g)
 
-proc makeSine*(A,N,D:float64): TFunction = 
+proc makeSine*(A,N,D:float64): TFunction =
   result = makeFunction(
     proc (x:float64): float64 = A * math.sin(N * x + D),
     proc (x:float64): float64 = N * A * math.cos(N * x + D) )
-  
+
 proc makeSine*(): TFunction = makeSine(1,1,0)
 proc makeSine*(a,n:float64): TFunction = makeSine(a,n,0)
 
-proc makeCosine*(A,N,D: float64): TFunction = 
+proc makeCosine*(A,N,D: float64): TFunction =
   result = makeFunction(
     proc (x:float64): float64 = A * math.cos(N * x + D),
     proc (x:float64): float64 = -N * A * math.sin(N * x + D) )
 
 proc makeCosine*(): TFunction = makeCosine(1,1,0)
 
-proc makeExp*(A,K,D: float64): TFunction = 
+proc makeExp*(A,K,D: float64): TFunction =
   result = makeFunction(
     proc (x:float64): float64 = A * math.exp(x * K + D),
     proc (x:float64): float64 = A * K * math.exp(x * K + D) )
@@ -117,9 +117,9 @@ proc makeCurve*(x, y: TFunction): Curve =
   result.mDx = x.mDF
   result.mY  = y.mF
   result.mDy = y.mDF
-  
+
 proc X*(f: Curve, t: float64): float64 = f.mX(t)
-  
+
 proc Y*(f: Curve, t: float64): float64 = f.mY(t)
 
 proc Dx*(f: Curve, t: float64): float64 = f.mDx(t)
@@ -138,8 +138,8 @@ proc makeCyclicCurve*(x,y: TFunction; cycleStart, cycleEnd: float64): CyclicCurv
   result.mDx = x.mDF
 
   result.mY = y.mF
-  result.mDy = y.mDF      
-  
+  result.mDy = y.mDF
+
   result.CycleStart = cycleStart
   result.CycleEnd = cycleEnd
 
@@ -151,25 +151,25 @@ proc makePolarCyclicCurve*(r: TFunction; cycleStart, cycleEnd: float64): CyclicC
 
 proc makeRose*(A: float64, N, D: int): CyclicCurve =
   let Omega = float64(N) / float64(D)
-  
+
   let f = makeFunction(
-    proc (theta: float64): float64 = A * math.sin(Omega * theta), 
+    proc (theta: float64): float64 = A * math.sin(Omega * theta),
     proc (theta: float64): float64 = Omega * A * math.cos(Omega * theta))
-  
-  var cycle = float64(D) * 2* math.PI / GCD(N, D)
+
+  var cycle = float64(D) * 2 * math.PI / GCD(N, D)
   if ((N == 1) and ((D mod 2) == 1)): cycle = cycle / 2
-  
+
   result = makePolarCyclicCurve(f, 0, cycle)
 
 proc makeLissajous*(A, B: float64; N, D: int; Delta: float64) : CyclicCurve =
   let Omega = float64(N) / float64(D)
 
   let x = makeFunction(
-    proc (t: float64): float64 = A * math.sin(Omega * t + Delta), 
+    proc (t: float64): float64 = A * math.sin(Omega * t + Delta),
     proc (t: float64): float64 = Omega * A * math.cos(Omega * t + Delta))
-  
+
   let y = makeFunction(
-    proc (t: float64): float64 = B * math.sin(t), 
+    proc (t: float64): float64 = B * math.sin(t),
     proc (t: float64): float64 = B * math.cos(t))
 
   result = makeCyclicCurve(x,y, 0, math.PI * 2 * float64(D) / GCD(N,D) )
@@ -179,7 +179,7 @@ proc makeEpicycloid*(R, P: float64; N, D: int) : CyclicCurve =
   let pp  = float64(N) / gcd
   let qq  = float64(D) / gcd
   let k   = pp / qq
-  
+
   let fx = makeFunction(
     proc (x: float64): float64 = R * ((k + 1) * math.cos(x + P) - math.cos((k + 1) * x + P)),
     proc (x: float64): float64 = -R * ((k + 1) * math.sin(x + P) - (k + 1) * math.sin((k + 1) * x + P)))
@@ -187,7 +187,7 @@ proc makeEpicycloid*(R, P: float64; N, D: int) : CyclicCurve =
   let fy = makeFunction(
     proc (x: float64): float64 = R * (k + 1) * math.sin(x + P) - R * math.sin((k + 1) * x + P),
     proc (x: float64): float64 = R * (k + 1) * math.cos(x + P) - R * (k + 1) * math.cos((k + 1) * x + P))
-  
+
   result = makeCyclicCurve(fx, fy, 0,  math.PI * 2 * qq)
 
 proc makeEpitrochoid*(R, P, M: float64; N, D: int) : CyclicCurve =
@@ -195,7 +195,7 @@ proc makeEpitrochoid*(R, P, M: float64; N, D: int) : CyclicCurve =
   let pp  = float64(N) / gcd
   let qq  = float64(D) / gcd
   let k   = pp / qq
-  
+
   let fx = makeFunction(
     proc (t: float64): float64 = R * ((k + 1) * math.cos(t + P) - math.pow(2, M) * math.cos((k + 1) * t + P)),
     proc (t: float64): float64 = -R * ((k + 1) * math.sin(t + P) - (k + 1) * math.pow(2, M) * math.sin((k + 1) * t + P)))
@@ -203,7 +203,7 @@ proc makeEpitrochoid*(R, P, M: float64; N, D: int) : CyclicCurve =
   let fy = makeFunction(
     proc (t: float64): float64 = R * (k + 1) * math.sin(t + P) - R * math.pow(2, M) * math.sin((k + 1) * t + P),
     proc (t: float64): float64 = R * (k + 1) * math.cos(t + P) - R * (k + 1) * math.pow(2, M) * math.cos((k + 1) * t + P))
-  
+
   result = makeCyclicCurve(fx, fy, 0, math.PI * 2 * qq)
 
 proc makeHipocycloid*(R, P: float64; N, D: int) : CyclicCurve =
@@ -211,7 +211,7 @@ proc makeHipocycloid*(R, P: float64; N, D: int) : CyclicCurve =
   let pp  = float64(N) / gcd
   let qq  = float64(D) / gcd
   let m   = pp / qq - 1
-  
+
   let fx = makeFunction(
     proc (t: float64): float64 = R * m * math.cos(t + P) + R * math.cos(m * t + P),
     proc (t: float64): float64 = -R * m * math.sin(t + P) - m * R * math.sin(m * t + P))
@@ -219,7 +219,7 @@ proc makeHipocycloid*(R, P: float64; N, D: int) : CyclicCurve =
   let fy = makeFunction(
     proc (t: float64): float64 = R * m * math.sin(t + P) - R * math.sin(m * t + P),
     proc (t: float64): float64 = R * m * math.cos(t + P) - R * m * math.cos(m * t + P))
-  
+
   result = makeCyclicCurve(fx, fy, 0, math.PI * 2 * qq)
 
 proc makeHipotrochoid*(R, P, M: float64; N, D: int) : CyclicCurve =
@@ -227,7 +227,7 @@ proc makeHipotrochoid*(R, P, M: float64; N, D: int) : CyclicCurve =
   let pp  = float64(N) / gcd
   let qq  = float64(D) / gcd
   let k   = pp / qq
-  
+
   let fx = makeFunction(
     proc (t: float64): float64 = R * ((k - 1) * math.cos(t + P) + math.pow(2, M) * math.cos((k - 1) * t + P)),
     proc (t: float64): float64 = -R * ((k - 1) * math.sin(t + P) + (k - 1) * math.pow(2, M) * math.sin((k - 1) * t + P)))
@@ -235,16 +235,16 @@ proc makeHipotrochoid*(R, P, M: float64; N, D: int) : CyclicCurve =
   let fy = makeFunction(
     proc (t: float64): float64 = R * (k - 1) * math.sin(t + P) - R * math.pow(2, M) * math.sin((k - 1) * t + P),
     proc (t: float64): float64 = R * (k - 1) * math.cos(t + P) - R * (k - 1) * math.pow(2, M) * math.cos((k - 1) * t + P))
-    
+
   result = makeCyclicCurve(fx, fy, 0, math.PI * 2 * qq)
-  
+
 proc makeFarrisWheel*(F1, F2, F3, W1, W2, W3, P1, P2, P3, R, P: float64) : CyclicCurve =
   let maxRadius   = abs(W1) + abs(W2) + abs(W3)
   let scaleFactor = R / maxRadius
   let pp1PI = (P + P1) * math.PI
   let pp2PI = (P + P2) * math.PI
   let pp3PI = (P + P3) * math.PI
-  
+
   let fx = makeFunction(
     proc (t: float64): float64 = scaleFactor * (W1 * math.cos(F1 * t + pp1PI) + W2 * math.cos(F2 * t + pp2PI) + W3 * math.cos(F3 * t + pp3PI)),
     proc (t: float64): float64 = scaleFactor * (-F1 * W1 * math.sin(F1 * t + pp1PI) - F2 * W2 * math.sin(F2 * t + pp2PI) - F3 * W3 * math.sin(F3 * t + pp3PI)))
@@ -252,7 +252,7 @@ proc makeFarrisWheel*(F1, F2, F3, W1, W2, W3, P1, P2, P3, R, P: float64) : Cycli
   let fy = makeFunction(
     proc (t: float64): float64 = scaleFactor * (W1 * math.sin(F1 * t + pp1PI) + W2 * math.sin(F2 * t + pp2PI) + W3 * math.sin(F3 * t + pp3PI)),
     proc (t: float64): float64 = scaleFactor * (F1 * W1 * math.cos(F1 * t + pp1PI) + F2 * W2 * math.cos(F2 * t + pp2PI) + F3 * W3 * math.cos(F3 * t + pp3PI)))
-  
+
   result = makeCyclicCurve(fx, fy, 0, math.PI * 2)
 
 
@@ -264,7 +264,7 @@ proc TransformedCurve*(c: Curve; xTrans, yTrans: TFunction): Curve =
   let y = makeFunction(
     proc (t: float64): float64 = yTrans.Val(c.Y(t)),
     proc (t: float64): float64 = yTrans.DVal(c.Y(t)) * c.Dy(t) ) #chain rule
-  
+
   result = makeCurve(x, y)
 
 proc makeTransformedFunction*(f, xTrans, yTrans: TFunction): TransformedFunction =
@@ -283,7 +283,7 @@ proc DVal(f: TransformedFunction, x: float64): float64 =
 proc QuadraticBezierGeometry*(tf: TransformedFunction, fstart, fend: float64, segments: int): Path =
   result = makePath()
   var StartPoint = point2d(tf.Input(fstart), tf.Val(fstart))
-  
+
   proc f(x: float64): float64 = tf.Val(x)
   proc df(x: float64): float64 = tf.DVal(x)
 
@@ -320,13 +320,13 @@ proc CubicBezierGeometry*(tf: TransformedFunction, fstart, fend: float64, segmen
 
 proc CubicBezierGeometry*(tc: Curve, fstart, fend: float64, segments: int): Path =
   result = makePath()
-  
+
   #P0 = x(t0), y(t0)
   #P3 = x(t1), y(t1)
   #dt = t1 - t0
   #P1 = P0 + (dt/3) P'(t0)
   #P2 = P3 - (dt/3) P'(t1)
-  
+
   for i in 0..segments-1:
     let t0 = float64(i) * (fend - fstart) / float64(segments) + fstart
     let t1 = float64(i + 1) * (fend - fstart) / float64(segments) + fstart

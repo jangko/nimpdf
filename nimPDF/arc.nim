@@ -40,8 +40,8 @@ proc bezier_arc_centre(x, y, rx, ry, start, sweep : float64, approx: var arc_app
   var sweep_angle = sweep
   var start_angle = start
 
-  start_angle = math.fmod(start_angle, 2.0 * math.PI)
-  if sweep_angle >=  2.0 * math.PI: sweep_angle =  2.0 * math.PI
+  start_angle = start_angle mod (2.0 * math.PI).float64
+  if sweep_angle >= 2.0 * math.PI: sweep_angle = 2.0 * math.PI
   if sweep_angle <= -2.0 * math.PI: sweep_angle = -2.0 * math.PI
 
   if abs(sweep_angle) < 1e-10:
@@ -134,7 +134,7 @@ proc bezier_arc_endpoints(x0, y0, rrx, rry, angle: float64; large_arc_flag, swee
   var sq   = (prx*pry - prx*py1 - pry*px1) / (prx*py1 + pry*px1)
   if sq < 0: sq = 0
   let coef = sign * math.sqrt(sq)
-  let cx1  = coef *  ((rx * y1) / ry)
+  let cx1  = coef * ((rx * y1) / ry)
   let cy1  = coef * -((ry * x1) / rx)
 
 
@@ -164,7 +164,7 @@ proc bezier_arc_endpoints(x0, y0, rrx, rry, angle: float64; large_arc_flag, swee
 
   var v = p / n
   if v < -1.0: v = -1.0
-  if v >  1.0: v =  1.0
+  if v > 1.0: v = 1.0
   let start_angle = sign * math.arccos(v)
 
   #Calculate the sweep angle
@@ -178,7 +178,7 @@ proc bezier_arc_endpoints(x0, y0, rrx, rry, angle: float64; large_arc_flag, swee
 
   v = p / n
   if v < -1.0: v = -1.0
-  if v >  1.0: v =  1.0
+  if v > 1.0: v = 1.0
 
   var sweep_angle = sign * math.arccos(v);
   if (not sweep_flag) and (sweep_angle > 0):

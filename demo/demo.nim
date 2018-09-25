@@ -221,7 +221,7 @@ proc draw_demo_4(doc: PDF) =
   #Draw horizontal lines
   var y = 0.0
   while y < height:
-    if fmod(y, 10.0) == 0.0:
+    if `mod`(y, 10.0) == 0.0:
       doc.setLineWidth(0.3)
     else:
       doc.setLineWidth(0.1)
@@ -230,7 +230,7 @@ proc draw_demo_4(doc: PDF) =
     doc.lineTo(width, y)
     doc.stroke()
 
-    if (fmod(y, 10.0) == 0) and (y > 0):
+    if (`mod`(y, 10.0) == 0) and (y > 0):
       doc.setStrokeColor(gray_thin)
 
       doc.moveTo(0, y)
@@ -244,7 +244,7 @@ proc draw_demo_4(doc: PDF) =
   #Draw vertical lines
   var x = 0.0
   while x < width:
-    if fmod(x, 10) == 0:
+    if `mod`(x, 10) == 0:
       doc.setLineWidth(0.3)
     else:
       doc.setLineWidth(0.1)
@@ -253,7 +253,7 @@ proc draw_demo_4(doc: PDF) =
     doc.lineTo(x, height)
     doc.stroke()
 
-    if (fmod(x,50.0) == 0) and (x > 0):
+    if (`mod`(x,50.0) == 0) and (x > 0):
       doc.setStrokeColor(gray_thin)
 
       doc.moveTo(x, 0)
@@ -270,14 +270,14 @@ proc draw_demo_4(doc: PDF) =
   # Draw horizontal text
   y = 0.0
   while y < height:
-    if (fmod(y,10.0) == 0) and (y > 0):
+    if (`mod`(y,10.0) == 0) and (y > 0):
       doc.drawText(5, y - 2, $y)
     y += 5.0
 
   #Draw vertical text
   x = 0
   while x < width:
-    if (fmod(x,50) == 0) and (x > 0):
+    if (`mod`(x,50) == 0) and (x > 0):
       doc.drawText(x, 5, $x)
       doc.drawText(x, height - 5, $x)
     x += 5.0

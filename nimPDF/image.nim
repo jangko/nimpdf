@@ -10,7 +10,7 @@
 # currently, identify file format only by it's file name extension
 # eg: .png, .jpg, .jpeg, .bmp
 
-import nimBMP, os, strutils, nimPNG, private.nimz, objects
+import nimBMP, os, strutils, nimPNG, private/nimz, objects
 
 # William Whitacre - 2018/01/19 - Fallback
 import stb_image/read as stbi
@@ -82,7 +82,7 @@ proc loadImageBMP(fileName:string): Image =
 
 # William Whitacre - 2018/01/19
 template initImageData(dat, siz: untyped): untyped =
-  if dat.isNil: dat = newString(siz) else: dat.setLen(siz)
+  if dat.len == 0: dat = newString(siz) else: dat.setLen(siz)
 
 # William Whitacre - 2018/01/19
 template setChannels(odat, i, r, g, b: untyped): untyped =
@@ -129,7 +129,7 @@ proc loadImageFallbackSTBI(filename: string, nomask: bool): Image =
     let
       bytes = stbi.load(fileName, img.width, img.height, numChannels, if nomask: 3 else: 4)
 
-    if not (bytes.isNil or bytes.len == 0):
+    if not (bytes.len == 0):
       bytes.mapImageData(img.width * img.height, numChannels, img.data, img.mask, nomask)
       result = img
   except:
@@ -137,7 +137,6 @@ proc loadImageFallbackSTBI(filename: string, nomask: bool): Image =
     result = nil
 
 proc loadImage*(fileName:string): Image =
-  echo "before it's ", fileName
   let path = splitFile(fileName)
   var nomask = false
   if path.ext.len() > 0:
@@ -152,7 +151,7 @@ proc loadImage*(fileName:string): Image =
       result = loadImageJPG(fileName)
 
     if result.isNil: # try fallback
-      echo "falling back!"
+      echo "before it's ", fileName, " falling back!"
       result = loadImageFallbackSTBI(fileName, nomask)
   else:
     result = nil
