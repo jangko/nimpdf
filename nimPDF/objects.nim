@@ -1,4 +1,4 @@
-import encrypt, tables, streams, strutils, private/nimz
+import encrypt, tables, streams, strutils, nimPNG/nimz
 
 const
   NeedEscape = {'\x00'..'\x20', '\\', '%', '#',

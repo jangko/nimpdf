@@ -10,7 +10,7 @@
 # currently, identify file format only by it's file name extension
 # eg: .png, .jpg, .jpeg, .bmp
 
-import nimBMP, os, strutils, nimPNG, private/nimz, objects
+import nimBMP, os, strutils, nimPNG, nimPNG/nimz, objects
 
 # William Whitacre - 2018/01/19 - Fallback
 import stb_image/read as stbi
