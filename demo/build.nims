@@ -4,6 +4,8 @@ import strutils, ospaths
 
 var switches = ""
 
+const testDir {.strdefine.} = ""
+
 proc addSwitch(sw: string) =
   switches.add " --"
   switches.add sw
@@ -25,8 +27,10 @@ let files = [
   "text_annot"
   ]
 
+let testDirSep = if testDir != "": testDir & DirSep else: ""
+
 for file in files:
-  exec "nim c $1 $2" % [switches, file]
+  exec "nim c $1 $2$3" % [switches, testDirSep, file]
 
 for file in files:
   exec file
