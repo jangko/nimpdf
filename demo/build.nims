@@ -11,7 +11,8 @@ proc addSwitch(sw: string) =
   switches.add sw
 
 addSwitch("path:.." & DirSep & "nimPDF")
-addSwitch("define:release")
+when defined(release):
+  addSwitch("define:release")
 
 let files = [
   "basic_outline",
@@ -33,4 +34,4 @@ for file in files:
   exec "nim c $1 $2$3" % [switches, testDirSep, file]
 
 for file in files:
-  exec file
+  exec "$1$2" % [testDirSep, file]
