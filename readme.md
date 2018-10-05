@@ -1,5 +1,10 @@
 # nimPDF
 
+[![Build Status (Travis)](https://img.shields.io/travis/jangko/nimpdf/master.svg?label=Linux%20/%20macOS "Linux/macOS build status (Travis)")](https://travis-ci.org/jangko/nimpdf)
+[![Windows build status (Appveyor)](https://img.shields.io/appveyor/ci/jangko/nimpdf/master.svg?label=Windows "Windows build status (Appveyor)")](https://ci.appveyor.com/project/jangko/nimpdf)
+![nimble](https://img.shields.io/badge/available%20on-nimble-yellow.svg?style=flat-square)
+![license](https://img.shields.io/github/license/citycide/cascade.svg?style=flat-square)
+
 nimPDF is a free PDF writer library, written mostly in nim programming language
 
 nimPDF was heavily inspired by PHP-[FPDF](http://www.fpdf.org) but also influenced by  [jagPDF](http://www.jagpdf.org), [libHaru](http://www.libharu.org)(especially for the demo), [PyFPDF](https://code.google.com/p/pyfpdf), [pdfkit](http://devongovett.github.io/pdfkit)

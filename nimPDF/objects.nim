@@ -311,7 +311,7 @@ proc add*(obj: ArrayObj, val: PdfObject) =
     proxy.objID = proxy.objID or OTYPE_DIRECT
     obj.value.add proxy
   else:
-    obj.objID = obj.objID or OTYPE_DIRECT
+    val.objID = val.objID or OTYPE_DIRECT
     obj.value.add val
 
 proc addNumber*(obj: ArrayObj, val: int) =

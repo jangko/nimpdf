@@ -1,0 +1,7 @@
+combo box
+radio group
+text field
+list box
+check box
+
+default AP for each widget
