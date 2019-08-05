@@ -1,4 +1,4 @@
-import strutils, gState, objects, fontmanager, image, path
+import strutils, gstate, objects, fontmanager, image, path
 import tables, encryptdict, os, resources, times, "subsetter/Font"
 import streams, encryptdict, encrypt, options, wtf8, unicode
 import basic2d, math
