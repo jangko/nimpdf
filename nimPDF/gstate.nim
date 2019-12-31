@@ -6,7 +6,7 @@
 #-----------------------------------------
 # graphic state
 
-import math, basic2d, fontmanager, image, "subsetter/Font", tables
+import math, basic2d, image, "subsetter/Font", tables
 
 const
   PGU_K_MM = 72/25.4
@@ -169,15 +169,13 @@ proc initCMYK*(c,m,y,k: float64): CMYKColor =
   result.k = k
 
 proc newLinearGradient*(a, b: RGBColor, axis: Coord): Gradient =
-  new(result)
-  result.gradType = GDT_LINEAR
+  result = Gradient(gradType: GDT_LINEAR)
   result.a = a
   result.b = b
   result.axis = axis
 
 proc newRadialGradient*(a, b: RGBColor, coord: CoordRadial): Gradient =
-  new(result)
-  result.gradType = GDT_RADIAL
+  result = Gradient(gradType: GDT_RADIAL)
   result.a = a
   result.b = b
   result.radCoord = coord

@@ -11,6 +11,8 @@ proc addSwitch(sw: string) =
   switches.add sw
 
 addSwitch("path:.." & DirSep & "nimPDF")
+addSwitch("warning[LockLevel]:off")
+
 when defined(release):
   addSwitch("define:release")
 

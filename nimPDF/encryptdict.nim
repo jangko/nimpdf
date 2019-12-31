@@ -1,4 +1,4 @@
-import encrypt, objects, times, md5, tables, strutils
+import encrypt, objects, times, md5, tables
 
 const
   stdCFName = "StdCF"

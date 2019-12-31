@@ -4,7 +4,7 @@
 # (See accompanying file LICENSE.txt)
 #
 #-----------------------------------------
-import FontIOStreams, FontData, sets, tables
+import FontIOStreams, FontData, tables
 
 const
   kHMetricsStart = 0
