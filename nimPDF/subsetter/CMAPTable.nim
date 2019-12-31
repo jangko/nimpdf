@@ -4,7 +4,7 @@
 # (See accompanying file LICENSE.txt)
 #
 #-----------------------------------------
-import FontIOStreams, FontData, tables
+import FontData, tables
 
 const
   kTableVersion = 0

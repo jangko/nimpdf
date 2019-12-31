@@ -1,4 +1,4 @@
-import md5, strutils, nimSHA2, nimAES, math, random
+import md5, strutils, nimSHA2, nimAES, random
 
 const
   PDF_ID_LEN           =  16

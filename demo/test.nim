@@ -1,5 +1,4 @@
-import streams, math, basic2d
-import nimPDF, spline
+import streams, nimPDF
 
 proc draw_title(doc: PDF, text:string) =
   let size = getSizeFromName("A4")

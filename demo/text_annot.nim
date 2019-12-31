@@ -5,10 +5,7 @@ proc createPDF(doc: PDF) =
   let pg1 = doc.addPage(size, PGO_PORTRAIT)
   let text = "Click Here"
   doc.drawText(15, 30, text)
-  let w = doc.getTextWidth(text)
-  #doc.drawRect(15, 25, w, 6)
-  #doc.stroke()
-
+  discard doc.getTextWidth(text)
   let r = initRect(15, 19, 10, 6)
   discard doc.textAnnot(r, pg1, "Hello There")
 

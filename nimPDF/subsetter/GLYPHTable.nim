@@ -4,7 +4,7 @@
 # (See accompanying file LICENSE.txt)
 #
 #-----------------------------------------
-import FontIOStreams, FontData, LOCATable, sets, tables, math
+import FontData, LOCATable, sets, tables, math
 
 const
   kNumberOfContours = 0
@@ -91,8 +91,8 @@ proc newGLYPHTable*(header: Header, data: FontData): GLYPHTable =
   initFontTable(result, header, data)
 
 proc CollectMoreGlyphs(t: GLYPHTable, neededGlyphs: HashSet[int]): HashSet[int] =
-  var additionalGlyphs = initSet[int]()
-  var visited = initSet[int]()
+  var additionalGlyphs = initHashSet[int]()
+  var visited = initHashSet[int]()
 
   for i in items(neededGlyphs):
     let length = t.loca.GlyphLength(i)
@@ -105,7 +105,7 @@ proc CollectMoreGlyphs(t: GLYPHTable, neededGlyphs: HashSet[int]): HashSet[int] 
       visited.incl(i)
 
   additionalGlyphs = difference(additionalGlyphs, neededGlyphs)
-  var moreGlyphs = initSet[int]()
+  var moreGlyphs = initHashSet[int]()
 
   while true:
     for i in items(additionalGlyphs):
@@ -144,7 +144,7 @@ proc UpdateGlyphsOffset(fd: FontData, loc: int, GID2GID: OrderedTable[int, int])
     if (flags and MORE_COMPONENTS) == 0: break
 
 proc EncodeGLYPHTable*(t: GLYPHTable, GID2GID: var OrderedTable[int, int]): GLYPHTable =
-  var Glyphs = initSet[int](math.nextPowerOfTwo(GID2GID.len))
+  var Glyphs = initHashSet[int](math.nextPowerOfTwo(GID2GID.len))
   for i in keys(GID2GID): Glyphs.incl(i)
 
   let moreGlyphs = t.CollectMoreGlyphs(Glyphs)

@@ -57,10 +57,10 @@ proc hash*(c: TTag): Hash =
 proc toString*(tag: TTag): string =
   result = newString(4)
   let t = int(tag)
-  result[0] = chr(toU32(t shr 24) and 0xFF)
-  result[1] = chr(toU32(t shr 16) and 0xFF)
-  result[2] = chr(toU32(t shr 8) and 0xFF)
-  result[3] = chr(toU32(t) and 0xFF)
+  result[0] = chr(uint32(t shr 24) and 0xFF)
+  result[1] = chr(uint32(t shr 16) and 0xFF)
+  result[2] = chr(uint32(t shr 8) and 0xFF)
+  result[3] = chr(uint32(t) and 0xFF)
 
 #---------------------------------------------------
 proc tagSortedComparator*(x,y: Header): int = cmp(int(x.mTag), int(y.mTag))
