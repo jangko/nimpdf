@@ -528,23 +528,21 @@ proc newArray*(rc: Rectangle): ArrayObj =
   result = newArray(rc.x, rc.y, rc.w, rc.h)
 
 proc newLinkAnnot*(doc: DocState, rect: Rectangle, src: Page, dest: Destination): Annot =
-  new(result)
+  result = Annot(annotType: ANNOT_LINK)
   let xx = doc.fromUser(rect.x)
   let yy = doc.vPoint(rect.y)
   let ww = doc.fromUser(rect.x + rect.w)
   let hh = doc.vPoint(rect.y + rect.h)
-  result.annotType = ANNOT_LINK
   result.rect = initRect(xx,yy,ww,hh)
   result.dest = dest
   src.annots.add(result)
 
 proc newTextAnnot*(doc: DocState, rect: Rectangle, src: Page, content: string): Annot =
-  new(result)
+  result = Annot(annotType: ANNOT_TEXT)
   let xx = doc.fromUser(rect.x)
   let yy = doc.vPoint(rect.y)
   let ww = doc.fromUser(rect.x + rect.w)
   let hh = doc.vPoint(rect.y + rect.h)
-  result.annotType = ANNOT_TEXT
   result.rect = initRect(xx,yy,ww,hh)
   result.content = content
   src.annots.add(result)
