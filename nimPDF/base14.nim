@@ -328,16 +328,48 @@ proc getWidth(cp:int, widths: TableRef[int,int]): int =
   result = 0
   if widths.hasKey(cp): result = widths[cp]
 
-proc helveticaGetWidth(cp: int): int = getWidth(cp, CHAR_DATA_HELVETICA)
-proc helveticaBoldGetWidth(cp: int): int = getWidth(cp, CHAR_DATA_HELVETICA_BOLD)
-proc helveticaBoldObliqueGetWidth(cp: int): int = getWidth(cp, CHAR_DATA_HELVETICA_BOLD_OBLIQUE)
-proc helveticaObliqueGetWidth(cp: int): int = getWidth(cp, CHAR_DATA_HELVETICA_OBLIQUE)
-proc timesGetWidth(cp: int): int = getWidth(cp, CHAR_DATA_TIMES_ROMAN)
-proc timesBoldGetWidth(cp: int): int = getWidth(cp, CHAR_DATA_TIMES_BOLD)
-proc timesItalicGetWidth(cp: int): int = getWidth(cp, CHAR_DATA_TIMES_ITALIC)
-proc timesBoldItalicGetWidth(cp: int): int = getWidth(cp, CHAR_DATA_TIMES_BOLD_ITALIC)
-proc symbolGetWidth(cp: int): int = getWidth(cp, CHAR_DATA_SYMBOL)
-proc zapfDingbatsGetWidth(cp: int): int = getWidth(cp, CHAR_DATA_ZAPF_DINGBATS)
+# we override the compiler side effects analysis
+# using {.nosideEffect.} pragma.
+# and this allow us to compile using nim > 1.2
+proc helveticaGetWidth(cp: int): int =
+  {.noSideEffect.}:
+    getWidth(cp, CHAR_DATA_HELVETICA)
+
+proc helveticaBoldGetWidth(cp: int): int =
+  {.noSideEffect.}:
+    getWidth(cp, CHAR_DATA_HELVETICA_BOLD)
+
+proc helveticaBoldObliqueGetWidth(cp: int): int =
+  {.noSideEffect.}:
+    getWidth(cp, CHAR_DATA_HELVETICA_BOLD_OBLIQUE)
+
+proc helveticaObliqueGetWidth(cp: int): int =
+  {.noSideEffect.}:
+    getWidth(cp, CHAR_DATA_HELVETICA_OBLIQUE)
+
+proc timesGetWidth(cp: int): int =
+  {.noSideEffect.}:
+    getWidth(cp, CHAR_DATA_TIMES_ROMAN)
+
+proc timesBoldGetWidth(cp: int): int =
+  {.noSideEffect.}:
+    getWidth(cp, CHAR_DATA_TIMES_BOLD)
+
+proc timesItalicGetWidth(cp: int): int =
+  {.noSideEffect.}:
+    getWidth(cp, CHAR_DATA_TIMES_ITALIC)
+
+proc timesBoldItalicGetWidth(cp: int): int =
+  {.noSideEffect.}:
+    getWidth(cp, CHAR_DATA_TIMES_BOLD_ITALIC)
+
+proc symbolGetWidth(cp: int): int =
+  {.noSideEffect.}:
+    getWidth(cp, CHAR_DATA_SYMBOL)
+
+proc zapfDingbatsGetWidth(cp: int): int =
+  {.noSideEffect.}:
+    getWidth(cp, CHAR_DATA_ZAPF_DINGBATS)
 
 const
   #BaseFont, SearchName, getWidth, is_font_specific, ascent, descent, x_height, cap_height, bbox
