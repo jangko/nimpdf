@@ -1,9 +1,9 @@
 version: '{build}'
 
 cache:
-- x86_64-4.9.2-release-win32-seh-rt_v4-rev4.7z -> .appveyor.yml
-- i686-4.9.2-release-win32-dwarf-rt_v4-rev4.7z -> .appveyor.yml
-- Nim -> .appveyor.yml
+  - x86_64-8.1.0-release-posix-seh-rt_v6-rev0.7z -> .appveyor.yml
+  - i686-8.1.0-release-posix-dwarf-rt_v6-rev0.7z -> .appveyor.yml
+  - Nim -> .appveyor.yml
 
 matrix:
   # We always want 32 and 64-bit compilation
@@ -17,13 +17,13 @@ install:
   - setlocal EnableExtensions EnableDelayedExpansion
 
   - IF "%PLATFORM%" == "x86" (
-      SET "MINGW_ARCHIVE=i686-4.9.2-release-win32-dwarf-rt_v4-rev4.7z" &
-      SET "MINGW_URL=https://sourceforge.net/projects/mingw-w64/files/Toolchains%%20targetting%%20Win32/Personal%%20Builds/mingw-builds/4.9.2/threads-win32/dwarf/i686-4.9.2-release-win32-dwarf-rt_v4-rev4.7z" &
+      SET "MINGW_ARCHIVE=i686-8.1.0-release-posix-dwarf-rt_v6-rev0.7z" &
+      SET "MINGW_URL=https://sourceforge.net/projects/mingw-w64/files/Toolchains%%20targetting%%20Win32/Personal%%20Builds/mingw-builds/8.1.0/threads-posix/dwarf/i686-8.1.0-release-posix-dwarf-rt_v6-rev0.7z" &
       SET "MINGW_DIR=mingw32"
     ) ELSE (
       IF "%PLATFORM%" == "x64" (
-        SET "MINGW_ARCHIVE=x86_64-4.9.2-release-win32-seh-rt_v4-rev4.7z" &
-        SET "MINGW_URL=https://sourceforge.net/projects/mingw-w64/files/Toolchains%%20targetting%%20Win64/Personal%%20Builds/mingw-builds/4.9.2/threads-win32/seh/x86_64-4.9.2-release-win32-seh-rt_v4-rev4.7z" &
+        SET "MINGW_ARCHIVE=x86_64-8.1.0-release-posix-seh-rt_v6-rev0.7z" &
+        SET "MINGW_URL=https://sourceforge.net/projects/mingw-w64/files/Toolchains%%20targetting%%20Win64/Personal%%20Builds/mingw-builds/8.1.0/threads-posix/seh/x86_64-8.1.0-release-posix-seh-rt_v6-rev0.7z" &
         SET "MINGW_DIR=mingw64"
       ) else (
         echo "Unknown platform"
