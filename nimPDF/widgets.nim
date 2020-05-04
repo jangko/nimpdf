@@ -1,4 +1,6 @@
-import objects, fontmanager, gstate, page, tables, image, strutils, basic2d
+import
+  objects, fontmanager, gstate, page, tables, image, strutils, basic2d,
+  macros
 
 const
   FIELD_TYPE_BUTTON = "Btn"
@@ -6,7 +8,7 @@ const
   FIELD_TYPE_CHOICE = "Ch"
 
 type
-  AnnotFlags = enum
+  AnnotFlag = enum
     afInvisible = 1
     afHidden = 2
     afPrint = 3
@@ -39,13 +41,13 @@ type
     VisibleNotPrintable
     HiddenButPrintable
 
-  ButtonFlags = enum
+  ButtonFlag = enum
     bfNoToggleToOff = 15
     bfRadio = 16
     bfPushButton = 17
     bfRadiosInUnison = 26
 
-  TextFieldFlags* = enum
+  TextFieldFlag* = enum
     tfMultiline = 13
     tfPassWord = 14
     tfFileSelect = 21
@@ -59,7 +61,7 @@ type
     tfaCenter
     tfaRight
 
-  ComboBoxFlags = enum
+  ComboBoxFlag = enum
     cfCombo = 18
     cfEdit = 19
     cfSort = 20
@@ -237,7 +239,7 @@ type
     hmPush
     hmToggle
 
-  FieldFlags = enum
+  FieldFlag = enum
     ffReadOnly = 1
     ffRequired = 2
     ffNoExport = 3
@@ -265,7 +267,7 @@ type
     calculateScript: string
     format: FormatObject
     highLightMode: HighLightMode
-    fieldFlags: int
+    FieldFlag: int
     normalAP: AppearanceStream
     rollOverAP: AppearanceStream
     downAP: AppearanceStream
@@ -275,7 +277,7 @@ type
     align: TextFieldAlignment
     maxChars: int
     defaultValue: string
-    flags: set[TextFieldFlags]
+    flags: set[TextFieldFlag]
 
   CheckBox* = ref object of Widget
     shape: string
@@ -333,6 +335,15 @@ const
     "mmm-yy", "mmm-yyyy", "mmmm-yy", "mmmm-yyyy",
     "mmm d, yyyy", "mmmm d, yyyy", "m/d/yy h:MM tt",
     "m/d/yyyy h:MM tt", "m/d/yy HH:MM", "m/d/yyyy HH MM"]
+
+# convert enum with holes to array
+# useful to replace enum low(T)..high(T) for loop
+macro toArray(x: type): untyped =
+  let fields = getImpl(x)[2]
+  result = nnkBracket.newTree
+  for i in 1..<fields.len:
+    let field = fields[i][1]
+    result.add quote do: `x`(`field`)
 
 proc newBorder(): Border =
   new(result)
@@ -424,17 +435,17 @@ proc createPDFObject(self: Widget): DictObj =
   if self.toolTip.len > 0:
     dict.addString("TU", self.toolTip)
 
-  var annotFlags = 0
+  var AnnotFlag = 0
 
   case self.visibility:
-  of Visible: annotFlags.setBit(afPrint)
-  of Hidden: annotFlags.setBit(afHidden)
+  of Visible: AnnotFlag.setBit(afPrint)
+  of Hidden: AnnotFlag.setBit(afHidden)
   of VisibleNotPrintable: discard
   of HiddenButPrintable:
-    annotFlags.setBit(afPrint)
-    annotFlags.setBit(afHidden)
+    AnnotFlag.setBit(afPrint)
+    AnnotFlag.setBit(afHidden)
 
-  dict.addNumber("F", annotFlags)
+  dict.addNumber("F", AnnotFlag)
 
   var mk = newDictObj()
   let bg = newColorArray(self.fillColorType, self.fillColorRGB, self.fillColorCMYK)
@@ -610,7 +621,7 @@ method finalizeObject(self: Widget; page, parent, resourceDict: DictObj) =
   if self.downAP != nil:
     self.putAP(self.downAP, "D", resourceDict)
 
-  self.dictObj.addNumber("Ff", self.fieldFlags)
+  self.dictObj.addNumber("Ff", self.FieldFlag)
 
 method needCalculateOrder*(self: Widget): bool =
   result = self.calculateScript.len > 0
@@ -636,7 +647,7 @@ proc init(self: Widget, doc: DocState, id: string) =
   self.calculateScript = ""
   self.format = nil
   self.highLightMode = hmNone
-  self.fieldFlags = 0
+  self.FieldFlag = 0
   self.normalAP = nil
   self.rollOverAP = nil
   self.downAP = nil
@@ -668,16 +679,16 @@ proc setRotation*(self: Widget, angle: int) =
   self.rotation = angle
 
 proc setReadOnly*(self: Widget, val: bool) =
-  if val: self.fieldFlags.setBit(ffReadOnly)
-  else: self.fieldFlags.removeBit(ffReadOnly)
+  if val: self.FieldFlag.setBit(ffReadOnly)
+  else: self.FieldFlag.removeBit(ffReadOnly)
 
 proc setRequired*(self: Widget, val: bool) =
-  if val: self.fieldFlags.setBit(ffRequired)
-  else: self.fieldFlags.removeBit(ffRequired)
+  if val: self.FieldFlag.setBit(ffRequired)
+  else: self.FieldFlag.removeBit(ffRequired)
 
 proc setNoExport*(self: Widget, val: bool) =
-  if val: self.fieldFlags.setBit(ffNoExport)
-  else: self.fieldFlags.removeBit(ffNoExport)
+  if val: self.FieldFlag.setBit(ffNoExport)
+  else: self.FieldFlag.removeBit(ffNoExport)
 
 proc setFont*(self: Widget, family: string) =
   self.fontFamily = family
@@ -956,26 +967,27 @@ proc setMaxChars*(self: TextField, maxChars: int) =
 proc setDefaultValue*(self: TextField, val: string) =
   self.defaultValue = val
 
-proc setFlag*(self: TextField, flag: TextFieldFlags) =
+proc setFlag*(self: TextField, flag: TextFieldFlag) =
   self.flags.incl flag
 
-proc setFlags*(self: TextField, flags: set[TextFieldFlags]) =
+proc setFlags*(self: TextField, flags: set[TextFieldFlag]) =
   self.flags.incl flags
 
-proc removeFlag*(self: TextField, flag: TextFieldFlags) =
+proc removeFlag*(self: TextField, flag: TextFieldFlag) =
   self.flags.excl flag
 
-proc removeFlags*(self: TextField, flags: set[TextFieldFlags]) =
+proc removeFlags*(self: TextField, flags: set[TextFieldFlag]) =
   self.flags.excl flags
 
 method createObject(self: TextField): PdfObject =
   var dict = self.createPDFObject()
   dict.addName("FT", FIELD_TYPE_TEXT)
-  for c in low(TextFieldFlags)..high(TextFieldFlags):
+  const flags = toArray(TextFieldFlag)
+  for c in flags:
     if c in self.flags:
-      self.fieldFlags.setBit(c)
+      self.FieldFlag.setBit(c)
     else:
-      self.fieldFlags.removeBit(c)
+      self.FieldFlag.removeBit(c)
   result = dict
 
 method createDefaultAP*(self: TextField): AppearanceStream =
@@ -1034,8 +1046,8 @@ proc setCaption*(self: RadioButton, val: string) =
 method createObject(self: RadioButton): PdfObject =
   var dict = self.createPDFObject()
   dict.addName("FT", FIELD_TYPE_BUTTON)
-  self.fieldFlags.setBit(bfRadio)
-  self.fieldFlags.setBit(bfNoToggleToOff)
+  self.FieldFlag.setBit(bfRadio)
+  self.FieldFlag.setBit(bfNoToggleToOff)
   result = dict
 
 method createDefaultAP*(self: RadioButton): AppearanceStream =
@@ -1062,11 +1074,11 @@ proc setEditable*(self: ComboBox, val: bool) =
 method createObject(self: ComboBox): PdfObject =
   var dict = self.createPDFObject()
   dict.addName("FT", FIELD_TYPE_CHOICE)
-  self.fieldFlags.setBit(cfCombo)
-  if self.editable: self.fieldFlags.setBit(cfEdit)
-  if self.sortItem: self.fieldFlags.setBit(cfSort)
-  if not self.spellCheck: self.fieldFlags.setBit(cfDoNotSpellCheck)
-  if self.commitOnSelChange: self.fieldFlags.setBit(cfCommitOnSelChange)
+  self.FieldFlag.setBit(cfCombo)
+  if self.editable: self.FieldFlag.setBit(cfEdit)
+  if self.sortItem: self.FieldFlag.setBit(cfSort)
+  if not self.spellCheck: self.FieldFlag.setBit(cfDoNotSpellCheck)
+  if self.commitOnSelChange: self.FieldFlag.setBit(cfCommitOnSelChange)
   result = dict
 
 method createDefaultAP*(self: ComboBox): AppearanceStream =
@@ -1093,10 +1105,10 @@ proc setMultipleSelect*(self: ListBox, val: bool) =
 method createObject(self: ListBox): PdfObject =
   var dict = self.createPDFObject()
   dict.addName("FT", FIELD_TYPE_CHOICE)
-  if self.multipleSelect: self.fieldFlags.setBit(cfMultiSelect)
-  if self.sortItem: self.fieldFlags.setBit(cfSort)
-  if not self.spellCheck: self.fieldFlags.setBit(cfDoNotSpellCheck)
-  if self.commitOnSelChange: self.fieldFlags.setBit(cfCommitOnSelChange)
+  if self.multipleSelect: self.FieldFlag.setBit(cfMultiSelect)
+  if self.sortItem: self.FieldFlag.setBit(cfSort)
+  if not self.spellCheck: self.FieldFlag.setBit(cfDoNotSpellCheck)
+  if self.commitOnSelChange: self.FieldFlag.setBit(cfCommitOnSelChange)
   result = dict
 
 method createDefaultAP*(self: ListBox): AppearanceStream =
@@ -1156,7 +1168,7 @@ proc setFlag*(self: PushButton, look: PushButtonLook) =
 method createObject(self: PushButton): PdfObject =
   var dict = self.createPDFObject()
   dict.addName("FT", FIELD_TYPE_BUTTON)
-  self.fieldFlags.setBit(bfPushButton)
+  self.FieldFlag.setBit(bfPushButton)
 
   var mk = DictObj(self.dictObj.getItem("MK", CLASS_DICT))
 

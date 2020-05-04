@@ -1112,8 +1112,18 @@ proc getTextWidth*(self: ContentBase, text:string): float64 =
   result = self.toUser(res)
 
 proc getTextHeight*(self: ContentBase, text:string): float64 =
-  var res = 0.0
   let tw = self.state.gState.font.GetTextHeight(text)
+  let res = float64(tw) * self.state.gState.fontSize / 1000
+  result = self.toUser(res)
+
+proc getVTextWidth*(self: ContentBase, text:string): float64 =
+  let tw = self.state.gState.font.GetVTextWidth(text)
+  let res = float64(tw) * self.state.gState.fontSize / 1000
+  result = self.toUser(res)
+
+proc getVTextHeight*(self: ContentBase, text:string): float64 =
+  var res = 0.0
+  let tw = self.state.gState.font.GetVTextHeight(text)
 
   res += self.state.gState.wordSpace * float64(tw.numspace)
   res += float64(tw.width) * self.state.gState.fontSize / 1000
