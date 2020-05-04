@@ -1,4 +1,4 @@
-import streams, nimPDF
+import streams, nimPDF, unittest
 
 proc draw_title(doc: PDF, text:string) =
   let size = getSizeFromName("A4")
@@ -36,6 +36,40 @@ proc createPDF(doc: PDF) =
   doc.setInfo(DI_AUTHOR, "Andri Lim")
   doc.setInfo(DI_SUBJECT, "TTF Font Demo")
 
+proc test(doc: PDF) =
+  let text = "Hello"
+  test "getTextWidth and GetTextHeight base14":
+    doc.setFont("Helvetica", {FS_REGULAR}, 5)
+    var tw = doc.getTextWidth(text)
+    var th = doc.getTextHeight(text)
+    check:
+      $tw == "11.39"
+      $th == "3.59"
+
+  test "getTextWidth and GetTextHeight TTF":
+    doc.setFont("FreeMono", {FS_REGULAR}, 5)
+    var tw = doc.getTextWidth(text)
+    var th = doc.getTextHeight(text)
+    check:
+      $tw == "15.0"
+      $th == "3.02"
+
+  test "getVTextWidth and GetVTextHeight base14":
+    doc.setFont("Helvetica", {FS_REGULAR}, 5)
+    var tw = doc.getVTextWidth(text)
+    var th = doc.getVTextHeight(text)
+    check:
+      $tw == "3.61"
+      $th == "14.05"
+
+  test "getTextWidth and GetTextHeight TTF":
+    doc.setFont("FreeMono", {FS_REGULAR}, 5)
+    var tw = doc.getVTextWidth(text)
+    var th = doc.getVTextHeight(text)
+    check:
+      $tw == "3.0"
+      $th == "13.325"
+
 proc main(): bool {.discardable.} =
   #echo currentSourcePath()
   var fileName = "test.pdf"
@@ -45,6 +79,7 @@ proc main(): bool {.discardable.} =
     var doc = newPDF()
     doc.createPDF()
     doc.writePDF(file)
+    doc.test()
     file.close()
     echo "OK"
     return true

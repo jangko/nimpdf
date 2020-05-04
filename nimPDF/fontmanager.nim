@@ -15,6 +15,7 @@
 import base14, tables, strutils, collect, strtabs, unicode, math, encode
 import "subsetter/Font", "subsetter/CMAPTable", "subsetter/HEADTable"
 import "subsetter/HMTXTable", "subsetter/FontData", "subsetter/VMTXTable"
+import "subsetter/GLYPHTable"
 
 const
   defaultFont = "Times"
@@ -36,6 +37,7 @@ type
     cmap: CMAP
     hmtx: HMTXTable
     vmtx: VMTXTable
+    glyph: GLYPHTable
     scaleFactor: float64
     CH2GID*: CH2GIDMAP
     newGID: int
@@ -53,6 +55,8 @@ type
   TextWidth* = object
     numchars*, width*, numspace*, numwords*: int
 
+  TextHeight* = int
+
   FontManager* = object
     fontList*: seq[Font]
     baseFont: seq[Base14]
@@ -63,7 +67,11 @@ proc GetCharWidth*(f: TTFont, gid: int): int =
   result = math.round(float(f.hmtx.advanceWidth(gid)) * f.scaleFactor).int
 
 proc GetCharHeight*(f: TTFont, gid: int): int =
-  result = math.round(float(f.vmtx.advanceHeight(gid)) * f.scaleFactor).int
+  if f.vmtx.isNil:
+    let height = (abs(f.glyph.YMin(gid)) + f.glyph.YMax(gid)).float
+    result = math.round(height * f.scaleFactor).int
+  else:
+    result = math.round(float(f.vmtx.advanceHeight(gid)) * f.scaleFactor).int
 
 proc GenerateWidths*(f: TTFont): string =
   f.CH2GID.sort(proc(x,y: tuple[key: int, val: TONGID]):int = cmp(x.val.newGID, y.val.newGID) )
@@ -133,47 +141,6 @@ method EscapeString*(f: TTFont, text: string): string =
 method GetTextWidth*(f: Font, text: string): TextWidth {.base.} =
   discard
 
-method GetTextWidth(f: TTFont, text: string): TextWidth =
-  result.width = 0
-  result.numchars = 0
-  result.numwords = 0
-  result.numspace = 0
-
-  for b in runes(text):
-    inc(result.numchars)
-    let GID = f.cmap.GlyphIndex(int(b))
-    result.width += f.GetCharWidth(GID)
-    if isWhiteSpace(b):
-      inc(result.numspace)
-      inc(result.numwords)
-
-  let lastChar = runeLen(text) - 1
-  if not isWhiteSpace(runeAt(text, lastChar)):
-    inc(result.numwords)
-
-method GetTextHeight*(f: Font, text: string): TextWidth {.base.} =
-  discard
-
-method GetTextHeight*(f: Base14, text: string): TextWidth =
-  result = GetTextWidth(f, text)
-
-method GetTextHeight*(f: TTFont, text: string): TextWidth =
-  result.width = 0
-  result.numchars = 0
-  result.numwords = 0
-  result.numspace = 0
-
-  for b in runes(text):
-    inc(result.numchars)
-    result.width += f.GetCharHeight(int(b))
-    if isWhiteSpace(b):
-      inc(result.numspace)
-      inc(result.numwords)
-
-  let lastChar = runeLen(text) - 1
-  if not isWhiteSpace(runeAt(text, lastChar)):
-    inc(result.numwords)
-
 method GetTextWidth(f: Base14, text: string): TextWidth =
   result.numchars = 0
   result.width = 0
@@ -193,6 +160,89 @@ method GetTextWidth(f: Base14, text: string): TextWidth =
 
   if chr(b) notin Whitespace:
     inc(result.numwords)
+
+method GetTextWidth(f: TTFont, text: string): TextWidth =
+  result.width = 0
+  result.numchars = 0
+  result.numwords = 0
+  result.numspace = 0
+
+  for b in runes(text):
+    inc(result.numchars)
+    let GID = f.cmap.GlyphIndex(int(b))
+    result.width += f.GetCharWidth(GID)
+    if isWhiteSpace(b):
+      inc(result.numspace)
+      inc(result.numwords)
+
+  let lastChar = runeLen(text) - 1
+  if not isWhiteSpace(runeAt(text, lastChar)):
+    inc(result.numwords)
+
+method GetTextHeight*(f: Font, text: string): TextHeight {.base.} =
+  discard
+
+method GetTextHeight*(f: Base14, text: string): TextHeight =
+  for c in text:
+    let ww = if isUpperAscii(c): f.capHeight else: f.xHeight
+    result = max(ww, result)
+
+method GetTextHeight*(f: TTFont, text: string): TextHeight =
+  for b in runes(text):
+    let GID = f.cmap.GlyphIndex(int(b))
+    result = max(f.GetCharHeight(GID), result)
+
+method GetVTextHeight*(f: Font, text: string): TextWidth {.base.} =
+  discard
+
+method GetVTextHeight*(f: Base14, text: string): TextWidth =
+  result.width = 0
+  result.numchars = 0
+  result.numwords = 0
+  result.numspace = 0
+
+  for c in text:
+    inc(result.numchars)
+    let ww = if isUpperAscii(c): f.capHeight else: f.xHeight
+    result.width += ww
+    if c in Whitespace:
+      inc(result.numspace)
+      inc(result.numwords)
+
+  let lastChar = text[^1]
+  if lastChar notin Whitespace:
+    inc(result.numwords)
+
+method GetVTextHeight*(f: TTFont, text: string): TextWidth =
+  result.width = 0
+  result.numchars = 0
+  result.numwords = 0
+  result.numspace = 0
+
+  for b in runes(text):
+    inc(result.numchars)
+    let GID = f.cmap.GlyphIndex(int(b))
+    result.width += f.GetCharHeight(GID)
+    if isWhiteSpace(b):
+      inc(result.numspace)
+      inc(result.numwords)
+
+  let lastChar = runeLen(text) - 1
+  if not isWhiteSpace(runeAt(text, lastChar)):
+    inc(result.numwords)
+
+method GetVTextWidth*(f: Font, text: string): TextHeight {.base.} =
+  discard
+
+method GetVTextWidth*(f: Base14, text: string): TextHeight =
+  for c in text:
+    let ww = f.getWidth(f.encode(c.int))
+    result = max(ww, result)
+
+method GetVTextWidth*(f: TTFont, text: string): TextHeight =
+  for b in runes(text):
+    let GID = f.cmap.GlyphIndex(int(b))
+    result = max(f.GetCharWidth(GID), result)
 
 proc reverse(s: string): string =
   result = newString(s.len)
@@ -247,6 +297,8 @@ proc init*(ff: var FontManager, fontDirs: seq[string]) =
     ff.baseFont[i].baseFont   = BUILTIN_FONTS[i][0]
     ff.baseFont[i].searchName = BUILTIN_FONTS[i][1]
     ff.baseFont[i].getWidth   = BUILTIN_FONTS[i][2]
+    ff.baseFont[i].xHeight    = BUILTIN_FONTS[i][6]
+    ff.baseFont[i].capHeight  = BUILTIN_FONTS[i][7]
     ff.baseFont[i].subType    = FT_BASE14
     ff.baseFont[i].missingWidth = ff.baseFont[i].getWidth(0x20)
 
@@ -270,6 +322,7 @@ proc makeTTFont(font: FontDef, searchName: string): TTFont =
   res.cmap     = encodingcmap
   res.hmtx     = hmtx
   res.vmtx     = VMTXTable(font.getTable(TAG.vmtx))
+  res.glyph    = GLYPHTable(font.getTable(TAG.glyf))
   res.scaleFactor= 1000 / head.UnitsPerEm()
   res.CH2GID   = initOrderedTable[int, TONGID]()
   res.newGID   = 1

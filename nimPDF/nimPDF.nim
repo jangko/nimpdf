@@ -389,6 +389,14 @@ proc getTextHeight*(doc: PDF, text: string): float64 =
   assert(doc.curPage != nil)
   doc.curPage.getTextHeight(text)
 
+proc getVTextWidth*(doc: PDF, text: string): float64 =
+  assert(doc.curPage != nil)
+  doc.curPage.getVTextWidth(text)
+
+proc getVTextHeight*(doc: PDF, text: string): float64 =
+  assert(doc.curPage != nil)
+  doc.curPage.getVTextHeight(text)
+
 proc clip*(doc: PDF) =
   assert(doc.curPage != nil)
   doc.curPage.clip()
