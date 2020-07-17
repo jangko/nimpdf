@@ -3,10 +3,10 @@ import streams, nimPDF
 proc createPDF(doc: PDF) =
   let size = getSizeFromName("A4")
   let pg1 = doc.addPage(size, PGO_PORTRAIT)
+
   let text1 = "Your Name: "
   doc.drawText(15, 30, text1)
   let w1 = doc.getTextWidth(text1)
-
 
   let
     x = 15.0 + w1
@@ -16,7 +16,7 @@ proc createPDF(doc: PDF) =
 
   doc.drawRect(x,y,w,h)
   doc.stroke()
-  discard doc.newTextField(x,y,x+w,y+h, "id")
+  discard doc.newTextField(x,y,w,h, "TextField1")
 
 proc main(): bool {.discardable.} =
   var fileName = "text_field.pdf"

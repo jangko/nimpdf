@@ -518,7 +518,7 @@ proc putAP(self: Widget, ap: AppearanceStream, code: string, resourceDict: DictO
   currAP.addNumber("FormType", 1)
   currAP.addElement("Resources", resourceDict)
   var r = self.rect
-  var rc = newArray(0.0, 0.0, r.w, r.h)
+  var rc = newArray(r.x, r.y, r.x+r.w, r.y+r.h)
   currAP.addElement("BBox", rc)
   var m = newArray(self.matrix.ax, self.matrix.ay, self.matrix.bx, self.matrix.by, self.matrix.tx, self.matrix.ty)
   currAP.addElement("Matrix", m)
@@ -1210,19 +1210,4 @@ method createObject(self: PushButton): PdfObject =
 
 method createDefaultAP*(self: PushButton): AppearanceStream =
   var ap = newAppearanceStream(self.state)
-
-  ap.saveState()
-  ap.setCoordinateMode(self.state.getCoordinateMode)
-  ap.setUnit(PGU_PT)
-  ap.setFont(self.fontFamily, self.fontStyles, self.fontSize)
-
-  var r = self.rect
-  let textWidth = ap.getTextWidth(self.caption)
-  ap.drawText(r.x + (r.w - textWidth) / 2, r.y + (r.h - self.fontSize) / 2, self.caption)
-
-  ap.setLineWidth(0.2)
-  ap.drawRect(r.x, r.y, r.w, r.h)
-  ap.stroke()
-  ap.restoreState()
-
   result = ap
