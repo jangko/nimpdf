@@ -7,10 +7,16 @@ proc createPDF(doc: PDF) =
   doc.drawText(15, 30, text1)
   let w1 = doc.getTextWidth(text1)
 
-  let r1 = initRect(15+w1,25,50,6)
-  doc.drawRect(15+w1,25,50,6)
+
+  let
+    x = 15.0 + w1
+    y = 25.0
+    w = 50.0
+    h = 6.0
+
+  doc.drawRect(x,y,w,h)
   doc.stroke()
-  discard doc.newTextField(r1.x,r1.y,r1.w,r1.h, "id")
+  discard doc.newTextField(x,y,x+w,y+h, "id")
 
 proc main(): bool {.discardable.} =
   var fileName = "text_field.pdf"
