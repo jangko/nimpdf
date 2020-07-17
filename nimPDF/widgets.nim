@@ -116,6 +116,7 @@ type
     pblCaptionOverlaidIcon
 
   ColorType = enum
+    ColorNone
     ColorRGB
     ColorCMYK
 
@@ -448,8 +449,9 @@ proc createPDFObject(self: Widget): DictObj =
   dict.addNumber("F", AnnotFlag)
 
   var mk = newDictObj()
-  let bg = newColorArray(self.fillColorType, self.fillColorRGB, self.fillColorCMYK)
-  mk.addElement("BG", bg)
+  if self.fillColorType != ColorNone:
+    let bg = newColorArray(self.fillColorType, self.fillColorRGB, self.fillColorCMYK)
+    mk.addElement("BG", bg)
   mk.addNumber("R", self.rotation)
   dict.addElement("MK", mk)
 
@@ -613,6 +615,7 @@ method finalizeObject(self: Widget; page, parent, resourceDict: DictObj) =
 
   if self.normalAP.isNil:
     self.normalAP = self.createDefaultAP()
+
   self.putAP(self.normalAP, "N", resourceDict)
 
   if self.rollOverAP != nil:
@@ -640,7 +643,7 @@ proc init(self: Widget, doc: DocState, id: string) =
   self.fontEncoding = ENC_STANDARD
   self.fontColorType = ColorRGB
   self.fontColorRGB = initRGB(0, 0, 0)
-  self.fillColorType = ColorRGB
+  self.fillColorType = ColorNone
   self.fillColorRGB = initRGB(0, 0, 0)
   self.actions = @[]
   self.validateScript = ""
@@ -763,139 +766,133 @@ proc setBorderDash*(self: Widget, dash: openArray[int]) =
   self.border.setDash(dash)
 
 proc addActionOpenWebLink*(self: Widget, trigger: FormActionTrigger, uri: string, isMap: bool) =
-  var action = new(FormAction)
-  action.trigger = trigger
-  action.kind = fakOpenWebLink
-  action.uri = uri
-  action.isMap = isMap
+  var action = FormAction(
+    trigger: trigger,
+    kind: fakOpenWebLink,
+    uri: uri,
+    isMap: isMap)
   self.actions.add action
 
 proc addActionResetForm*(self: Widget, trigger: FormActionTrigger) =
-  var action = new(FormAction)
-  action.trigger = trigger
-  action.kind = fakResetForm
-  action.rfFields = @[]
-  action.rfExclude = false
+  var action = FormAction(
+    trigger: trigger,
+    kind: fakResetForm,
+    rfFields: @[],
+    rfExclude: false)
   self.actions.add action
 
 proc addActionResetForm*(self: Widget, trigger: FormActionTrigger, fields: openArray[Widget], exclude: bool) =
-  var action = new(FormAction)
-  action.trigger = trigger
-  action.kind = fakResetForm
-  action.rfFields = @fields
-  action.rfExclude = exclude
+  var action = FormAction(
+    trigger: trigger,
+    kind: fakResetForm,
+    rfFields: @fields,
+    rfExclude: exclude)
   self.actions.add action
 
 proc addActionSubmitForm*(self: Widget, trigger: FormActionTrigger, format: FormSubmitFormat, url: string) =
-  var action = new(FormAction)
-  action.trigger = trigger
-  action.kind = fakSubmitForm
-  action.format = format
-  action.sfFields = @[]
-  action.url = url
+  var action = FormAction(
+    trigger: trigger,
+    kind: fakSubmitForm,
+    format: format,
+    sfFields: @[],
+    url: url)
   self.actions.add action
 
 proc addActionSubmitForm*(self: Widget, trigger: FormActionTrigger, format: FormSubmitFormat, url: string, fields: openArray[Widget], exclude: bool) =
-  var action = new(FormAction)
-  action.trigger = trigger
-  action.kind = fakSubmitForm
-  action.format = format
-  action.sfFields = @fields
-  action.sfExclude = exclude
-  action.url = url
+  var action = FormAction(
+    trigger: trigger,
+    kind: fakSubmitForm,
+    format: format,
+    sfFields: @fields,
+    sfExclude: exclude,
+    url: url)
   self.actions.add action
 
 proc addActionEmailEntirePDF*(self: Widget, trigger: FormActionTrigger; to, cc, bcc, title, body: string) =
-  var action = new(FormAction)
-  action.trigger = trigger
-  action.kind = fakEmailEntirePDF
-  action.to = to
-  action.cc = cc
-  action.bcc = bcc
-  action.title = title
-  action.body = body
+  var action = FormAction(
+    trigger: trigger,
+    kind: fakEmailEntirePDF,
+    to: to,
+    cc: cc,
+    bcc: bcc,
+    title: title,
+    body: body)
   self.actions.add action
 
 proc addActionRunJS*(self: Widget, trigger: FormActionTrigger, script: string) =
-  var action = new(FormAction)
-  action.trigger = trigger
-  action.kind = fakRunJS
-  action.jsScript = script
+  var action = FormAction(
+    trigger: trigger,
+    kind: fakRunJS,
+    jsScript: script)
   self.actions.add action
 
 proc addActionNamed*(self: Widget, trigger: FormActionTrigger, name: NamedAction) =
-  var action = new(FormAction)
-  action.trigger = trigger
-  action.kind = fakNamedAction
-  action.namedAction = name
+  var action = FormAction(
+    trigger: trigger,
+    kind: fakNamedAction,
+    namedAction: name)
   self.actions.add action
 
 proc addActionGotoLocalPage*(self: Widget, trigger: FormActionTrigger, dest: Destination) =
-  var action = new(FormAction)
-  action.trigger = trigger
-  action.kind = fakGotoLocalPage
-  action.localDest = dest
+  var action = FormAction(
+    trigger: trigger,
+    kind: fakGotoLocalPage,
+    localDest: dest)
   self.actions.add action
 
 proc addActionGotoAnotherPDF*(self: Widget, trigger: FormActionTrigger, path: string, pageNo: int) =
-  var action = new(FormAction)
-  action.trigger = trigger
-  action.kind = fakGotoAnotherPDF
-  action.remotePage = pageNo
-  action.path = path
+  var action = FormAction(
+    trigger: trigger,
+    kind: fakGotoAnotherPDF,
+    remotePage: pageNo,
+    path: path)
   self.actions.add action
 
 proc addActionLaunchApp*(self: Widget, trigger: FormActionTrigger; app, params, operation, defaultDir: string) =
-  var action = new(FormAction)
-  action.trigger = trigger
-  action.kind = fakLaunchApp
-  action.app = app
-  action.params = params
-  action.operation = operation
-  action.defaultDir = defaultDir
+  var action = FormAction(
+    trigger: trigger,
+    kind: fakLaunchApp,
+    app: app,
+    params: params,
+    operation: operation,
+    defaultDir: defaultDir)
   self.actions.add action
 
 proc formatNumber*(self: Widget, decimalNumber: int, sepStyle: SepStyle, negStyle: NegStyle, strCurrency: string = "", currencyPrepend: bool = false) =
-  var fmt = new(FormatObject)
-  fmt.kind = FormatNumber
-  fmt.decimalNumber = decimalNumber
-  fmt.sepStyle = sepStyle
-  fmt.negStyle = negStyle
-  fmt.strCurrency = strCurrency
-  fmt.currencyPrepend = currencyPrepend
-  self.format = fmt
+  self.format = FormatObject(
+    kind: FormatNumber,
+    decimalNumber: decimalNumber,
+    sepStyle: sepStyle,
+    negStyle: negStyle,
+    strCurrency: strCurrency,
+    currencyPrepend: currencyPrepend)
 
 proc formatPercent*(self: Widget, decimalNumber: int, sepStyle: SepStyle) =
-  var fmt = new(FormatObject)
-  fmt.kind = FormatPercent
-  fmt.decimalNumber = decimalNumber
-  fmt.sepStyle = sepStyle
-  self.format = fmt
+  self.format = FormatObject(
+  kind: FormatPercent,
+  decimalNumber: decimalNumber,
+  sepStyle: sepStyle)
 
 proc formatDate*(self: Widget, formatType: FormatDateType) =
-  var fmt = new(FormatObject)
-  fmt.kind = FormatDate
-  fmt.formatDateType = formatType
-  self.format = fmt
+  self.format = FormatObject(
+  kind: FormatDate,
+  formatDateType: formatType)
 
 proc formatTime*(self: Widget, formatType: FormatTimeType) =
-  var fmt = new(FormatObject)
-  fmt.kind = FormatTime
-  fmt.formatTimeType = formatType
-  self.format = fmt
+  self.format = FormatObject(
+  kind: FormatTime,
+  formatTimeType: formatType)
 
 proc formatSpecial*(self: Widget, special: SpecialFormat) =
-  var fmt = new(FormatObject)
-  fmt.kind = FormatSpecial
-  fmt.special = special
-  self.format = fmt
+  self.format = FormatObject(
+  kind: FormatSpecial,
+  special: special)
 
 proc formatCustom*(self: Widget, JSfmt, keyStroke: string) =
-  var fmt = new(FormatObject)
-  fmt.kind = FormatCustom
-  fmt.JSfmt = JSfmt
-  fmt.keyStroke = keyStroke
-  self.format = fmt
+  self.format = FormatObject(
+  kind: FormatCustom,
+  JSfmt: JSfmt,
+  keyStroke: keyStroke)
 
 #[
 // 0 <= N <= 100
@@ -991,7 +988,10 @@ method createObject(self: TextField): PdfObject =
   result = dict
 
 method createDefaultAP*(self: TextField): AppearanceStream =
-  discard
+  var ap = newAppearanceStream(self.state)
+  ap.saveState()
+  ap.restoreState()
+  result = ap
 
 #----------------------CHECK BOX
 proc newCheckBox*(doc: DocState, x,y,w,h: float64, id: string): CheckBox =
@@ -1018,7 +1018,8 @@ method createObject(self: CheckBox): PdfObject =
   result = dict
 
 method createDefaultAP*(self: CheckBox): AppearanceStream =
-  discard
+  var ap = newAppearanceStream(self.state)
+  result = ap
 
 #----------------------RADIO BUTTON
 proc newRadioButton*(doc: DocState, x,y,w,h: float64, id: string): RadioButton =
@@ -1051,7 +1052,8 @@ method createObject(self: RadioButton): PdfObject =
   result = dict
 
 method createDefaultAP*(self: RadioButton): AppearanceStream =
-  discard
+  var ap = newAppearanceStream(self.state)
+  result = ap
 
 #---------------------COMBO BOX
 proc newComboBox*(doc: DocState, x,y,w,h: float64, id: string): ComboBox =
@@ -1082,7 +1084,8 @@ method createObject(self: ComboBox): PdfObject =
   result = dict
 
 method createDefaultAP*(self: ComboBox): AppearanceStream =
-  discard
+  var ap = newAppearanceStream(self.state)
+  result = ap
 
 #---------------------LIST BOX
 proc newListBox*(doc: DocState, x,y,w,h: float64, id: string): ListBox =
@@ -1112,7 +1115,8 @@ method createObject(self: ListBox): PdfObject =
   result = dict
 
 method createDefaultAP*(self: ListBox): AppearanceStream =
-  discard
+  var ap = newAppearanceStream(self.state)
+  result = ap
 
 #---------------------PUSH BUTTON
 proc newPushButton*(doc: DocState, x,y,w,h: float64, id: string): PushButton =
@@ -1206,19 +1210,4 @@ method createObject(self: PushButton): PdfObject =
 
 method createDefaultAP*(self: PushButton): AppearanceStream =
   var ap = newAppearanceStream(self.state)
-
-  ap.saveState()
-  ap.setCoordinateMode(BOTTOM_UP)
-  ap.setUnit(PGU_PT)
-  ap.setFont(self.fontFamily, self.fontStyles, self.fontSize)
-
-  var r = self.rect
-  let textWidth = ap.getTextWidth(self.caption)
-  ap.drawText(r.x + (r.w - textWidth) / 2, r.y + (r.h - self.fontSize) / 2, self.caption)
-
-  ap.setLineWidth(0.2)
-  ap.drawRect(r.x, r.y, r.w, r.h)
-  ap.stroke()
-  ap.restoreState()
-
   result = ap

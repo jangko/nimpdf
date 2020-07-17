@@ -445,8 +445,8 @@ proc newTextField*(doc: PDF, x,y,w,h: float64, id: string): TextField =
 
   let xx = doc.state.fromUser(x)
   let yy = doc.state.vPoint(y)
-  let ww = doc.state.fromUser(w)
-  let hh = doc.state.vPointMirror(h)
+  let ww = doc.state.fromUser(x+w)
+  let hh = doc.state.vPoint(y+h)
 
   result = newTextField(doc.state, xx, yy, ww, hh, id)
   doc.curPage.addWidget result
@@ -457,8 +457,8 @@ proc newCheckBox*(doc: PDF, x,y,w,h: float64, id: string): CheckBox =
 
   let xx = doc.state.fromUser(x)
   let yy = doc.state.vPoint(y)
-  let ww = doc.state.fromUser(w)
-  let hh = doc.state.vPointMirror(h)
+  let ww = doc.state.fromUser(x+w)
+  let hh = doc.state.vPoint(y+h)
 
   result = newCheckBox(doc.state, xx, yy, ww, hh, id)
   doc.curPage.addWidget result
@@ -469,8 +469,8 @@ proc newRadioButton*(doc: PDF, x,y,w,h: float64, id: string): RadioButton =
 
   let xx = doc.state.fromUser(x)
   let yy = doc.state.vPoint(y)
-  let ww = doc.state.fromUser(w)
-  let hh = doc.state.vPointMirror(h)
+  let ww = doc.state.fromUser(x+w)
+  let hh = doc.state.vPoint(y+h)
 
   result = newRadioButton(doc.state, xx, yy, ww, hh, id)
   doc.curPage.addWidget result
@@ -481,8 +481,8 @@ proc newComboBox*(doc: PDF, x,y,w,h: float64, id: string): ComboBox =
 
   let xx = doc.state.fromUser(x)
   let yy = doc.state.vPoint(y)
-  let ww = doc.state.fromUser(w)
-  let hh = doc.state.vPointMirror(h)
+  let ww = doc.state.fromUser(x+w)
+  let hh = doc.state.vPoint(y+h)
 
   result = newComboBox(doc.state, xx, yy, ww, hh, id)
   doc.curPage.addWidget result
@@ -493,8 +493,8 @@ proc newListBox*(doc: PDF, x,y,w,h: float64, id: string): ListBox =
 
   let xx = doc.state.fromUser(x)
   let yy = doc.state.vPoint(y)
-  let ww = doc.state.fromUser(w)
-  let hh = doc.state.vPointMirror(h)
+  let ww = doc.state.fromUser(x+w)
+  let hh = doc.state.vPoint(y+h)
 
   result = newListBox(doc.state, xx, yy, ww, hh, id)
   doc.curPage.addWidget result
@@ -505,8 +505,8 @@ proc newPushButton*(doc: PDF, x,y,w,h: float64, id: string): PushButton =
 
   let xx = doc.state.fromUser(x)
   let yy = doc.state.vPoint(y)
-  let ww = doc.state.fromUser(w)
-  let hh = doc.state.vPointMirror(h)
+  let ww = doc.state.fromUser(x+w)
+  let hh = doc.state.vPoint(y+h)
 
   result = newPushButton(doc.state, xx, yy, ww, hh, id)
   doc.curPage.addWidget result

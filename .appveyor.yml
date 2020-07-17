@@ -42,7 +42,7 @@ install:
   - SET "NEED_REBUILD="
 
   - IF NOT EXIST "Nim\\.git\\" (
-      git clone https://github.com/nim-lang/Nim.git
+      git clone --depth 1 https://github.com/nim-lang/Nim.git
     ) ELSE (
       ( cd Nim ) &
       ( git pull ) &
