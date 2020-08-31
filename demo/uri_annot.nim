@@ -12,13 +12,13 @@ proc createPDF(doc: PDF) =
     y = 70.0
     link = "https://www.google.com"
     wlink = doc.getTextWidth(link)
-    #hlink = doc.getTextHeight(link) # ugh, getTextHeight doest include upper and lower parts
+    #hlink = doc.getTextHeight(link) # ugh, getTextHeight does not include upper and lower parts
     r = initRect(x, y-fontSize, wlink, fontSize)
 
   doc.drawText(x, y, link)
   doc.setStrokeColor(initRGB("skyblue"))
   doc.drawLine(x, y, x+wlink, y)
-  doc.drawRect(r.x, r.y, r.w, r.h)
+  #doc.drawRect(r.x, r.y, r.w, r.h)
   doc.stroke()
 
   # current r.y is text baseline position
