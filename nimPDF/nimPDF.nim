@@ -1,4 +1,4 @@
-﻿# Copyright (c) 2015 Andri Lim
+﻿# Copyright (c) 2015-2020 Andri Lim
 #
 # Distributed under the MIT license
 # (See accompanying file LICENSE.txt)
@@ -14,7 +14,7 @@ export encryptdict.DocInfo, encrypt.EncryptMode, widgets
 export path, gstate, image, fontmanager, page, options
 
 const
-  nimPDFVersion = "0.4.0"
+  nimPDFVersion = "0.4.3"
 
   PageNames = [
     #my paper size
@@ -433,6 +433,9 @@ proc linkAnnot*(doc: PDF, rect: Rectangle, src: Page, dest: Destination): Annot 
 
 proc textAnnot*(doc: PDF, rect: Rectangle, src: Page, content: string): Annot =
   result = doc.state.newTextAnnot(rect, src, content)
+
+proc uriAnnot*(doc: PDF, rect: Rectangle, src: Page, uri: string): Annot =
+  result = doc.state.newUriAnnot(rect, src, uri)
 
 proc setPassword*(doc: PDF, ownerPass, userPass: string): bool =
   result = doc.state.setPassword(ownerPass, userPass)

@@ -1,5 +1,5 @@
 packageName   = "nimPDF"
-version       = "0.4.2"
+version       = "0.4.3"
 author        = "Andri Lim"
 description   = "PDF document generation library written in nim"
 license       = "MIT"
