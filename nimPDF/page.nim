@@ -23,7 +23,7 @@ type
     x*,y*,w*,h*: float64
 
   AnnotType = enum
-    ANNOT_LINK, ANNOT_TEXT
+    ANNOT_LINK, ANNOT_TEXT, ANNOT_URI
 
   Annot* = ref object
     rect: Rectangle
@@ -32,6 +32,8 @@ type
       dest: Destination
     of ANNOT_TEXT:
       content: string
+    of ANNOT_URI:
+      uri: string
 
   PageLabel = object
     pageIndex: int
@@ -198,12 +200,24 @@ proc putPages(doc: DocState, resource: DictObj, pages: seq[Page]): DictObj =
       doc.xref.add(annot)
       annots.add(annot)
       annot.addName("Type", "Annot")
-      if a.annotType == ANNOT_LINK:
+      case a.annotType
+      of ANNOT_LINK:
         annot.addName("Subtype", "Link")
         putDestination(annot, a.dest)
-      else:
+      of ANNOT_TEXT:
         annot.addName("Subtype", "Text")
         annot.addString("Contents", a.content)
+      of ANNOT_URI:
+        annot.addName("Subtype", "Link")
+        # do we need this flags?
+        annot.addNumber("F", 4)
+        annot.addNumber("StructParent", annots.getId)
+        var uri = newDictObj()
+        uri.addName("Type", "Action")
+        uri.addName("S", "URI")
+        uri.addString("URI", a.uri)
+        annot.addElement("A", uri)
+
       annot.addElement("Rect", newArray(a.rect.x, a.rect.y, a.rect.w, a.rect.h))
       annot.addElement("Border", newArray(16, 16, 1))
       annot.addPlain("BS", "<</W 0>>")
@@ -545,6 +559,16 @@ proc newTextAnnot*(doc: DocState, rect: Rectangle, src: Page, content: string): 
   let hh = doc.vPoint(rect.y + rect.h)
   result.rect = initRect(xx,yy,ww,hh)
   result.content = content
+  src.annots.add(result)
+
+proc newUriAnnot*(doc: DocState, rect: Rectangle, src: Page, uri: string): Annot =
+  result = Annot(annotType: ANNOT_URI)
+  let xx = doc.fromUser(rect.x)
+  let yy = doc.vPoint(rect.y)
+  let ww = doc.fromUser(rect.x + rect.w)
+  let hh = doc.vPoint(rect.y + rect.h)
+  result.rect = initRect(xx,yy,ww,hh)
+  result.uri = uri
   src.annots.add(result)
 
 proc setPassword*(doc: DocState, ownerPass, userPass: string): bool =

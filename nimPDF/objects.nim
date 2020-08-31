@@ -106,6 +106,9 @@ type
     prev: PdfXref
     trailer: DictObj
 
+proc getId*(obj: PdfObject): int =
+  obj.objID and 0x0FFFFFFF'i32
+
 proc zcompress*(data: string): string =
   var nz = nzDeflateInit(data)
   result = nz.zlib_compress()
