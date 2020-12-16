@@ -4,6 +4,7 @@
 [![Windows build status (Appveyor)](https://img.shields.io/appveyor/ci/jangko/nimpdf/master.svg?label=Windows "Windows build status (Appveyor)")](https://ci.appveyor.com/project/jangko/nimpdf)
 ![nimble](https://img.shields.io/badge/available%20on-nimble-yellow.svg?style=flat-square)
 ![license](https://img.shields.io/github/license/citycide/cascade.svg?style=flat-square)
+![Github action](https://github.com/jangko/nimPDF/workflows/nimPDF%20CI/badge.svg)
 
 nimPDF is a free PDF writer library, written mostly in nim programming language
 
