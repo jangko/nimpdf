@@ -12,7 +12,18 @@ requires: "nimSHA2 >= 0.1.0"
 requires: "nimAES >= 0.1.0"
 requires: "stb_image >= 2.1"
 
+### Helper functions
+proc test(env, path: string) =
+  # Compilation language is controlled by TEST_LANG
+  var lang = "c"
+  if existsEnv"TEST_LANG":
+    lang = getEnv"TEST_LANG"
+
+  if not dirExists "build":
+    mkDir "build"
+  exec "nim " & lang & " " & env &
+    " -r --hints:off --warnings:off " & path
+
 task test, "Run all tests":
   withDir("demo"):
-    exec "nim c --warning[LockLevel]:off --path:../nimPDF test_all"
-    exec "nim c --warning[LockLevel]:off --path:../nimPDF -d:release test_all"
+    test "--warning[LockLevel]:off --path:../nimPDF -d:release", "test_all"
