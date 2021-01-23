@@ -217,7 +217,26 @@ jobs:
 
       - name: Run nimPDF tests
         shell: bash
+        working-directory: nimPDF
         run: |
-          cd nimPDF
           nimble install -y --depsOnly
           nimble test
+
+      - name: Setup VCC (Windows-i386)
+        if: runner.os == 'Windows' && matrix.target.cpu == 'i386'
+        uses: ilammy/msvc-dev-cmd@v1.5.0
+        with:
+          arch: amd64_x86
+
+      - name: Setup VCC (Windows-amd64)
+        if: runner.os == 'Windows' && matrix.target.cpu == 'amd64'
+        uses: ilammy/msvc-dev-cmd@v1.5.0
+        with:
+          arch: x64
+
+      - name: Test using VCC
+        if: runner.os == 'Windows'
+        shell: cmd
+        working-directory: nimPDF
+        run: |
+          env TEST_LANG="${{ matrix.target.TEST_LANG }}" nimble testvcc
