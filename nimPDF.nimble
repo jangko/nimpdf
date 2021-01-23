@@ -19,11 +19,13 @@ proc test(env, path: string) =
   if existsEnv"TEST_LANG":
     lang = getEnv"TEST_LANG"
 
-  if not dirExists "build":
-    mkDir "build"
   exec "nim " & lang & " " & env &
     " -r --hints:off --warnings:off " & path
 
 task test, "Run all tests":
   withDir("demo"):
     test "--warning[LockLevel]:off --path:../nimPDF -d:release", "test_all"
+
+task testvcc, "Run all tests":
+  withDir("demo"):
+    test "--cc:vcc --warning[LockLevel]:off --path:../nimPDF -d:release", "test_all"
