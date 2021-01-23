@@ -235,7 +235,7 @@ jobs:
           arch: x64
 
       - name: Test using VCC
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && matrix.target.cpu == 'amd64'
         shell: cmd
         working-directory: nimPDF
         run: |
