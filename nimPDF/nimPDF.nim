@@ -44,8 +44,8 @@ const
 
 type
   PDF* = ref object of StateBase
-    pages: seq[Page]
-    curPage: Page
+    pages*: seq[Page]
+    curPage*: Page
 
   NamedPageSize = tuple[name: string, width: float64, height: float64]
 
