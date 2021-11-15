@@ -16,27 +16,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-
-    - name: Cache choosenim
-      id: cache-choosenim
-      uses: actions/cache@v2
+    - uses: ./
       with:
-        path: ~/.choosenim
-        key: ${{ runner.os }}-choosenim-1.4.6
-
-    - name: Cache nimble
-      id: cache-nimble
-      uses: actions/cache@v2
-      with:
-        path: ~/.nimble
-        key: ${{ runner.os }}-nimble-1.4.6
-
-    - name: Install Nim
-      if: steps.cache-choosenim.outputs.cache-hit != 'true' || steps.cache-nimble.outputs.cache-hit != 'true'
-      run: |
-        export CHOOSENIM_CHOOSE_VERSION="1.4.6"
-        curl https://nim-lang.org/choosenim/init.sh -sSf > init.sh
-        sh init.sh -y
+        nim-version: ${{ matrix.version }}
 
     - name: Print Nim version
       run: nim -v
