@@ -13,7 +13,7 @@ proc createPDF(doc: PDF) =
 
   doAssert doc.pages.len() == 4
 
-  # Add text to page 1 (index - 1)
+  # Add text to page 2
   doc.curPage = doc.pages[1]
   doc.drawText(15, 40, "More text to page 2")
 
