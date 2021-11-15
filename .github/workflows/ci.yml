@@ -18,9 +18,9 @@ jobs:
     - uses: actions/checkout@v2
 
     - name: Setup nim
-        uses: jiro4989/setup-nim-action@v1
-        with:
-          nim-version: ${{ matrix.version }}
+      uses: jiro4989/setup-nim-action@v1
+      with:
+        nim-version: ${{ matrix.version }}
 
     - name: Print Nim version
       run: nim -v
