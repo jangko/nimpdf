@@ -11,15 +11,35 @@ proc createPDF(doc: PDF) =
     newPage(doc, size)
     doc.drawText(15, 30, "Page " & $i)
 
-  doAssert doc.pages.len() == 4
+  doAssert doc.numPages() == 4
+  doAssert doc.currentPage() == 4
+  doc.drawText(15, 40, "There are " & $doc.numPages() & " pages and this is page " & $doc.currentPage())
 
-  # Add text to page 2
-  doc.curPage = doc.pages[1]
-  doc.drawText(15, 40, "More text to page 2")
+  # Goto page 2 and add some more text
+  doc.gotoPage(2)
+  doc.drawText(15, 40, "[Page 2] Goto page 2 and add some more text")
+  doAssert doc.currentPage() == 2
 
-  # Return to newest page
-  doc.curPage = doc.pages[doc.pages.len() - 1]
-  doc.drawText(15, 40, "Final page")
+  # Goto to previous page and add some more text
+  doc.prevPage()
+  doc.drawText(15, 40, "[Page 1] Goto to previous page and add some more text")
+  doAssert doc.currentPage() == 1
+
+  # Goto the last page and add some more text
+  doc.gotoLastPage()
+  doc.drawText(15, 50, "[Page 4] Goto the last page and add some more text")
+  doAssert doc.currentPage() == 4
+
+  # Goto the first page and add some more text
+  doc.gotoFirstPage()
+  doc.drawText(15, 50, "[Page 1] Goto the first page and add some more text")
+  doAssert doc.currentPage() == 1
+
+  # Goto the next page and add some more text
+  doc.nextPage()
+  doc.drawText(15, 50, "[Page 2] Goto the next page and add some more text")
+  doAssert doc.currentPage() == 2
+
 
 proc main(): bool {.discardable.} =
   var fileName = "change_page.pdf"

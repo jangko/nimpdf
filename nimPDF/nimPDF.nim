@@ -44,8 +44,8 @@ const
 
 type
   PDF* = ref object of StateBase
-    pages*: seq[Page]
-    curPage*: Page
+    pages: seq[Page]
+    curPage: Page
 
   NamedPageSize = tuple[name: string, width: float64, height: float64]
 
@@ -119,6 +119,46 @@ proc writePDF*(doc: PDF, fileName: string): bool =
     doc.writePDF(file)
     file.close()
     result = true
+
+proc gotoPage*(doc: PDF, page: int) =
+  ## Changes the current active page. The first page is `1`.
+  assert(doc.pages.len() >= page)
+  doc.curPage = doc.pages[page-1]
+
+proc gotoFirstPage*(doc: PDF) =
+  ## Changes to current page to the first page.
+  assert(doc.pages.len() != 0)
+  doc.curPage = doc.pages[0]
+
+proc gotoLastPage*(doc: PDF) =
+  ## Changes to current page to the last page.
+  assert(doc.pages.len() != 0)
+  doc.curPage = doc.pages[doc.pages.len()-1]
+
+proc numPages*(doc: PDF): int =
+  ## Returns the number of pages in the document.
+  result = doc.pages.len()
+
+proc currentPage*(doc: PDF): int =
+  ## Returns the current active page number.
+  assert(doc.curPage != nil)
+  for pageIndex in 0..doc.pages.len()-1:
+    if doc.curPage == doc.pages[pageIndex]:
+      return pageIndex + 1
+
+proc nextPage*(doc: PDF, curPageNr = doc.currentPage()) =
+  ## Changes to current page to the next page, except if the current page is the last page.
+  assert(doc.curPage != nil)
+  # `curPageNr` is the current page number which corresponds to the index of the next page in the `seq[Pages]`.
+  if (curPageNr) <= doc.pages.len():
+    doc.curPage = doc.pages[curPageNr]
+
+proc prevPage*(doc: PDF, curPageNr = doc.currentPage()) =
+  ## Changes to current page to the previous page, except if the current page is the first page.
+  assert(doc.curPage != nil)
+  # We are subtracting 2 - 1 because the index starts at 0, and 1 to get the previous page.
+  if (curPageNr - 2) >= 0:
+    doc.curPage = doc.pages[curPageNr - 2]
 
 proc setFont*(doc: PDF, family: string, style: FontStyles, size: float64, enc: EncodingType = ENC_STANDARD) =
   assert(doc.curPage != nil)
