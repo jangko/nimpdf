@@ -41,6 +41,7 @@ type
     scaleFactor: float64
     CH2GID*: CH2GIDMAP
     newGID: int
+    fullCharMap*: CH2GIDMAPCache  # Cache for full character mapping
 
   Base14* = ref object of Font
     baseFont* : string
@@ -102,25 +103,63 @@ proc GenerateRanges*(f: TTFont): string =
   result = mapping
 
 proc GetDescriptor*(f: TTFont): FontDescriptor =
-   f.CH2GID.sort(proc(x,y: tuple[key: int, val: TONGID]):int = cmp(x.key, y.key) )
-   result = f.font.newFontDescriptor(f.CH2GID)
+  f.CH2GID.sort(proc(x,y: tuple[key: int, val: TONGID]):int = cmp(x.key, y.key) )
+  result = f.font.newFontDescriptor(f.CH2GID)
 
-proc GetSubsetBuffer*(f: TTFont, subsetTag: string): string =
-   let fd = f.font.subset(f.CH2GID, subsetTag)
-   result = fd.getInternalBuffer()
+proc GetSubsetBuffer*(f: TTFont, subsetTag: string, embedFont: bool): string =
+  if embedFont:
+    let fd = f.font.embedFullFont(subsetTag)
+    result = fd.getInternalBuffer()
+  else:
+    let fd = f.font.subset(f.CH2GID, subsetTag)
+    result = fd.getInternalBuffer()
 
 method CanWriteVertical*(f: Font): bool {.base.} = false
 method CanWriteVertical*(f: Base14): bool = false
 method CanWriteVertical*(f: TTFont): bool =
   result = f.vmtx != nil
 
-method EscapeString*(f: Font, text: string): string {.base.} =
+method EscapeString*(f: Font, text: string, embedFont: bool = false): string {.base.} =
   discard
 
-method EscapeString*(f: Base14, text: string): string =
+method EscapeString*(f: Base14, text: string, embedFont: bool = false): string =
   result = text
 
-method EscapeString*(f: TTFont, text: string): string =
+proc EscapeStringAndEmbedFullFont*(f: TTFont, text: string): string =
+  # Use the cached full character mapping from FontDef
+  if f.font.fullCharMap.len > 0:
+    f.CH2GID = f.font.fullCharMap
+  else:
+    # Initialize the cache if not already done
+    var encodingcmap = f.cmap
+    if encodingcmap != nil:
+      # Add all possible Unicode characters (0 to 0xFFFF)
+      for charCode in 0..0xFFFF:
+        let oldGID = encodingcmap.GlyphIndex(charCode)
+        if oldGID != 0:
+          f.CH2GID[charCode] = (oldGID, oldGID)  # Keep original GID mapping
+      # Store the cache in FontDef for future use
+      f.font.fullCharMap = f.CH2GID
+
+  result = ""
+  for c in runes(text):
+    let charCode = int(c)
+    if f.CH2GID.hasKey(charCode):
+      let gid = f.CH2GID[charCode].newGID
+      result.add(toHex(gid, 4))
+    else:
+      # If character not found, try to map it
+      let oldGID = f.cmap.GlyphIndex(charCode)
+      if oldGID != 0:
+        f.CH2GID[charCode] = (oldGID, oldGID)
+        result.add(toHex(oldGID, 4))
+      else:
+        result.add("0000")  # Missing glyph
+
+method EscapeString*(f: TTFont, text: string, embedFont: bool = false): string =
+  if embedFont:
+    return f.EscapeStringAndEmbedFullFont(text)
+
   for c in runes(text):
     let charCode = int(c)
     if not f.CH2GID.hasKey(charCode):
@@ -325,7 +364,23 @@ proc makeTTFont(font: FontDef, searchName: string): TTFont =
   res.glyph    = GLYPHTable(font.getTable(TAG.glyf))
   res.scaleFactor= 1000 / head.UnitsPerEm()
   res.CH2GID   = initOrderedTable[int, TONGID]()
+  res.fullCharMap = initOrderedTable[int, TONGID]()  # Initialize cache
   res.newGID   = 1
+
+  # Pre-populate the full character mapping cache
+  if encodingcmap != nil:
+    # Only map characters that are actually in the font's cmap
+    var cmapTable = CMAPTable(font.getTable(TAG.cmap))
+    if cmapTable != nil:
+      let encodingcmap = cmapTable.GetEncodingCMAP()
+      if encodingcmap != nil:
+        # Get the actual character ranges from the cmap
+        var ranges = initOrderedTable[int, seq[int]]()
+        for i in 0..0xFFFF:
+          let gid = encodingcmap.GlyphIndex(i)
+          if gid != 0:
+            res.fullCharMap[i] = (gid, gid)
+
   result = res
 
 proc searchFromTTList(ff: FontManager, name:string): Font =

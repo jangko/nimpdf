@@ -59,10 +59,14 @@ type
     subType*: FontType
     searchName*: string
 
+  TONGIDCache* = tuple[oldGID, newGID: int]
+  CH2GIDMAPCache* = OrderedTable[int, TONGIDCache]
+
   FontDef* = ref object
     checksum: int64
     tables: FontTableMap
     sfntVersion, numTables, searchRange, entrySelector, rangeShift: int
+    fullCharMap*: CH2GIDMAPCache  # Cache for full character mapping
 
   FontArray* = seq[FontDef]
 
@@ -355,6 +359,63 @@ proc serializeFont*(tables: var seq[FontTable]): FontData =
   var checksum = checksum(fd, fd.length())
   discard fd.writeULong(headoffset + 8, 0xB1B0AFBA - checksum)
   result = fd
+
+proc embedFullFont*(font: FontDef, newTag: string): FontData =
+  var cmap = CMAPTable(font.getTable(TAG.cmap))
+  var maxp = MAXPTable(font.getTable(TAG.maxp))
+  var glyf = GLYPHTable(font.getTable(TAG.glyf))
+  var head = HEADTable(font.getTable(TAG.head))
+  var hhea = HHEATable(font.getTable(TAG.hhea))
+  var hmtx = HMTXTable(font.getTable(TAG.hmtx))
+  var name = NAMETable(font.getTable(TAG.name))
+  var post = POSTTable(font.getTable(TAG.post))
+  var os2  = OS2Table(font.getTable(TAG.OS_2))
+  var cvt  = font.getTable(TAG.cvt)
+  var fpgm = font.getTable(TAG.fpgm)
+  var prep = font.getTable(TAG.prep)
+  var gasp = font.getTable(TAG.gasp)
+  var vhea = VHEATable(font.getTable(TAG.vhea))
+  var vmtx = VMTXTable(font.getTable(TAG.vmtx))
+
+  var isSymbol = false
+  if os2 != nil:
+    isSymbol = os2.IsSymbolCharSet() and
+      cmap.CMAPavailable(proc(platformID, encodingID, format: int): bool =
+        result = (platformID == 3) and (encodingID == 0) )
+
+  # Use the cached full character mapping from FontDef
+  var CH2GID = initOrderedTable[int, TONGID]()
+  var encodingcmap = cmap.GetEncodingCMAP()
+  if encodingcmap != nil:
+    if font.fullCharMap.len > 0:
+      CH2GID = font.fullCharMap
+    else:
+      # Initialize the cache if not already done
+      for i in 0..0xFFFF:
+        let gid = encodingcmap.GlyphIndex(i)
+        if gid != 0:
+          CH2GID[i] = (gid, gid)
+      font.fullCharMap = CH2GID
+
+  var newglyf = glyf # Keep original glyph table
+  var newloca = newglyf.GetLoca()
+  head.SetIndexToLocFormat(newLoca.GetFormatVersion())
+  hhea.SetNumberOfHMetrics(maxp.NumGlyphs())
+  maxp.SetNumGlyphs(maxp.NumGlyphs())
+  var newhmtx = hmtx # Keep original hmtx table
+  var newcmap = encodeCMAPTable(CH2GID, isSymbol)
+  var newname = encodeNAMETable(name, newTag)
+  var newpost = encodePOSTTable(post)
+
+  # Keep all original tables
+  var tables = @[newcmap, newglyf, head, hhea, newhmtx, newloca, maxp, newname, os2, newpost, prep, cvt, fpgm, gasp]
+  if vhea != nil and vmtx != nil:
+    vhea.SetNumberOfVMetrics(maxp.NumGlyphs())
+    var newvmtx = vmtx # Keep original vmtx table
+    tables.add(vhea)
+    tables.add(newvmtx)
+
+  result = serializeFont(tables)
 
 proc subset*(font: FontDef, CH2GID: CH2GIDMAP, newTag: string): FontData =
   var cmap = CMAPTable(font.getTable(TAG.cmap))
