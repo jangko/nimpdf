@@ -52,13 +52,13 @@ proc size*(ba: ByteArray): int = ba.storageLength
 
 method put*(ba: ByteArray, index: int, b: char) {.base.}  =
   if index < 0 or index >= ba.size():
-    raise newIndexError("Attempt to write outside the bounds of the data.")
+    raise newException(ValueError, "Attempt to write outside the bounds of the data.")
   ba.internalPut(index, b)
   ba.filledLength = max(ba.filledLength, index + 1)
 
 method put*(ba: ByteArray, index: int, b:string, offset, length: int): int {.base.} =
   if index < 0 or index >= ba.size():
-    raise newIndexError("Attempt to write outside the bounds of the data.")
+    raise newException(ValueError, "Attempt to write outside the bounds of the data.")
   let actualLength = min(length, ba.size() - index)
 
   let bytesWritten = ba.internalPut(index, b, offset, actualLength)

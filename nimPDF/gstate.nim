@@ -6,7 +6,7 @@
 #-----------------------------------------
 # graphic state
 
-import math, basic2d, image, "subsetter/Font", tables
+import basic2d, image, "subsetter/Font", tables
 
 const
   PGU_K_MM = 72/25.4

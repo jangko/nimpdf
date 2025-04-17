@@ -165,7 +165,7 @@ proc SetYStrikeoutPosition*(t: OS2Table, position: int) = discard t.data.writeSh
 proc SetSFamilyClass*(t: OS2Table, family: int) = discard t.data.writeShort(kSFamilyClass, family)
 proc SetPanose*(t: OS2Table, panose: ByteVector) =
   if panose.len != kPanoseLength:
-    raise newAssertionError("Panose bytes must be exactly 10 in length")
+    raise newException(ValueError, "Panose bytes must be exactly 10 in length")
   discard t.data.writeBytes(kPanose, panose)
 
 proc SetUlUnicodeRange1*(t: OS2Table, range: int64) = discard t.data.writeULong(kUlUnicodeRange1, range)

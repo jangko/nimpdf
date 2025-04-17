@@ -253,13 +253,13 @@ proc newFontData*(length: int): FontData =
 proc readUByte*(fd: FontData, index: int): int =
   let b = fd.data.get(fd.getBoundOffset(index))
   if b < 0:
-    raise newIndexError("Index attempted to be read from is out of bounds " & $index)
+    raise newException(ValueError, "Index attempted to be read from is out of bounds " & $index)
   result = b
 
 proc readByte*(fd: FontData, index: int): int =
   let b = fd.data.get(fd.getBoundOffset(index))
   if b < 0:
-    raise newIndexError("Index attempted to be read from is out of bounds " & $index)
+    raise newException(ValueError, "Index attempted to be read from is out of bounds " & $index)
 
   result = b
   if b >= 0x80: result = b - 0x100
@@ -289,7 +289,7 @@ proc readULongAsInt*(fd: FontData, index: int): int =
   let ulong = fd.readULong(index)
 
   if (ulong and 0x80000000) == 0x80000000:
-    raise newArithErr("Long value too large to fit into an integer.")
+    raise newException(ValueError, "Long value too large to fit into an integer.")
 
   result = cast[int](ulong)
 
@@ -336,13 +336,13 @@ proc copyTo*(fd: FontData, ba: ByteArray): int =
 
 proc slice*(fd: FontData, offset, length: int): FontData =
   if (offset < 0) or ((offset + length) > fd.size()):
-    raise newIndexError("Attempt to bind data outside of its limits")
+    raise newException(ValueError, "Attempt to bind data outside of its limits")
 
   result = newFontData(fd, offset, length)
 
 proc slice*(fd: FontData, offset: int): FontData =
   if (offset < 0) or (offset > fd.size()):
-    raise newIndexError("Attempt to bind data outside of its limits")
+    raise newException(ValueError, "Attempt to bind data outside of its limits")
 
   result = newFontData(fd, offset)
 

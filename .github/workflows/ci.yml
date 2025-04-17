@@ -7,54 +7,35 @@ jobs:
       fail-fast: false
       max-parallel: 20
       matrix:
-        branch: [master]
+        branch: [devel, version-2-2]
+        TEST_LANG: [c, cpp]
         target:
           - os: linux
             cpu: amd64
-            TEST_LANG: c
-          - os: linux
-            cpu: amd64
-            TEST_LANG: cpp
           - os: linux
             cpu: i386
-            TEST_LANG: c
-          - os: linux
-            cpu: i386
-            TEST_LANG: cpp
           - os: macos
             cpu: amd64
-            TEST_LANG: c
-          - os: macos
-            cpu: amd64
-            TEST_LANG: cpp
           - os: windows
             cpu: amd64
-            TEST_LANG: c
-          - os: windows
-            cpu: amd64
-            TEST_LANG: cpp
           - os: windows
             cpu: i386
-            TEST_LANG: c
-          - os: windows
-            cpu: i386
-            TEST_LANG: cpp
         include:
           - target:
               os: linux
-            builder: ubuntu-18.04
+            builder: ubuntu-22.04
           - target:
               os: macos
-            builder: macos-10.15
+            builder: macos-13
           - target:
               os: windows
-            builder: windows-2019
+            builder: windows-latest
 
-    name: '${{ matrix.target.os }}-${{ matrix.target.cpu }}-${{ matrix.target.TEST_LANG }} (${{ matrix.branch }})'
+    name: '${{ matrix.target.os }}-${{ matrix.target.cpu }}-${{ matrix.TEST_LANG }} (${{ matrix.branch }})'
     runs-on: ${{ matrix.builder }}
     steps:
       - name: Checkout nimPDF
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           path: nimPDF
           submodules: false
@@ -82,7 +63,7 @@ jobs:
       - name: Restore MinGW-W64 (Windows) from cache
         if: runner.os == 'Windows'
         id: windows-mingw-cache
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: external/mingw-${{ matrix.target.cpu }}
           key: 'mingw-${{ matrix.target.cpu }}'
@@ -90,7 +71,7 @@ jobs:
       - name: Restore Nim DLLs dependencies (Windows) from cache
         if: runner.os == 'Windows'
         id: windows-dlls-cache
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: external/dlls-${{ matrix.target.cpu }}
           key: 'dlls-${{ matrix.target.cpu }}'
@@ -102,11 +83,12 @@ jobs:
         shell: bash
         run: |
           mkdir -p external
+          MINGW_BASE="https://github.com/brechtsanders/winlibs_mingw/releases/download/11.2.0-12.0.1-9.0.0-r1"
           if [[ '${{ matrix.target.cpu }}' == 'amd64' ]]; then
-            MINGW_URL="https://sourceforge.net/projects/mingw-w64/files/Toolchains targetting Win64/Personal Builds/mingw-builds/8.1.0/threads-posix/seh/x86_64-8.1.0-release-posix-seh-rt_v6-rev0.7z"
+            MINGW_URL="$MINGW_BASE/winlibs-x86_64-posix-seh-gcc-11.2.0-mingw-w64-9.0.0-r1.7z"
             ARCH=64
           else
-            MINGW_URL="https://sourceforge.net/projects/mingw-w64/files/Toolchains targetting Win32/Personal Builds/mingw-builds/8.1.0/threads-posix/dwarf/i686-8.1.0-release-posix-dwarf-rt_v6-rev0.7z"
+            MINGW_URL="$MINGW_BASE/winlibs-i686-posix-dwarf-gcc-11.2.0-mingw-w64-9.0.0-r1.7z"
             ARCH=32
           fi
           curl -L "$MINGW_URL" -o "external/mingw-${{ matrix.target.cpu }}.7z"
@@ -143,38 +125,38 @@ jobs:
             git ls-remote "https://github.com/$1" "${2:-HEAD}" | cut -f 1
           }
           nimHash=$(getHash nim-lang/Nim '${{ matrix.branch }}')
-          csourcesHash=$(getHash nim-lang/csources)
-          echo "::set-output name=nim::$nimHash"
-          echo "::set-output name=csources::$csourcesHash"
+          csourcesHash=$(getHash nim-lang/csources_v2)
+          echo "nimHash=$nimHash" >> $GITHUB_OUTPUT
+          echo "csourcesHash=$csourcesHash" >> $GITHUB_OUTPUT
 
       - name: Restore prebuilt Nim from cache
         id: nim-cache
-        uses: actions/cache@v1
+        uses: actions/cache@v4
         with:
           path: nim
-          key: 'nim-${{ matrix.target.os }}-${{ matrix.target.cpu }}-${{ steps.versions.outputs.nim }}'
+          key: 'nim-${{ matrix.target.os }}-${{ matrix.target.cpu }}-${{ steps.versions.outputs.nimHash }}'
 
       - name: Restore prebuilt csources from cache
         if: steps.nim-cache.outputs.cache-hit != 'true'
         id: csources-cache
-        uses: actions/cache@v1
+        uses: actions/cache@v4
         with:
           path: csources/bin
-          key: 'csources-${{ matrix.target.os }}-${{ matrix.target.cpu }}-${{ steps.versions.outputs.csources }}'
+          key: 'csources-${{ matrix.target.os }}-${{ matrix.target.cpu }}-${{ steps.versions.outputs.csourcesHash }}'
 
       - name: Checkout Nim csources
         if: >
           steps.csources-cache.outputs.cache-hit != 'true' &&
           steps.nim-cache.outputs.cache-hit != 'true'
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
-          repository: nim-lang/csources
+          repository: nim-lang/csources_v2
           path: csources
           ref: ${{ steps.versions.outputs.csources }}
 
       - name: Checkout Nim
         if: steps.nim-cache.outputs.cache-hit != 'true'
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: nim-lang/Nim
           path: nim
@@ -239,4 +221,4 @@ jobs:
         shell: cmd
         working-directory: nimPDF
         run: |
-          env TEST_LANG="${{ matrix.target.TEST_LANG }}" nimble testvcc
+          env TEST_LANG="${{ matrix.TEST_LANG }}" nimble testvcc

@@ -68,11 +68,11 @@ proc wtf8_decode*(str: cstring, maxbytes: int, codep: var int): cstring =
   while i < maxbytes:
     let res = wtf8_decode_state(state, codep, str[i].ord)
     inc i
-    if res == UTF8_ACCEPT: return str[i].unsafeAddr
+    if res == UTF8_ACCEPT: return cast[cstring](str[i].unsafeAddr)
     elif res == UTF8_REJECT: break
 
   codep = 0xFFFD
-  result = str[i].unsafeAddr
+  result = cast[cstring](str[i].unsafeAddr)
 
 iterator wtf8_decode*(str: string): int =
   var state = 0
@@ -88,22 +88,22 @@ iterator wtf8_decode*(str: string): int =
 proc wtf8_encode*(codepoint: int, str: var cstring): cstring =
   if codepoint <= 0x7f:
     str[0] = codepoint.chr
-    result = str[1].addr
+    result = cast[cstring](str[1].addr)
   elif codepoint <= 0x7ff:
     str[0] = chr(0xc0 + (codepoint shr 6))
     str[1] = chr(0x80 + (codepoint and 0x3f))
-    result = str[2].addr
+    result = cast[cstring](str[2].addr)
   elif codepoint <= 0xffff:
     str[0] = chr(0xe0 + (codepoint shr 12))
     str[1] = chr(0x80 + ((codepoint shr 6) and 63))
     str[2] = chr(0x80 + (codepoint and 63))
-    result = str[3].addr
+    result = cast[cstring](str[3].addr)
   elif codepoint <= 0x1fffff:
     str[0] = chr(0xf0 + (codepoint shr 18))
     str[1] = chr(0x80 + ((codepoint shr 12) and 0x3f))
     str[2] = chr(0x80 + ((codepoint shr 6) and 0x3f))
     str[3] = chr(0x80 + (codepoint and 0x3f))
-    result = str[4].addr
+    result = cast[cstring](str[4].addr)
 
 proc wtf8_encode*(codepoint: int, str: var string) =
   if codepoint <= 0x7f:

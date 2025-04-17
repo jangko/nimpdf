@@ -4,7 +4,7 @@
 # (See accompanying file LICENSE.txt)
 #
 #-----------------------------------------
-import FontIOStreams, FontData, tables
+import FontData, tables
 
 const
   kVMetricsStart = 0
@@ -28,14 +28,14 @@ proc numberOfVMetrics*(t: VMTXTable): int = t.numVMetrics
 proc numberOfTSBs*(t: VMTXTable): int = t.numGlyphs - t.numVMetrics
 proc vmetricAdvanceHeight(t: VMTXTable, entry: int): int =
   if entry > t.numVMetrics:
-    raise newIndexError("VMetricAdvanceHeight index error")
+    raise newException(ValueError, "VMetricAdvanceHeight index error")
 
   let offset = kVMetricsStart + (entry * kVMetricsSize) + kVMetricsAdvanceHeight
   result = t.data.readUShort(offset)
 
 proc vmetricTSB(t: VMTXTable, entry: int): int =
   if entry > t.numVMetrics:
-    raise newIndexError("VMetricTSB index error")
+    raise newException(ValueError, "VMetricTSB index error")
 
   let offset = kVMetricsStart + (entry * kVMetricsSize) + kVMetricsTopSideBearing
   result = t.data.readFWord(offset)
@@ -43,7 +43,7 @@ proc vmetricTSB(t: VMTXTable, entry: int): int =
 proc tsbTableEntry(t: VMTXTable, entry: int): int =
   if entry > t.numberOfTSBs():
     #echo "num tsb: ", $t.NumberOftsbs()
-    raise newIndexError("TSBTableEntry index error")
+    raise newException(ValueError, "TSBTableEntry index error")
 
   let offset = kVMetricsStart + (t.numVMetrics * kVMetricsSize) + (entry * kTopSideBearingSize)
   result = t.data.readFWord(offset)

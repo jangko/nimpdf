@@ -44,13 +44,13 @@ type
 
   Base14* = ref object of Font
     baseFont* : string
-    getWidth : proc(cp: int): int {.locks:0.}
+    getWidth : proc(cp: int): int
     isFontSpecific : bool
     ascent, descent, xHeight, capHeight : int
     bbox : BBox
     missingWidth: int
     encoding*: EncodingType
-    encode: proc(val: int): int {.locks:0.}
+    encode: proc(val: int): int
 
   TextWidth* = object
     numchars*, width*, numspace*, numwords*: int

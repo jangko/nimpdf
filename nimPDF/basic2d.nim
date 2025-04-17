@@ -59,23 +59,22 @@ const
     ## used internally by DegToRad and RadToDeg
 
 type
-    Matrix2d* = object
-      ## Implements a row major 2d matrix, which means
-      ## transformations are applied the order they are concatenated.
-      ## The rightmost column of the 3x3 matrix is left out since normally
-      ## not used for geometric transformations in 2d.
-      ax*,ay*,bx*,by*,tx*,ty*:float
-    Point2d* = object
-      ## Implements a non-homogeneous 2d point stored as
-      ## an `x` coordinate and an `y` coordinate.
-      x*,y*:float
-    Vector2d* = object
-      ## Implements a 2d **direction vector** stored as
-      ## an `x` coordinate and an `y` coordinate. Direction vector means,
-      ## that when transforming a vector with a matrix, the translational
-      ## part of the matrix is ignored.
-      x*,y*:float
-{.deprecated: [TMatrix2d: Matrix2d, TPoint2d: Point2d, TVector2d: Vector2d].}
+  Matrix2d* = object
+    ## Implements a row major 2d matrix, which means
+    ## transformations are applied the order they are concatenated.
+    ## The rightmost column of the 3x3 matrix is left out since normally
+    ## not used for geometric transformations in 2d.
+    ax*,ay*,bx*,by*,tx*,ty*:float
+  Point2d* = object
+    ## Implements a non-homogeneous 2d point stored as
+    ## an `x` coordinate and an `y` coordinate.
+    x*,y*:float
+  Vector2d* = object
+    ## Implements a 2d **direction vector** stored as
+    ## an `x` coordinate and an `y` coordinate. Direction vector means,
+    ## that when transforming a vector with a matrix, the translational
+    ## part of the matrix is ignored.
+    x*,y*:float
 
 
 # Some forward declarations...
@@ -287,7 +286,7 @@ proc inverse*(m:Matrix2d):Matrix2d {.noInit.} =
   ## will be raised.
   let d=m.determinant
   if d==0.0:
-    raise newException(DivByZeroError,"Cannot invert a zero determinant matrix")
+    raise newException(ValueError,"Cannot invert a zero determinant matrix")
 
   result.setElements(
     m.by/d,-m.ay/d,
@@ -433,7 +432,7 @@ proc normalize*(v:var Vector2d) {.inline.}=
   ## Modifies `v` to have a length of 1.0, keeping its angle.
   ## If  `v` has zero length, an EDivByZero will be raised.
   if not tryNormalize(v):
-    raise newException(DivByZeroError,"Cannot normalize zero length vector")
+    raise newException(ValueError,"Cannot normalize zero length vector")
 
 proc transformNorm*(v:var Vector2d,t:Matrix2d)=
   ## Applies a normal direction transformation `t` onto `v` in place.
@@ -449,7 +448,7 @@ proc transformNorm*(v:var Vector2d,t:Matrix2d)=
   #             | | 0  0  1 |    |
   let d=t.determinant
   if(d==0.0):
-    raise newException(DivByZeroError,"Matrix is not invertible")
+    raise newException(ValueError,"Matrix is not invertible")
   let newx = (t.by*v.x-t.ay*v.y)/d
   v.y = (t.ax*v.y-t.bx*v.x)/d
   v.x = newx
@@ -463,7 +462,7 @@ proc transformInv*(v:var Vector2d,t:Matrix2d)=
   let d=t.determinant
 
   if(d==0.0):
-    raise newException(DivByZeroError,"Matrix is not invertible")
+    raise newException(ValueError,"Matrix is not invertible")
 
   let newx=(t.by*v.x-t.bx*v.y)/d
   v.y = (t.ax*v.y-t.ay*v.x)/d
@@ -705,7 +704,7 @@ proc transformInv*(p:var Point2d,t:Matrix2d){.inline.}=
   #             | TX TY 1 |
   let d=t.determinant
   if d==0.0:
-    raise newException(DivByZeroError,"Cannot invert a zero determinant matrix")
+    raise newException(ValueError,"Cannot invert a zero determinant matrix")
   let
     newx= (t.bx*t.ty-t.by*t.tx+p.x*t.by-p.y*t.bx)/d
   p.y = -(t.ax*t.ty-t.ay*t.tx+p.x*t.ay-p.y*t.ax)/d

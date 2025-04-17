@@ -4,7 +4,7 @@
 # (See accompanying file LICENSE.txt)
 #
 #-----------------------------------------
-import FontIOStreams, FontData
+import FontData
 
 const
   IndexToLocFormat* = (kShortOffset : 0, kLongOffset : 1)
@@ -21,19 +21,19 @@ proc GetNumGlyphs*(t: LOCATable): int = t.numGlyphs
 
 proc Loca*(t: LOCATable, index: int): int =
   if index > t.numGlyphs:
-    raise newIndexError("loca outside bound")
+    raise newException(ValueError, "loca outside bound")
   if t.version == IndexToLocFormat.kShortOffset:
     return 2 * t.data.readUShort(index * DataSize.kUSHORT)
   result = t.data.readULongAsInt(index * DataSize.kULONG)
 
 proc GlyphOffset*(t: LOCATable, glyph_id: int): int =
   if (glyph_id < 0) or (glyph_id >= t.numGlyphs):
-    raise newIndexError("Glyph ID is out of bounds.")
+    raise newException(ValueError, "Glyph ID is out of bounds.")
   result = t.Loca(glyph_id)
 
 proc GlyphLength*(t: LOCATable, glyph_id: int): int =
   if (glyph_id < 0) or (glyph_id >= t.numGlyphs):
-    raise newIndexError("Glyph ID is out of bounds. " & $glyph_id)
+    raise newException(ValueError, "Glyph ID is out of bounds. " & $glyph_id)
   result = t.Loca(glyph_id + 1) - t.Loca(glyph_id)
 
 proc NumLocas*(t: LOCATable): int = t.numGlyphs + 1

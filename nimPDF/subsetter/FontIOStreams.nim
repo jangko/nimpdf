@@ -43,18 +43,6 @@ proc newEIO*(msg: string): ref IOError =
   new(result)
   result.msg = msg
 
-proc newIndexError*(msg: string): ref IndexError =
-  new(result)
-  result.msg = msg
-
-proc newArithErr*(msg: string): ref ArithmeticError =
-  new(result)
-  result.msg = msg
-
-proc newAssertionError*(msg: string): ref AssertionError =
-  new(result)
-  result.msg = msg
-
 #----------------------------------------------------------
 method available*(s: InputStream): int {.base.} = discard
 method close*(s: InputStream) {.base.} = discard
@@ -204,7 +192,7 @@ method write*(s:MemoryOutputStream, b: ByteVector, offset, length: int): int =
     s.store.add(b.substr(offset, offset + length))
     result = length
   else:
-    raise newIndexError("Attempt to write outside the bounds of the data.")
+    raise newException(ValueError, "Attempt to write outside the bounds of the data.")
 
 method write*(s:MemoryOutputStream, b: char): int =
   s.store.add(b)
@@ -241,7 +229,7 @@ method write*(s:FileOutputStream, b: ByteVector, offset, length: int): int =
     s.len += length
     result = length
   else:
-    raise newIndexError("Attempt to write outside the bounds of the data.")
+    raise newException(ValueError, "Attempt to write outside the bounds of the data.")
 
 method write*(s:FileOutputStream, b: char): int =
   write(s.f, b)
@@ -331,7 +319,7 @@ method readULong*(s: FontInputStream): int64 {.base.} =
 method readULongAsInt*(s: FontInputStream): int {.base.} =
   let ulong = s.readULong()
   if (ulong and 0x80000000) == 0x80000000:
-    raise newArithErr("Long value too large to fit into an integer.")
+    raise newException(ValueError, "Long value too large to fit into an integer.")
 
   result = int(ulong) and not 0x80000000'i32
 
@@ -368,7 +356,7 @@ method flush*(s:FontOutputStream) =
 method write*(s:FontOutputStream, b: ByteVector, offset, length:int): int =
   assert(s.stream != nil)
   if (offset < 0 or length < 0 or (offset + length) < 0 or (offset + length) > b.len):
-    raise newIndexError("Attempt to write outside the bounds of the data.")
+    raise newException(ValueError, "Attempt to write outside the bounds of the data.")
 
   result = s.stream.write(b, offset, length)
   s.pos += length
