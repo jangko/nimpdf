@@ -4,7 +4,7 @@
 # (See accompanying file LICENSE.txt)
 #
 #-----------------------------------------
-import FontIOStreams, FontData, tables
+import FontData, tables
 
 const
   kHMetricsStart = 0
@@ -28,21 +28,21 @@ proc numberOfHMetrics*(t: HMTXTable): int = t.numHMetrics
 proc numberOfLSBs*(t: HMTXTable): int = t.numGlyphs - t.numHMetrics
 proc hmetricAdvanceWidth(t: HMTXTable, entry: int): int =
   if entry > t.numHMetrics:
-    raise newIndexError("HMetricAdvanceWidth index error")
+    raise newException(ValueError, "HMetricAdvanceWidth index error")
 
   let offset = kHMetricsStart + (entry * kHMetricsSize) + kHMetricsAdvanceWidth
   result = t.data.readUShort(offset)
 
 proc hmetricLSB(t: HMTXTable, entry: int): int =
   if entry > t.numHMetrics:
-    raise newIndexError("HMetricLSB index error")
+    raise newException(ValueError, "HMetricLSB index error")
 
   let offset = kHMetricsStart + (entry * kHMetricsSize) + kHMetricsLeftSideBearing
   result = t.data.readFWord(offset)
 
 proc lsbTableEntry(t: HMTXTable, entry: int): int =
   if entry > t.numberOfLSBs():
-    raise newIndexError("LsbTableEntry index error")
+    raise newException(ValueError, "LsbTableEntry index error")
 
   let offset = kHMetricsStart + (t.numHMetrics * kHMetricsSize) + (entry * kLeftSideBearingSize)
   result = t.data.readFWord(offset)
