@@ -231,7 +231,7 @@ proc putResources(doc: DocState): DictObj =
   let grads = putGradients(doc.xref, doc.gradients)
   let exts  = putExtGStates(doc.xref, doc.ExtGStates)
   let imgs  = putImages(doc.xref, doc.images)
-  let fonts = putFonts(doc.xref, doc.fontMan.fontList)
+  let fonts = putFonts(doc.xref, doc.fontMan.fontList, doc.opts.getEmbedFont())
 
   result = newDictObj()
   doc.xref.add(result)
@@ -702,7 +702,7 @@ proc drawText*(self: ContentBase; x,y: float64; text: string) =
 
   if font.subType == FT_TRUETYPE:
     var utf8 = replace_invalid(text)
-    self.put("BT ",f2s(xx)," ",f2s(yy)," Td <",font.EscapeString(utf8),"> Tj ET")
+    self.put("BT ",f2s(xx)," ",f2s(yy)," Td <",font.EscapeString(utf8, self.state.opts.getEmbedFont()),"> Tj ET")
   else:
     self.put("BT ",f2s(xx)," ",f2s(yy)," Td (",escapeString(text),") Tj ET")
 
@@ -719,7 +719,7 @@ proc drawVText*(self: ContentBase; x,y: float64; text: string) =
   var xx = self.fromUser(x)
   var yy = self.state.vPoint(y)
   let utf8 = replace_invalid(text)
-  let cid = font.EscapeString(utf8)
+  let cid = font.EscapeString(utf8, self.state.opts.getEmbedFont())
 
   self.put("BT")
   var i = 0
@@ -762,7 +762,7 @@ proc showText*(self: ContentBase, text:string) =
 
   if font.subType == FT_TRUETYPE:
     var utf8 = replace_invalid(text)
-    self.put("<",font.EscapeString(utf8),"> Tj")
+    self.put("<",font.EscapeString(utf8, self.state.opts.getEmbedFont()),"> Tj")
   else:
     self.put("(",escapeString(text),") Tj")
 

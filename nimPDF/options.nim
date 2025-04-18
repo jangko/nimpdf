@@ -3,12 +3,14 @@ type
     resourcesPath: seq[string]
     fontsPath: seq[string]
     imagesPath: seq[string]
+    embedFont*: bool
 
 proc newPDFOptions*(): PDFOptions =
   new(result)
   result.resourcesPath = @[]
   result.fontsPath = @[]
   result.imagesPath = @[]
+  result.embedFont = false
 
 proc getFontsPath*(opt: PDFOptions): seq[string] =
   result = opt.fontsPath
@@ -37,7 +39,14 @@ proc clearImagesPath*(opt: PDFOptions) =
 proc clearResourcesPath*(opt: PDFOptions) =
   opt.resourcesPath.setLen(0)
 
+proc setEmbedFont*(opt: PDFOptions, embedFont: bool) =
+  opt.embedFont = embedFont
+
+proc getEmbedFont*(opt: PDFOptions): bool =
+  result = opt.embedFont
+
 proc clearAllPath*(opt: PDFOptions) =
   opt.clearFontsPath()
   opt.clearImagesPath()
   opt.clearResourcesPath()
+  opt.setEmbedFont(false)
