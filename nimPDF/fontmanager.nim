@@ -74,18 +74,66 @@ proc GetCharHeight*(f: TTFont, gid: int): int =
   else:
     result = math.round(float(f.vmtx.advanceHeight(gid)) * f.scaleFactor).int
 
-proc GenerateWidths*(f: TTFont): string =
-  f.CH2GID.sort(proc(x,y: tuple[key: int, val: TONGID]):int = cmp(x.val.newGID, y.val.newGID) )
-  var widths = "[ 1["
-  var x = 0
+proc GenerateWidths*(f: TTFont, embedFont: bool): string =
+  # Generates the /Widths array for the font descriptor.
+  # The format depends on whether we are embedding the full font or a subset.
+  if embedFont:
+    # When embedding the full font, use Format 1 for /W array: [ c [w1 ... wn] ... ]
+    # Collect unique GIDs and their widths, sorted by GID.
+    var gidWidths = initOrderedTable[int, int]() # Use OrderedTable to sort by GID
+    # Ensure CH2GID is populated correctly (it maps charCode -> (oldGID, oldGID) when embedding)
+    if f.CH2GID.len == 0 and f.font.fullCharMap.len > 0:
+      # This case shouldn't happen if EscapeStringAndEmbedFullFont was called, but safety first
+      f.CH2GID = f.font.fullCharMap
+    elif f.CH2GID.len == 0:
+      # If CH2GID is empty (e.g., text was empty), populate minimal map or return empty widths
+      # For now, just proceed, might result in empty widths if no chars were processed
+      discard
 
-  for gid in values(f.CH2GID):
-    widths.add($f.GetCharWidth(gid.oldGID))
-    if x < f.CH2GID.len-1: widths.add(' ')
-    inc(x)
+    for code, gidInfo in pairs(f.CH2GID):
+      let currentGID = gidInfo.oldGID
+      if currentGID != 0 and not gidWidths.hasKey(currentGID):
+          gidWidths[currentGID] = f.GetCharWidth(currentGID)
 
-  widths.add("]]")
-  result = widths
+    if gidWidths.len == 0: return "[]" # No glyphs processed
+
+    # Build the /W array string by grouping contiguous GIDs
+    var widthsParts: seq[string] = @[]
+    var startGID = -1
+    var currentWidths: seq[string] = @[]
+
+    for gid, width in pairs(gidWidths): # Iterates in GID order
+      if startGID == -1: # First GID in a potential group
+        startGID = gid
+        currentWidths.add($width)
+      elif gid == startGID + currentWidths.len: # Contiguous GID, add to current group
+        currentWidths.add($width)
+      else: # Non-contiguous GID, finalize previous group and start a new one
+        widthsParts.add($startGID & " [ " & currentWidths.join(" ") & " ]")
+        startGID = gid
+        currentWidths = @[$width]
+
+    # Add the last group
+    if startGID != -1:
+      widthsParts.add($startGID & " [ " & currentWidths.join(" ") & " ]")
+
+    result = "[ " & widthsParts.join(" ") & " ]"
+
+  else:
+    # When subsetting, GIDs used are sequential newGIDs starting from 1.
+    # Sort by newGID to ensure correct order for the widths array.
+    f.CH2GID.sort(proc(x,y: tuple[key: int, val: TONGID]):int = cmp(x.val.newGID, y.val.newGID))
+    # The format is [ firstGID [w1 w2 ... wn] ], where firstGID is typically 1.
+    var firstGID = -1
+    var widthsArray: seq[string] = @[]
+
+    for gidInfo in values(f.CH2GID):
+      if firstGID == -1: firstGID = gidInfo.newGID # Capture the first new GID (should be 1)
+      widthsArray.add($f.GetCharWidth(gidInfo.oldGID)) # Get width using oldGID
+
+    if firstGID == -1: return "[]" # No glyphs in subset
+
+    result = "[ " & $firstGID & " [ " & widthsArray.join(" ") & " ] ]"
 
 proc GenerateRanges*(f: TTFont): string =
   var range: seq[string] = @[]

@@ -81,8 +81,8 @@ proc putTrueTypeFonts(xref: Pdfxref, font: Font, seed: int, embedFont: bool): Di
   let fon = TTFont(font)
   let subsetTag  = makeSubsetTag(seed)
 
-  let widths   = fon.GenerateWidths() #don't change this order
-  let ranges   = fon.GenerateRanges() #coz they sort CH2GID differently
+  let widths   = fon.GenerateWidths(embedFont) #don't change this order
+  let ranges   = fon.GenerateRanges() #cos they sort CH2GID differently
   let desc     = fon.GetDescriptor()
   let buf      = fon.GetSubsetBuffer(subsetTag, embedFont)
   let Length1  = buf.len
