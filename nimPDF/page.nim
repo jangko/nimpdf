@@ -22,7 +22,7 @@ type
   GlyphPoint = object
     x, y: float64
     onCurve: bool
-  
+
   GlyphContour = seq[GlyphPoint]
   GlyphOutline = seq[GlyphContour]
 
@@ -458,13 +458,13 @@ proc newDocState*(opts: PDFOptions): DocState =
 
 proc makeFont*(doc: DocState, family: string, style: FontStyles, enc: EncodingType = ENC_STANDARD, renderMode: FontRenderMode = frmDefault): Font =
   let finalRenderMode = case renderMode:
-    of frmPathRendering: 
+    of frmPathRendering:
       frmPathRendering  # Always honor explicit path rendering
-    of frmEmbed: 
-      frmEmbed          # Always honor explicit embedding  
-    of frmDefault: 
+    of frmEmbed:
+      frmEmbed          # Always honor explicit embedding
+    of frmDefault:
       frmDefault  # Use default rendering (no global embedding option)
-  
+
   result = doc.fontMan.makeFont(family, style, enc, finalRenderMode)
 
 proc getOpt*(doc: DocState): PDFOptions =
@@ -714,6 +714,9 @@ proc setFont*(
 ) =
   var font = self.state.makeFont(family, style, enc, renderMode)
   let fontSize = self.fromUser(size)
+  if renderMode == frmDefault:
+    let fontNumber = font.ID
+    self.put("BT /F",$fontNumber," ",$fontSize," Tf ET")
 
   self.state.gState.font = font
   self.state.gState.fontSize = fontSize
@@ -727,43 +730,43 @@ proc setFont*(
 proc parseGlyphOutline(glyphTable: GLYPHTable, glyphIndex: int): GlyphOutline =
   # Parse TrueType glyph outline data into vector paths
   result = @[]
-  
+
   if glyphTable == nil or glyphIndex <= 0:
     return
-  
+
   let locaTable = glyphTable.GetLoca()
   let offset = locaTable.GlyphOffset(glyphIndex)
   let length = locaTable.GlyphLength(glyphIndex)
-  
+
   if length == 0:
     return # Empty glyph
-  
+
   let numberOfContours = glyphTable.NumberOfContours(glyphIndex)
-  
+
   if numberOfContours < 0:
     # Composite glyph - not implemented yet
     return
-  
+
   if numberOfContours == 0:
     return # No contours
-  
+
   try:
     var dataOffset = offset + 10  # Skip header (numberOfContours, xMin, yMin, xMax, yMax)
-    
+
     # Read contour endpoints
     var contourEnds: seq[int] = @[]
     for i in 0..<numberOfContours:
       contourEnds.add(int(glyphTable.data.readUShort(dataOffset)))
       dataOffset += 2
-    
+
     let numPoints = contourEnds[contourEnds.high] + 1
     if numPoints <= 0:
       return
-    
+
     # Skip instruction length and instructions
     let instructionLength = int(glyphTable.data.readUShort(dataOffset))
     dataOffset += 2 + instructionLength
-    
+
     # Read flags
     var flags: seq[int] = @[]
     var flagIndex = 0
@@ -772,7 +775,7 @@ proc parseGlyphOutline(glyphTable: GLYPHTable, glyphIndex: int): GlyphOutline =
       inc(dataOffset)
       flags.add(flag)
       inc(flagIndex)
-      
+
       # Handle repeat flag
       if (flag and REPEAT_FLAG) != 0:
         let repeatCount = int(glyphTable.data.readUByte(dataOffset))
@@ -781,7 +784,7 @@ proc parseGlyphOutline(glyphTable: GLYPHTable, glyphIndex: int): GlyphOutline =
           if flagIndex < numPoints:
             flags.add(flag)
             inc(flagIndex)
-    
+
     # Read x coordinates
     var xCoords: seq[int16] = @[]
     var currentX: int = 0
@@ -798,8 +801,8 @@ proc parseGlyphOutline(glyphTable: GLYPHTable, glyphIndex: int): GlyphOutline =
         currentX += int(glyphTable.data.readShort(dataOffset))
         dataOffset += 2
       xCoords.add(int16(currentX))
-    
-    # Read y coordinates  
+
+    # Read y coordinates
     var yCoords: seq[int16] = @[]
     var currentY: int = 0
     for i in 0..<numPoints:
@@ -815,25 +818,25 @@ proc parseGlyphOutline(glyphTable: GLYPHTable, glyphIndex: int): GlyphOutline =
         currentY += int(glyphTable.data.readShort(dataOffset))
         dataOffset += 2
       yCoords.add(int16(currentY))
-    
+
     # Build contours
     var startIndex = 0
     for contourIndex in 0..<numberOfContours:
       let endIndex = contourEnds[contourIndex]
       var contour: GlyphContour = @[]
-      
+
       for pointIndex in startIndex..endIndex:
         contour.add(GlyphPoint(
           x: float64(xCoords[pointIndex]),
           y: float64(yCoords[pointIndex]),
           onCurve: (flags[pointIndex] and ON_CURVE_POINT) != 0
         ))
-      
+
       if contour.len > 0:
         result.add(contour)
-      
+
       startIndex = endIndex + 1
-  
+
   except:
     # Return empty outline on parsing error
     result = @[]
@@ -842,39 +845,39 @@ proc glyphOutlineToPDFPath(self: ContentBase, outline: GlyphOutline, x, y: float
   # Convert TrueType glyph outline to PDF path commands
   if outline.len == 0:
     return
-  
+
   # Scale from font units to user units
   let scale = fontSize / unitsPerEm
-  
+
   # Process each contour in the glyph outline
   for contourIndex, contour in outline:
     if contour.len == 0:
       continue
-    
+
     # Start the path with the first point
     let firstPoint = contour[0]
     let startUserX = x + firstPoint.x * scale
     let startUserY = y - firstPoint.y * scale  # Flip Y coordinate for TrueType fonts
     let startPdfX = self.fromUser(startUserX)
     let startPdfY = self.state.vPoint(startUserY)
-    
+
     self.put(f2s(startPdfX), " ", f2s(startPdfY), " m")
-    
+
     var currentPdfX = startPdfX
     var currentPdfY = startPdfY
-    
+
     # Process the rest of the contour points
     var i = 1
     while i < contour.len:
       let point = contour[i]
-      
+
       if point.onCurve:
         # Simple line to this on-curve point
         let userX = x + point.x * scale
         let userY = y - point.y * scale  # Flip Y coordinate for TrueType fonts
         let pdfX = self.fromUser(userX)
         let pdfY = self.state.vPoint(userY)
-        
+
         self.put(f2s(pdfX), " ", f2s(pdfY), " l")
         currentPdfX = pdfX
         currentPdfY = pdfY
@@ -883,7 +886,7 @@ proc glyphOutlineToPDFPath(self: ContentBase, outline: GlyphOutline, x, y: float
         # Quadratic Bézier curve - need to find the end point
         var endUserX, endUserY: float64
         var endPdfX, endPdfY: float64
-        
+
         if i + 1 < contour.len:
           let nextPoint = contour[i + 1]
           if nextPoint.onCurve:
@@ -901,16 +904,16 @@ proc glyphOutlineToPDFPath(self: ContentBase, outline: GlyphOutline, x, y: float
           endUserX = startUserX
           endUserY = startUserY
           inc(i)
-        
+
         endPdfX = self.fromUser(endUserX)
         endPdfY = self.state.vPoint(endUserY)
-        
+
         # Control point for the quadratic curve
         let ctrlUserX = x + point.x * scale
         let ctrlUserY = y - point.y * scale  # Flip Y coordinate for TrueType fonts
         let ctrlPdfX = self.fromUser(ctrlUserX)
         let ctrlPdfY = self.state.vPoint(ctrlUserY)
-        
+
         # Convert quadratic Bézier to cubic Bézier for PDF
         # Formula: cubic_cp1 = start + 2/3 * (quad_ctrl - start)
         #          cubic_cp2 = end + 2/3 * (quad_ctrl - end)
@@ -918,14 +921,14 @@ proc glyphOutlineToPDFPath(self: ContentBase, outline: GlyphOutline, x, y: float
         let cp1y = currentPdfY + (ctrlPdfY - currentPdfY) * 2.0 / 3.0
         let cp2x = endPdfX + (ctrlPdfX - endPdfX) * 2.0 / 3.0
         let cp2y = endPdfY + (ctrlPdfY - endPdfY) * 2.0 / 3.0
-        
+
         self.put(f2s(cp1x), " ", f2s(cp1y), " ", f2s(cp2x), " ", f2s(cp2y), " ", f2s(endPdfX), " ", f2s(endPdfY), " c")
         currentPdfX = endPdfX
         currentPdfY = endPdfY
-    
+
     # Close the contour
     self.put("h")
-  
+
   # Fill the path
   self.put("f")
 
@@ -934,14 +937,14 @@ proc drawTextAsPaths*(self: ContentBase, x, y: float64, text: string) =
   # Convert fontSize back to user units for character width calculations
   let fontSize = self.state.gState.docUnit.toUser(self.state.gState.fontSize)
   var currentX = x
-  
+
   if font.subType == FT_TRUETYPE:
     let ttFont = TTFont(font)
     var unitsPerEm = 2048.0
     let headTable = ttFont.font.getTable(TAG.head)
     if headTable != nil:
       unitsPerEm = float64(HEADTable(headTable).UnitsPerEm())
-    
+
     let cmapTable = CMAPTable(ttFont.font.getTable(TAG.cmap))
     if cmapTable != nil:
       let encodingCmap = cmapTable.GetEncodingCMAP()
@@ -952,7 +955,7 @@ proc drawTextAsPaths*(self: ContentBase, x, y: float64, text: string) =
             let glyphIndex = encodingCmap.GlyphIndex(charCode)
             if glyphIndex > 0:
               ttFont.CH2GID[charCode] = (glyphIndex, glyphIndex)
-    
+
     for ch in runes(text):
       if ch == Rune(32): # space character
         currentX += fontSize * 0.25
@@ -967,7 +970,7 @@ proc drawTextAsPaths*(self: ContentBase, x, y: float64, text: string) =
               self.put("q")
               self.glyphOutlineToPDFPath(outline, currentX, y, fontSize, unitsPerEm)
               self.put("Q")
-          
+
           let rawWidth = ttFont.GetCharWidth(ttFont.CH2GID[charCode].oldGID)
           let charWidth = float64(rawWidth) * fontSize / 1000.0
           currentX += charWidth
@@ -982,17 +985,24 @@ proc drawText*(self: ContentBase, x, y: float64, text: string) =
     self.setFont(defaultFont, {FS_REGULAR}, 5)
 
   var font = self.state.gState.font
-  
+
   if font.renderMode == frmPathRendering and font.subType == FT_TRUETYPE:
     self.drawTextAsPaths(x, y, text)
     return
 
-  if font.subType == FT_TRUETYPE:
-    var utf8 = replace_invalid(text)
-    # Use the font's actual renderMode for EscapeString
-    self.put("BT /F", $font.ID, " ", f2s(self.state.gState.fontSize), " Tf ", f2s(xx), " ", f2s(yy), " Td <", font.EscapeString(utf8), "> Tj ET")
+  if font.renderMode == frmDefault:
+    if font.subType == FT_TRUETYPE:
+      var utf8 = replace_invalid(text)
+      self.put("BT ",f2s(xx)," ",f2s(yy)," Td <",font.EscapeString(utf8),"> Tj ET")
+    else:
+      self.put("BT ",f2s(xx)," ",f2s(yy)," Td (",escapeString(text),") Tj ET")
   else:
-    self.put("BT /F", $font.ID, " ", f2s(self.state.gState.fontSize), " Tf ", f2s(xx), " ", f2s(yy), " Td (", escapeString(text), ") Tj ET")
+    if font.subType == FT_TRUETYPE:
+      var utf8 = replace_invalid(text)
+      # Use the font's actual renderMode for EscapeString
+      self.put("BT /F", $font.ID, " ", f2s(self.state.gState.fontSize), " Tf ", f2s(xx), " ", f2s(yy), " Td <", font.EscapeString(utf8), "> Tj ET")
+    else:
+      self.put("BT /F", $font.ID, " ", f2s(self.state.gState.fontSize), " Tf ", f2s(xx), " ", f2s(yy), " Td (", escapeString(text), ") Tj ET")
 
 proc drawVText*(self: ContentBase; x,y: float64; text: string) =
   if self.state.gState.font == nil or self.state.setFontCount == 0:
@@ -1010,7 +1020,8 @@ proc drawVText*(self: ContentBase; x,y: float64; text: string) =
   let cid = font.EscapeString(utf8)
 
   self.put("BT")
-  self.put("/F", $font.ID, " ", f2s(self.state.gState.fontSize), " Tf")
+  if font.renderMode != frmDefault:
+    self.put("/F", $font.ID, " ", f2s(self.state.gState.fontSize), " Tf")
   var i = 0
   for b in runes(utf8):
     self.put(f2s(xx)," ",f2s(yy)," Td <", substr(cid, i, i + 3),"> Tj")

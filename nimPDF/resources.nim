@@ -83,7 +83,7 @@ proc putTrueTypeFonts(xref: Pdfxref, font: Font, seed: int, renderMode: FontRend
 
   let widths   = fon.GenerateWidths(renderMode) #don't change this order
   let ranges   = fon.GenerateRanges() #cos they sort CH2GID differently
-  let desc     = fon.GetDescriptor()
+  let desc     = fon.GetDescriptor(renderMode)
   let buf      = fon.GetSubsetBuffer(subsetTag, renderMode)
   let Length1  = buf.len
   let psName   = subsetTag & desc.postscriptName
@@ -101,7 +101,12 @@ proc putTrueTypeFonts(xref: Pdfxref, font: Font, seed: int, renderMode: FontRend
   descriptor.addNumber("CapHeight", desc.capHeight)
   descriptor.addNumber("StemV", desc.stemV)
   descriptor.addNumber("XHeight", desc.xHeight)
-  
+  if renderMode == frmDefault:
+    var fontFile = xref.newDictStream(buf)
+    fontFile.addNumber("Length1", Length1)
+    descriptor.addElement("FontFile2", fontFile)
+
+
   # Only embed font data when renderMode is frmEmbed
   if renderMode == frmEmbed:
     var fontFile = xref.newDictStream(buf)
@@ -134,14 +139,24 @@ begincmap
 <0000> <FFFF>
 endcodespacerange"""
 
-  let toUni2 = """
+  var toUnicode: DictObj
+  if renderMode == frmEmbed:
+    let toUni2 = """
 endcmap
 CMapName currentdict /CMap defineresource pop
 end
 end"""
 
-  let toUni = if ranges.len > 0: toUni1 & "\n" & ranges & toUni2 else: toUni1 & toUni2
-  var toUnicode = xref.newDictStream(toUni)
+    let toUni = if ranges.len > 0: toUni1 & "\n" & ranges & toUni2 else: toUni1 & toUni2
+    toUnicode = xref.newDictStream(toUni)
+  else:
+    let toUni2 = """\x0Aendcmap
+CMapName currentdict /CMap defineresource pop
+end
+end"""
+
+    let toUni = toUni1 & ranges & toUni2
+    toUnicode = xref.newDictStream(toUni)
 
   var fn = newDictObj()
   xref.add(fn)
@@ -166,8 +181,9 @@ proc putFonts*(xref: Pdfxref, fonts: seq[Font]): DictObj =
   var fn: DictObj
 
   for fon in fonts:
-    if fon.subType == FT_BASE14: fn = xref.putBase14Fonts(fon)
-    if fon.subType == FT_TRUETYPE: 
+    if fon.subType == FT_BASE14:
+      fn = xref.putBase14Fonts(fon)
+    if fon.subType == FT_TRUETYPE:
       fn = xref.putTrueTypeFonts(fon, seed, fon.renderMode)
     result.addElement("F" & $fon.ID, fn)
     inc(seed)

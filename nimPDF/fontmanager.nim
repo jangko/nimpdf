@@ -122,7 +122,7 @@ proc GenerateWidths*(f: TTFont, renderMode: FontRenderMode): string =
 
     result = "[ " & widthsParts.join(" ") & " ]"
 
-  of frmDefault, frmPathRendering:
+  of frmPathRendering:
     # When subsetting, GIDs used are sequential newGIDs starting from 1.
     # Sort by newGID to ensure correct order for the widths array.
     f.CH2GID.sort(proc(x,y: tuple[key: int, val: TONGID]):int = cmp(x.val.newGID, y.val.newGID))
@@ -137,6 +137,19 @@ proc GenerateWidths*(f: TTFont, renderMode: FontRenderMode): string =
     if firstGID == -1: return "[]" # No glyphs in subset
 
     result = "[ " & $firstGID & " [ " & widthsArray.join(" ") & " ] ]"
+
+  of frmDefault:
+    f.CH2GID.sort(proc(x,y: tuple[key: int, val: TONGID]):int = cmp(x.val.newGID, y.val.newGID) )
+    var widths = "[ 1["
+    var x = 0
+
+    for gid in values(f.CH2GID):
+      widths.add($f.GetCharWidth(gid.oldGID))
+      if x < f.CH2GID.len-1: widths.add(' ')
+      inc(x)
+
+    widths.add("]]")
+    result = widths
 
 proc GenerateRanges*(f: TTFont): string =
   var entries: seq[string] = @[]
@@ -159,18 +172,18 @@ proc GenerateRanges*(f: TTFont): string =
                         let highSurrogate = 0xD800 + (codePoint shr 10)
                         let lowSurrogate = 0xDC00 + (codePoint and 0x3FF)
                         toHex(highSurrogate, 4).toUpperAscii & toHex(lowSurrogate, 4).toUpperAscii
-        
+
         # ToUnicode CMap maps oldGID (used in content stream) to Unicode
         let entry = "<" & cidHex & "> <" & codeHex & ">"
         entries.add(entry)
-  
-  of frmDefault, frmPathRendering:
+
+  of frmPathRendering:
     # For subset fonts, use the existing logic with newGID
     var usedCids = initHashSet[int]()
     for item in pairs(f.CH2GID):
       let code = item[0]  # Unicode value
       let cid = item[1].newGID  # For subset fonts, content stream uses newGID
-       
+
       # Only include valid CIDs (> 0) and valid Unicode values
       if cid > 0 and code > 0 and not usedCids.contains(cid):
         let cidHex = toHex(cid, 4).toUpperAscii
@@ -183,19 +196,35 @@ proc GenerateRanges*(f: TTFont): string =
                         let highSurrogate = 0xD800 + (codePoint shr 10)
                         let lowSurrogate = 0xDC00 + (codePoint and 0x3FF)
                         toHex(highSurrogate, 4).toUpperAscii & toHex(lowSurrogate, 4).toUpperAscii
-        
+
         # ToUnicode CMap maps character IDs (used in content stream) to Unicode
         let entry = "<" & cidHex & "> <" & codeHex & ">"
         entries.add(entry)
         usedCids.incl(cid)
+
+  of frmDefault:
+    var range: seq[string] = @[]
+    var mapping = ""
+
+    for code, gid in pairs(f.CH2GID):
+      if range.len >= 100:
+        mapping.add("\x0A" & $range.len & " beginbfchar\x0A" & join(range, "\x0A") & "\x0Aendbfchar")
+        range = @[]
+      range.add("<" & toHex(gid.newGID, 4) & "><" & toHex(code, 4) & ">")
+
+    if range.len > 0:
+      mapping.add("\x0A" & $range.len & " beginbfchar\x0A" & join(range, "\x0A") & "\x0Aendbfchar")
+
+    result = mapping
 
   if entries.len > 0:
     result = $entries.len & " beginbfchar\n" & entries.join("\n") & "\nendbfchar\n"
   else:
     result = ""
 
-proc GetDescriptor*(f: TTFont): FontDescriptor =
-  #f.CH2GID.sort(proc(x,y: tuple[key: int, val: TONGID]):int = cmp(x.key, y.key) )
+proc GetDescriptor*(f: TTFont, renderMode: FontRenderMode): FontDescriptor =
+  if renderMode == frmDefault:
+    f.CH2GID.sort(proc(x,y: tuple[key: int, val: TONGID]):int = cmp(x.key, y.key) )
   result = f.font.newFontDescriptor(f.CH2GID)
 
 proc GetSubsetBuffer*(f: TTFont, subsetTag: string, renderMode: FontRenderMode): string =
@@ -217,7 +246,7 @@ method CanWriteVertical*(f: Base14): bool = false
 method CanWriteVertical*(f: TTFont): bool =
   result = f.vmtx != nil
 
-method EscapeString*(f: Font, text: string,): string {.base.} =
+method EscapeString*(f: Font, text: string): string {.base.} =
   discard
 
 
@@ -261,11 +290,18 @@ method EscapeString*(f: TTFont, text: string): string =
     result = ""
     for c in runes(text):
       let charCode = int(c)
-      if f.CH2GID.hasKey(charCode):
-        # For subsetted fonts, use the newGID in the content stream
-        result.add(toHex(f.CH2GID[charCode].newGID, 4))
+      if f.renderMode == frmDefault:
+        if f.CH2GID.hasKey(charCode):
+          let gid = f.CH2GID[charCode].newGID
+          result.add(toHex(gid, 4))
+        else:
+          result.add("0000")
       else:
-        result.add("0000")
+        if f.CH2GID.hasKey(charCode):
+          # For subsetted fonts, use the newGID in the content stream
+          result.add(toHex(f.CH2GID[charCode].newGID, 4))
+        else:
+          result.add("0000")
 
 method GetTextWidth*(f: Font, text: string): TextWidth {.base.} =
   discard
@@ -445,7 +481,6 @@ proc makeTTFont(font: FontDef, searchName: string): TTFont =
   var res: TTFont
   new(res)
 
-  res.ID = 0  # Initialize ID field
   res.subType  = FT_TRUETYPE
   res.searchName = searchName
   res.font     = font
@@ -455,8 +490,10 @@ proc makeTTFont(font: FontDef, searchName: string): TTFont =
   res.glyph    = GLYPHTable(font.getTable(TAG.glyf))
   res.scaleFactor= 1000 / head.UnitsPerEm()
   res.CH2GID   = initOrderedTable[int, TONGID]()
-  res.fullCharMap = initOrderedTable[int, TONGID]()  # Initialize cache
   res.newGID   = 1
+
+  res.fullCharMap = initOrderedTable[int, TONGID]()  # Initialize cache
+  res.ID = 0  # Initialize ID field
   res.renderMode = frmDefault  # Initialize with default render mode
 
   # Pre-populate the full character mapping cache
@@ -534,7 +571,6 @@ proc makeFont*(
 
   var searchName = family
   searchName.add(searchStyle)
-  
 
 
   # First check if font already exists in fontList
@@ -583,7 +619,8 @@ proc makeFont*(
     ff.fontList.add(fon14)
     return fon14
 
-  result = nil
+  result = makeFont(ff, defaultFont, style, enc, renderMode)
+  #result = nil
 
 when isMainModule:
   var ff: FontManager
