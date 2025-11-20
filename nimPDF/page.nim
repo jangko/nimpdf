@@ -84,7 +84,7 @@ type
     images: seq[Image]
     gradients: seq[Gradient]
     fontMan: FontManager
-    gState: GState
+    gState*: GState
     pathStartX, pathStartY, pathEndX, pathEndY: float64
     recordShape: bool
     shapes: seq[Path]
@@ -645,7 +645,7 @@ proc setFontStyle*(a: AcroForm, style: FontStyles) =
 proc setEncoding*(a: AcroForm, enc: EncodingType) =
   a.encoding = enc
 
-proc put(self: ContentBase, text: varargs[string]) =
+proc put*(self: ContentBase, text: varargs[string]) =
   for s in items(text): self.content.add(s)
   self.content.add('\x0A')
 
