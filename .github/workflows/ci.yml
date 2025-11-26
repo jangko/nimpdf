@@ -14,6 +14,8 @@ jobs:
             cpu: amd64
           - os: linux
             cpu: i386
+          - os: linux
+            cpu: arm64
           - os: macos
             cpu: amd64
           - os: windows
@@ -25,8 +27,12 @@ jobs:
               os: linux
             builder: ubuntu-22.04
           - target:
+              os: linux
+              cpu: arm64
+            builder: ubuntu-22.04-arm
+          - target:
               os: macos
-            builder: macos-13
+            builder: macos-14
           - target:
               os: windows
             builder: windows-latest
@@ -60,7 +66,7 @@ jobs:
           chmod 755 external/bin/gcc external/bin/g++
           echo '${{ github.workspace }}/external/bin' >> $GITHUB_PATH
 
-      - name: Restore MinGW-W64 (Windows) from cache
+      - name: Restore llvm-mingw (Windows) from cache
         if: runner.os == 'Windows'
         id: windows-mingw-cache
         uses: actions/cache@v4
@@ -76,24 +82,25 @@ jobs:
           path: external/dlls-${{ matrix.target.cpu }}
           key: 'dlls-${{ matrix.target.cpu }}'
 
-      - name: Install MinGW64 dependency (Windows)
+      - name: Install llvm-mingw dependency (Windows)
         if: >
           steps.windows-mingw-cache.outputs.cache-hit != 'true' &&
           runner.os == 'Windows'
         shell: bash
         run: |
           mkdir -p external
-          MINGW_BASE="https://github.com/brechtsanders/winlibs_mingw/releases/download/11.2.0-12.0.1-9.0.0-r1"
+          LLVM_VERSION="20250730"
+          MINGW_BASE="https://github.com/mstorsjo/llvm-mingw/releases/download/$LLVM_VERSION"
           if [[ '${{ matrix.target.cpu }}' == 'amd64' ]]; then
-            MINGW_URL="$MINGW_BASE/winlibs-x86_64-posix-seh-gcc-11.2.0-mingw-w64-9.0.0-r1.7z"
+            MINGW_URL="$MINGW_BASE/llvm-mingw-$LLVM_VERSION-ucrt-x86_64.zip"
             ARCH=64
           else
-            MINGW_URL="$MINGW_BASE/winlibs-i686-posix-dwarf-gcc-11.2.0-mingw-w64-9.0.0-r1.7z"
+            MINGW_URL="$MINGW_BASE/llvm-mingw-$LLVM_VERSION-ucrt-i686.zip"
             ARCH=32
           fi
-          curl -L "$MINGW_URL" -o "external/mingw-${{ matrix.target.cpu }}.7z"
-          7z x -y "external/mingw-${{ matrix.target.cpu }}.7z" -oexternal/
-          mv external/mingw$ARCH external/mingw-${{ matrix.target.cpu }}
+          curl -L "$MINGW_URL" -o "external/mingw-${{ matrix.target.cpu }}.zip"
+          7z x -y "external/mingw-${{ matrix.target.cpu }}.zip" -oexternal/mingw-${{ matrix.target.cpu }}/
+          mv external/mingw-${{ matrix.target.cpu }}/**/* ./external/mingw-${{ matrix.target.cpu }}
 
       - name: Install DLLs dependencies (Windows)
         if: >
@@ -125,7 +132,7 @@ jobs:
             git ls-remote "https://github.com/$1" "${2:-HEAD}" | cut -f 1
           }
           nimHash=$(getHash nim-lang/Nim '${{ matrix.branch }}')
-          csourcesHash=$(getHash nim-lang/csources_v2)
+          csourcesHash=$(getHash nim-lang/csources_v3)
           echo "nimHash=$nimHash" >> $GITHUB_OUTPUT
           echo "csourcesHash=$csourcesHash" >> $GITHUB_OUTPUT
 
@@ -150,7 +157,7 @@ jobs:
           steps.nim-cache.outputs.cache-hit != 'true'
         uses: actions/checkout@v4
         with:
-          repository: nim-lang/csources_v2
+          repository: nim-lang/csources_v3
           path: csources
           ref: ${{ steps.versions.outputs.csources }}
 
