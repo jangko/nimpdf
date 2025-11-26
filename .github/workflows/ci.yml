@@ -60,7 +60,7 @@ jobs:
           chmod 755 external/bin/gcc external/bin/g++
           echo '${{ github.workspace }}/external/bin' >> $GITHUB_PATH
 
-      - name: Restore MinGW-W64 (Windows) from cache
+      - name: Restore llvm-mingw (Windows) from cache
         if: runner.os == 'Windows'
         id: windows-mingw-cache
         uses: actions/cache@v4
@@ -76,7 +76,7 @@ jobs:
           path: external/dlls-${{ matrix.target.cpu }}
           key: 'dlls-${{ matrix.target.cpu }}'
 
-      - name: Install MinGW64 dependency (Windows)
+      - name: Install llvm-mingw dependency (Windows)
         if: >
           steps.windows-mingw-cache.outputs.cache-hit != 'true' &&
           runner.os == 'Windows'
@@ -85,16 +85,16 @@ jobs:
           mkdir -p external
           LLVM_VERSION="20250730"
           MINGW_BASE="https://github.com/mstorsjo/llvm-mingw/releases/download/$LLVM_VERSION"
-          if [[ '${{ matrix.cpu }}' == 'amd64' ]]; then
+          if [[ '${{ matrix.target.cpu }}' == 'amd64' ]]; then
             MINGW_URL="$MINGW_BASE/llvm-mingw-$LLVM_VERSION-ucrt-x86_64.zip"
             ARCH=64
           else
             MINGW_URL="$MINGW_BASE/llvm-mingw-$LLVM_VERSION-ucrt-i686.zip"
             ARCH=32
           fi
-          curl -L "$MINGW_URL" -o "external/mingw-${{ matrix.cpu }}.zip"
-          7z x -y "external/mingw-${{ matrix.cpu }}.zip" -oexternal/mingw-${{ matrix.cpu }}/
-          mv external/mingw-${{ matrix.cpu }}/**/* ./external/mingw-${{ matrix.cpu }}
+          curl -L "$MINGW_URL" -o "external/mingw-${{ matrix.target.cpu }}.zip"
+          7z x -y "external/mingw-${{ matrix.target.cpu }}.zip" -oexternal/mingw-${{ matrix.target.cpu }}/
+          mv external/mingw-${{ matrix.target.cpu }}/**/* ./external/mingw-${{ matrix.target.cpu }}
 
       - name: Install DLLs dependencies (Windows)
         if: >
@@ -111,7 +111,7 @@ jobs:
           runner.os == 'Windows'
         shell: bash
         run: |
-          echo '${{ github.workspace }}'"/external/mingw-${{ matrix.cpu }}/bin" >> $GITHUB_PATH
+          echo '${{ github.workspace }}'"/external/mingw-${{ matrix.target.cpu }}/bin" >> $GITHUB_PATH
           echo '${{ github.workspace }}'"/external/dlls-${{ matrix.target.cpu }}" >> $GITHUB_PATH
 
       - name: Setup environment
