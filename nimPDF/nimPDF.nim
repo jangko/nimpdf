@@ -9,9 +9,11 @@
 import streams, basic2d
 import image, gstate, path, fontmanager
 import encryptdict, encrypt, page, options, widgets
+import table
 
 export encryptdict.DocInfo, encrypt.EncryptMode, widgets
 export path, gstate, image, fontmanager, page, options
+export table
 
 const
   nimPDFVersion = "0.4.3"
