@@ -14,6 +14,8 @@ jobs:
             cpu: amd64
           - os: linux
             cpu: i386
+          - os: linux
+            cpu: arm64
           - os: macos
             cpu: amd64
           - os: windows
@@ -25,8 +27,12 @@ jobs:
               os: linux
             builder: ubuntu-22.04
           - target:
+              os: linux
+              cpu: arm64
+            builder: ubuntu-22.04-arm64
+          - target:
               os: macos
-            builder: macos-13
+            builder: macos-14
           - target:
               os: windows
             builder: windows-latest
